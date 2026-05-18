@@ -221,12 +221,3 @@ curl http://localhost:8787/metrics
 curl http://localhost:8787/sla
 # {"uptime_percent":99.95,"meets_sla":true,...}
 ```
-
-## Roadmap
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) (coming Phase 1) for the complete multi-phase roadmap. Current focus:
-
-- **Phase 0** (✅ In Progress): Foundation (logging, testing, API docs, health checks)
-- **Phase 1** (📋 Planned): Quality gates (test coverage, CI/CD, performance regression detection)
-- **Phase 2** (📋 Planned): Multiplayer features (matchmaking, chat, leaderboards, social)
-- **Phase 3** (📋 Planned): Advanced (replays, spectator mode, monetization, multi-region)
