@@ -12,6 +12,7 @@ export interface PlayerState {
   id: string;
   position: Vector2;
   lastUpdated: number;
+  lastPing: number;
 }
 
 export interface RoomState {
@@ -24,8 +25,8 @@ export interface MovePayload {
 }
 
 export interface ClientMessage {
-  type: "MOVE";
-  payload: MovePayload;
+  type: "MOVE" | "PING";
+  payload?: any;
 }
 
 // --- Configuration ---
@@ -33,6 +34,7 @@ export interface ClientMessage {
 const TICK_RATE_HZ = 20;
 const TICK_INTERVAL_MS = 1000 / TICK_RATE_HZ; // 50ms
 const MAX_SPEED_PER_TICK = 10.0; // Maximum allowed distance a player can travel in one tick
+const CLIENT_TIMEOUT_MS = 15000; // Disconnect clients silent for 15 seconds
 
 /**
  * The core authoritative GameRoom built on Cloudflare Durable Objects.
@@ -59,6 +61,7 @@ export class GameRoom extends Server {
       id: connection.id,
       position: { x: 0, y: 0 },
       lastUpdated: Date.now(),
+      lastPing: Date.now(),
     };
     this.pendingMutations = true;
     
@@ -87,10 +90,23 @@ export class GameRoom extends Server {
 
       if (parsedMessage.type === "MOVE") {
         this.handlePlayerMove(connection, parsedMessage.payload);
+      } else if (parsedMessage.type === "PING") {
+        this.handlePing(connection);
       }
     } catch (error) {
       console.error("Failed to parse incoming message:", error);
     }
+  }
+
+  /**
+   * Keep-Alive hook: Responds to client pings.
+   */
+  private handlePing(connection: Connection) {
+    const player = this.state.players[connection.id];
+    if (player) {
+      player.lastPing = Date.now();
+    }
+    connection.send(JSON.stringify({ type: "PONG", payload: { serverTime: Date.now() } }));
   }
 
   /**
@@ -140,6 +156,26 @@ export class GameRoom extends Server {
    * Executes once per tick. Broadcasts state snapshots if mutations occurred.
    */
   private tick() {
+    const now = Date.now();
+    let hasStalePlayers = false;
+
+    // Check for stale connections (Timeout)
+    for (const [id, player] of Object.entries(this.state.players)) {
+      if (now - player.lastPing > CLIENT_TIMEOUT_MS) {
+        console.log(`[Timeout] Disconnecting stale player ${id}`);
+        const connection = this.getConnection(id);
+        if (connection) {
+          connection.close(1000, "Timeout");
+        }
+        delete this.state.players[id];
+        hasStalePlayers = true;
+      }
+    }
+
+    if (hasStalePlayers) {
+      this.pendingMutations = true;
+    }
+
     // Only broadcast if the state has changed to save bandwidth
     if (!this.pendingMutations) return;
 
@@ -155,3 +191,4 @@ export class GameRoom extends Server {
     this.pendingMutations = false;
   }
 }
+
