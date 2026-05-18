@@ -1,0 +1,54 @@
+# Nakama + CockroachDB — realistic traditional game server stack.
+# Nakama is the most popular open-source game server (Go, 12K+ stars).
+# This is what indie/AA studios actually deploy on EC2/Docker.
+#
+# Start: podman compose up -d   (or: docker compose up -d)
+# Stop:  podman compose down -v
+
+services:
+  cockroachdb:
+    image: cockroachdb/cockroach:latest-v24.3
+    command: start-single-node --insecure --store=attrs=ssd,path=/var/lib/cockroach
+    restart: unless-stopped
+    volumes:
+      - cockroach-data:/var/lib/cockroach
+    ports:
+      - "26257:26257"
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health?ready=1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  nakama:
+    image: heroiclabs/nakama:3.30.0
+    depends_on:
+      - cockroachdb
+    entrypoint:
+      - "/bin/sh"
+      - "-ec"
+      - |
+        echo "Waiting for CockroachDB..."
+        for i in $$(seq 1 30); do
+          /nakama/nakama migrate up --database.address root@cockroachdb:26257 2>/dev/null && break
+          echo "  attempt $$i/30..."
+          sleep 2
+        done
+        exec /nakama/nakama --database.address root@cockroachdb:26257 \
+          --session.token_expiry_sec 7200 \
+          --logger.level INFO \
+          --socket.server_key "benchmark-key" \
+          --runtime.http_key "benchmark-http"
+    restart: unless-stopped
+    ports:
+      - "7350:7350"  # HTTP API
+      - "7351:7351"  # gRPC
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7350/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  cockroach-data:

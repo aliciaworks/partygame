@@ -1,0 +1,42 @@
+{
+  "app": {
+    "title": "PartyGame 管理者"
+  },
+  "nav": {
+    "dashboard": "ダッシュボード",
+    "modules": "モジュール",
+    "operations": "オペレーション",
+    "players": "プレイヤー",
+    "settings": "設定",
+    "logout": "ログアウト"
+  },
+  "login": {
+    "title": "管理者ログイン",
+    "secret_label": "管理者シークレット",
+    "button": "ログイン"
+  },
+  "common": {
+    "loading": "読み込み中...",
+    "error": "エラー",
+    "refresh": "更新",
+    "enabled": "有効",
+    "disabled": "無効",
+    "wip": "準備中"
+  },
+  "dashboard": {
+    "title": "プラットフォーム概要"
+  },
+  "modules": {
+    "title": "機能モジュール",
+    "toggle_desc": "プラットフォーム全体で {{module}} モジュールを切り替えます。"
+  },
+  "features": {
+    "voiceChat": "ボイスチャット",
+    "textChat": "テキストチャット",
+    "gameUpdates": "ゲームの更新",
+    "matchmaking": "マッチメイキング",
+    "leaderboard": "リーダーボード",
+    "friends": "フレンド",
+    "playerProfile": "プレイヤープロフィール"
+  }
+}

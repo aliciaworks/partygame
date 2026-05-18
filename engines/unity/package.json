@@ -1,0 +1,7 @@
+{
+  "name": "com.partygame.core",
+  "version": "0.0.1",
+  "displayName": "PartyGame SDK",
+  "description": "Auto-generated PartyGame multiplayer types and client SDK.",
+  "unity": "2021.3"
+}

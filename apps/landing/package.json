@@ -1,0 +1,20 @@
+{
+  "name": "@partygame/landing",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "astro": "^7.1.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.7.0",
+    "typescript": "~7.0.2"
+  }
+}

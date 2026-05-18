@@ -1,0 +1,123 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate shared artifacts
+        run: npm run generate:types
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm run test
+
+      - name: Format check
+        run: npm run format
+
+      - name: Package engine SDK artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+
+          # Build a Unity .unitypackage archive from generated SDK assets.
+          rm -rf .ci-unitypackage
+          mkdir -p .ci-unitypackage
+
+          add_unity_asset() {
+            local source_file="$1"
+            local unity_path="$2"
+
+            local guid
+            guid="$(uuidgen | tr -d '-' | tr '[:upper:]' '[:lower:]')"
+            local asset_dir=".ci-unitypackage/${guid}"
+            mkdir -p "${asset_dir}"
+
+            cp "${source_file}" "${asset_dir}/asset"
+            printf '%s\n' "${unity_path}" > "${asset_dir}/pathname"
+
+            if [[ "${source_file}" == *.cs ]]; then
+              cat > "${asset_dir}/asset.meta" <<EOF
+          fileFormatVersion: 2
+          guid: ${guid}
+          MonoImporter:
+            externalObjects: {}
+            serializedVersion: 2
+            defaultReferences: []
+            executionOrder: 0
+            icon: {instanceID: 0}
+            userData:
+            assetBundleName:
+            assetBundleVariant:
+          EOF
+            else
+              cat > "${asset_dir}/asset.meta" <<EOF
+          fileFormatVersion: 2
+          guid: ${guid}
+          DefaultImporter:
+            externalObjects: {}
+            userData:
+            assetBundleName:
+            assetBundleVariant:
+          EOF
+            fi
+          }
+
+          add_unity_asset "engines/unity/Runtime/PartyGameTypes.cs" "Assets/PartyGame/Runtime/PartyGameTypes.cs"
+          add_unity_asset "engines/unity/PartyGame.asmdef" "Assets/PartyGame/PartyGame.asmdef"
+
+          tar -czf dist/PartyGame.unitypackage -C .ci-unitypackage .
+          rm -rf .ci-unitypackage
+
+          # Package Unreal and Godot SDK outputs as zip files.
+          python3 - <<'PY'
+          import os
+          import zipfile
+
+          def zip_dir(source: str, target: str) -> None:
+              with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as archive:
+                  for root, _, files in os.walk(source):
+                      for file_name in files:
+                          file_path = os.path.join(root, file_name)
+                          rel_path = os.path.relpath(file_path, source)
+                          archive.write(file_path, rel_path)
+
+          zip_dir("engines/unreal", "dist/PartyGame-Unreal.zip")
+          zip_dir("engines/godot", "dist/PartyGame-Godot.zip")
+          PY
+
+      - name: Upload engine SDK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: engine-sdks-${{ github.sha }}
+          path: |
+            dist/PartyGame.unitypackage
+            dist/PartyGame-Unreal.zip
+            dist/PartyGame-Godot.zip
+          if-no-files-found: error

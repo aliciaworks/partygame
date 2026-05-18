@@ -1,0 +1,10 @@
+{
+  "name": "@partygame/cli",
+  "version": "0.0.1",
+  "private": true,
+  "description": "AI-agent-friendly CLI for configuring PartyGame platform",
+  "type": "module",
+  "bin": {
+    "partygame": "./bin/partygame.js"
+  }
+}

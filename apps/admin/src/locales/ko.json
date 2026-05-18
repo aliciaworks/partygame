@@ -1,0 +1,42 @@
+{
+  "app": {
+    "title": "PartyGame 관리자"
+  },
+  "nav": {
+    "dashboard": "대시보드",
+    "modules": "모듈",
+    "operations": "운영",
+    "players": "플레이어",
+    "settings": "설정",
+    "logout": "로그아웃"
+  },
+  "login": {
+    "title": "관리자 로그인",
+    "secret_label": "관리자 시크릿",
+    "button": "로그인"
+  },
+  "common": {
+    "loading": "로딩 중...",
+    "error": "오류",
+    "refresh": "새로고침",
+    "enabled": "활성화됨",
+    "disabled": "비활성화됨",
+    "wip": "작업 중"
+  },
+  "dashboard": {
+    "title": "플랫폼 개요"
+  },
+  "modules": {
+    "title": "기능 모듈",
+    "toggle_desc": "플랫폼 전체에서 {{module}} 모듈을 켜거나 끕니다."
+  },
+  "features": {
+    "voiceChat": "음성 채팅",
+    "textChat": "텍스트 채팅",
+    "gameUpdates": "게임 업데이트",
+    "matchmaking": "매치메이킹",
+    "leaderboard": "리더보드",
+    "friends": "친구",
+    "playerProfile": "플레이어 프로필"
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "app": {
+    "title": "PartyGame Admin"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "modules": "Modules",
+    "assets": "Assets",
+    "operations": "Operations",
+    "players": "Players",
+    "settings": "Settings",
+    "logout": "Log Out"
+  },
+  "login": {
+    "title": "Admin Login",
+    "secret_label": "Admin Secret",
+    "button": "Login"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "refresh": "Refresh",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "wip": "Work In Progress"
+  },
+  "dashboard": {
+    "title": "Platform Overview"
+  },
+  "modules": {
+    "title": "Feature Modules",
+    "toggle_desc": "Toggle the {{module}} module across the platform."
+  },
+  "features": {
+    "voiceChat": "Voice Chat",
+    "textChat": "Text Chat",
+    "gameUpdates": "Game Updates",
+    "matchmaking": "Matchmaking",
+    "leaderboard": "Leaderboard",
+    "friends": "Friends",
+    "playerProfile": "Player Profile",
+    "watermark": "Hidden Watermark"
+  },
+  "assets": {
+    "title": "Asset Manager",
+    "upload_title": "Upload Asset",
+    "upload_desc": "Upload game assets with hidden watermarking and A/B/C testing variants.",
+    "name_label": "Asset Name",
+    "file_label": "Asset File",
+    "watermark_enable": "Enable Hidden Watermark",
+    "variant_count": "A/B/C Test Variants",
+    "variant_hint": "{{count}} uniquely watermarked copies.",
+    "processing": "Processing variants...",
+    "uploading": "Uploading...",
+    "upload_watermarked": "Upload {{count}} Variants",
+    "upload_btn": "Upload Asset",
+    "asset_list": "Deployed Assets",
+    "col_name": "Name",
+    "col_id": "Asset ID",
+    "col_variants": "Variants",
+    "col_size": "Size",
+    "col_date": "Uploaded",
+    "col_status": "Status",
+    "col_actions": "Actions",
+    "empty": "No assets uploaded yet.",
+    "forensic_title": "Forensic Watermark Extraction",
+    "forensic_desc": "Upload a leaked file to extract its hidden watermark and trace the source.",
+    "extract_btn": "Extract",
+    "watermark_found": "Watermark Found!",
+    "watermark_not_found": "No watermark block found.",
+    "variant_label": "Variant Index"
+  }
+}

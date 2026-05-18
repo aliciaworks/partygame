@@ -1,0 +1,29 @@
+{
+  "name": "partygame",
+  "version": "0.0.1",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "engines/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "dev": "npm run dev --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "format": "prettier --check .",
+    "generate:types": "npm run generate:types --workspace=@partygame/shared",
+    "generate-sdk": "npx @openapitools/openapi-generator-cli generate -i openapi.yaml -g csharp -o sdks/unity --additional-properties=targetFramework=net472,packageName=PartyGameSDK"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.1.1",
+    "autocannon": "^8.0.0",
+    "eslint": "^10.7.0",
+    "prettier": "^3.9.5",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  }
+}
