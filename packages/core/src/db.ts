@@ -4,7 +4,7 @@ import { eq, and, gte, sql } from "drizzle-orm";
 
 // --- Schema Definitions ---
 
-export const players = sqliteTable("players", {
+export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
   balance: integer("balance").notNull().default(0),
 });
@@ -13,6 +13,15 @@ export const inventory = sqliteTable("inventory", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   playerId: text("player_id").notNull(),
   itemId: text("item_id").notNull(),
+  quantity: integer("quantity").notNull().default(1),
+  deletedAt: integer("deleted_at"), // Soft delete timestamp (UNIX epoch)
+});
+
+export const transactions = sqliteTable("transactions", {
+  idempotencyKey: text("idempotency_key").primaryKey(),
+  playerId: text("player_id").notNull(),
+  status: text("status").notNull(), // 'success', 'failed'
+  createdAt: integer("created_at").notNull(),
 });
 
 // --- Game Database Logic ---
@@ -21,56 +30,85 @@ export const inventory = sqliteTable("inventory", {
  * Purchases an item for a player, deducting the cost from their balance
  * and adding the item to their inventory.
  * 
- * Uses an atomic decrement to completely prevent race conditions and 
- * negative balances, even under heavy concurrent requests.
+ * Includes Idempotency Check to prevent double charges on network retries.
  */
 export async function purchaseItem(
   d1db: D1Database,
   playerId: string,
   itemId: string,
-  cost: number
+  cost: number,
+  idempotencyKey: string
 ): Promise<{ success: boolean; message: string }> {
   const db = drizzle(d1db);
 
   try {
-    // We use D1 strict transactions via Drizzle
     const success = await db.transaction(async (tx) => {
-      // 1. Atomic Balance Deduction
-      // Instead of SELECTing the balance, checking it in JS, and then UPDATEing
-      // (which creates a race condition window), we do an atomic UPDATE WHERE.
-      // This ensures that the database engine handles the concurrency check.
-      const updateResult = await tx.update(players)
-        .set({ balance: sql`${players.balance} - ${cost}` })
-        .where(
-          and(
-            eq(players.id, playerId),
-            gte(players.balance, cost) // Crucial check: only update if they have enough
-          )
-        )
-        .returning({ updatedId: players.id });
-
-      // If the array is empty, the WHERE clause failed (insufficient funds or player not found)
-      if (updateResult.length === 0) {
-        // Rollback transaction by returning false or throwing
+      // 0. Idempotency Check
+      const existingTx = await tx.select().from(transactions).where(eq(transactions.idempotencyKey, idempotencyKey)).get();
+      if (existingTx) {
+        // If the transaction already exists and was successful, return true without doing anything.
+        if (existingTx.status === 'success') return true;
+        tx.rollback();
         return false;
       }
 
-      // 2. Insert the purchased item into the inventory
-      await tx.insert(inventory).values({
-        playerId,
-        itemId,
-      });
+      // 1. Atomic Balance Deduction
+      const updateResult = await tx.update(users)
+        .set({ balance: sql`${users.balance} - ${cost}` })
+        .where(
+          and(
+            eq(users.id, playerId),
+            gte(users.balance, cost) 
+          )
+        )
+        .returning({ updatedId: users.id });
+
+      if (updateResult.length === 0) {
+        // Record failed transaction to prevent retries from doing anything else
+        await tx.insert(transactions).values({ idempotencyKey, playerId, status: 'failed', createdAt: Date.now() });
+        tx.rollback();
+        return false;
+      }
+
+      // 2. Insert or update the purchased item in the inventory (ignoring soft-deleted items)
+      const existingItem = await tx.select().from(inventory).where(
+        and(
+          eq(inventory.playerId, playerId),
+          eq(inventory.itemId, itemId),
+          sql`${inventory.deletedAt} IS NULL`
+        )
+      ).get();
+
+      if (existingItem) {
+        await tx.update(inventory)
+          .set({ quantity: sql`${inventory.quantity} + 1` })
+          .where(eq(inventory.id, existingItem.id));
+      } else {
+        await tx.insert(inventory).values({
+          playerId,
+          itemId,
+          quantity: 1,
+        });
+      }
+
+      // 3. Record successful transaction
+      await tx.insert(transactions).values({ idempotencyKey, playerId, status: 'success', createdAt: Date.now() });
 
       return true;
     });
 
     if (!success) {
-      return { success: false, message: "Insufficient balance or player not found." };
+      return { success: false, message: "Transaction failed: Insufficient balance or invalid state." };
     }
 
     return { success: true, message: "Purchase successful." };
   } catch (error) {
+    if (error instanceof Error && error.message.includes("Rollback")) {
+      return { success: false, message: "Transaction failed." };
+    }
     console.error("Database transaction failed:", error);
     return { success: false, message: "Transaction error." };
   }
 }
+
+

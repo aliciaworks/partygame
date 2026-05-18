@@ -2,9 +2,14 @@
   "name": "edgepulse-monorepo",
   "version": "0.0.1",
   "private": true,
+  "workspaces": [
+    "packages/*",
+    "fixtures/*",
+    "clients/*"
+  ],
   "scripts": {
-    "build": "pnpm -r run build",
-    "dev": "pnpm -r run dev"
+    "build": "npm run build --workspaces --if-present",
+    "dev": "npm run dev --workspaces --if-present"
   },
   "devDependencies": {
     "typescript": "^5.4.5"

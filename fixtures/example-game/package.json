@@ -4,8 +4,8 @@
   "private": true,
   "main": "src/index.ts",
   "dependencies": {
-    "@edgepulse/core": "workspace:*",
-    "@edgepulse/auth": "workspace:*",
+    "@edgepulse/core": "*",
+    "@edgepulse/auth": "*",
     "hono": "^4.2.0",
     "partyserver": "^0.0.40"
   },

@@ -1,8 +1,0 @@
-{
-  "name": "@edgepulse/client-ts",
-  "version": "0.0.1",
-  "main": "src/client.ts",
-  "devDependencies": {
-    "typescript": "^5.4.5"
-  }
-}
