@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "typecheck": "npm run check"
+    "typecheck": "npm run check",
+    "deploy": "npm run build && wrangler pages deploy build"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.2.5",
@@ -21,6 +22,7 @@
     "svelte": "^5.28.2",
     "svelte-check": "^4.1.4",
     "typescript": "^5.4.5",
-    "vite": "^6.3.5"
+    "vite": "^6.3.5",
+    "wrangler": "^4.92.0"
   }
 }

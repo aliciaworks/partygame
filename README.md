@@ -49,6 +49,46 @@ This repository uses a native `npm` workspace monorepo structure:
    npm run dev
    ```
 
+## Deployment
+
+### Worker backend
+
+The worker entrypoint is the example game in [fixtures/example-game](fixtures/example-game). Deploy it with Wrangler from that directory:
+
+```bash
+cd fixtures/example-game
+npm run deploy
+```
+
+Before deploying, make sure these values are set in `wrangler.toml`:
+
+- `database_id` for your D1 database
+- any Durable Object migration state you need for the current version
+
+If you changed the Durable Object class name or schema, create and apply a new migration before deploying.
+
+### Pages admin app
+
+The admin UI lives in [pages/admin](pages/admin) and deploys separately as a Cloudflare Pages site:
+
+```bash
+cd pages/admin
+npm run build
+npx wrangler pages deploy build --project-name partygame-admin
+```
+
+If you have not created the Pages project yet, you can do that in the Cloudflare dashboard or let Wrangler create it the first time you deploy.
+
+### Required environment values
+
+The worker backend expects the following runtime bindings or secrets depending on which endpoints you use:
+
+- `DB` for D1
+- `GAME_ROOM` for the Durable Object binding
+- `GOOGLE_CLIENT_ID` for native Google login
+- `APPLE_CLIENT_ID` for native Apple login
+- `AUTH_SESSION_SECRET` for the stateless session token signing key
+
 ## Quality Gates
 
 Run these commands from the repository root before opening a pull request:
