@@ -6,12 +6,10 @@ import {
   verifyAccessToken,
   type JWTPayload,
 } from "@partygame/core";
-import { renderPortalHtml, DEFAULT_BACKEND_URL } from "./frontend";
 import {
   buildVoiceRoomBootstrap,
   isRouteAllowed,
   loadPlatformControls,
-  renderAdminPanelHtml,
   savePlatformControls,
   storeGameUpdateAsset,
   updateSingleControl,
@@ -27,7 +25,6 @@ type ExampleEnv = {
   GAME_ROOM: any;
   JWT_SECRET?: string;
   JWT_REFRESH_SECRET?: string;
-  FRONTEND_BACKEND_URL?: string;
 } & PlatformBindings;
 
 const app = new Hono<{ Bindings: ExampleEnv }>();
@@ -104,15 +101,9 @@ app.use("/admin/*", async (c, next) => {
   return next();
 });
 
-app.get("/", (c) => {
-  const backendUrl = c.env.FRONTEND_BACKEND_URL || DEFAULT_BACKEND_URL;
-  return c.html(renderPortalHtml(backendUrl));
-});
+app.get("/", (c) => c.text("PartyGame backend API"));
 
-app.get("/home", (c) => {
-  const backendUrl = c.env.FRONTEND_BACKEND_URL || DEFAULT_BACKEND_URL;
-  return c.html(renderPortalHtml(backendUrl));
-});
+app.get("/home", (c) => c.text("PartyGame backend API"));
 
 app.post("/api/session/login", async (c) => {
   ensureJwtConfigured(c.env);
@@ -192,10 +183,11 @@ app.get("/rooms/:id", (c) => {
   return c.text(`Connect via WS to room ${roomId}`);
 });
 
-app.get("/admin", async (c) => {
-  const controls = await loadPlatformControls(c.env.CONTROLS_BUCKET);
-  return c.html(renderAdminPanelHtml(controls));
-});
+app.get("/admin", (c) =>
+  c.json({
+    message: "Admin frontend is hosted in apps/admin.",
+  })
+);
 
 app.get("/admin/config", async (c) => {
   const controls = await loadPlatformControls(c.env.CONTROLS_BUCKET);

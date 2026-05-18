@@ -1,196 +1,510 @@
 <script lang="ts">
-  import { alerts, events, metrics, rooms } from "$lib/dashboard";
+  import { onMount } from 'svelte';
+  import {
+    BACKEND_STORAGE_KEY,
+    DEFAULT_BACKEND_URL,
+    EMAIL_STORAGE_KEY,
+    clearPortalSession,
+    fetchApiVersions,
+    fetchBackendHealth,
+    fetchBackendSla,
+    fetchSessionProfile,
+    fetchVoiceBootstrap,
+    loginToBackend,
+    normalizeBackendUrl,
+    readBackendUrl,
+    readPortalSession,
+    saveBackendUrl,
+    savePortalSession,
+    type ApiVersions,
+    type BackendHealth,
+    type BackendSla,
+    type PortalSession,
+    type SessionProfile,
+    type VoiceBootstrap,
+  } from '$lib/portal';
 
-  const filters = ["all", "healthy", "warning", "critical"] as const;
+  type ViewMode = 'boot' | 'login' | 'home';
 
-  let selectedFilter: (typeof filters)[number] = "all";
-  let search = "";
+  let view: ViewMode = 'boot';
+  let busy = false;
+  let statusMessage = 'Loading portal...';
+  let errorMessage = '';
 
-  $: visibleRooms = rooms.filter((room) => {
-    const matchesFilter = selectedFilter === "all" || room.status === selectedFilter;
-    const matchesSearch = room.name.toLowerCase().includes(search.toLowerCase());
+  let backendUrl = DEFAULT_BACKEND_URL;
+  let email = '';
+  let password = '';
+  let roomId = 'control-room';
 
-    return matchesFilter && matchesSearch;
-  });
+  let session: PortalSession | null = null;
+  let profile: SessionProfile | null = null;
+  let health: BackendHealth | null = null;
+  let sla: BackendSla | null = null;
+  let versions: ApiVersions | null = null;
+  let voiceBootstrap: VoiceBootstrap | null = null;
+  let lastSyncedAt = '';
 
-  function statusLabel(status: (typeof rooms)[number]["status"]) {
-    return status === "healthy" ? "stable" : status === "warning" ? "watch" : "intervene";
+  function setError(message: string) {
+    errorMessage = message;
   }
+
+  function clearError() {
+    errorMessage = '';
+  }
+
+  function syncBackendUrl(value: string) {
+    backendUrl = normalizeBackendUrl(value);
+    saveBackendUrl(backendUrl);
+  }
+
+  function cacheSession(nextSession: PortalSession) {
+    session = nextSession;
+    savePortalSession(nextSession);
+  }
+
+  async function loadRuntimeState(activeSession: PortalSession) {
+    const [nextHealth, nextSla, nextVersions] = await Promise.all([
+      fetchBackendHealth(backendUrl),
+      fetchBackendSla(backendUrl),
+      fetchApiVersions(backendUrl),
+    ]);
+
+    health = nextHealth;
+    sla = nextSla;
+    versions = nextVersions;
+    lastSyncedAt = new Date().toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    profile = await fetchSessionProfile(backendUrl, activeSession.accessToken);
+    statusMessage = `Signed in as ${profile.playerName}`;
+    view = 'home';
+  }
+
+  async function restoreSession() {
+    if (!session) {
+      view = 'login';
+      statusMessage = 'Sign in to continue.';
+      return;
+    }
+
+    busy = true;
+    clearError();
+
+    try {
+      await loadRuntimeState(session);
+    } catch (error) {
+      clearPortalSession();
+      session = null;
+      profile = null;
+      view = 'login';
+      statusMessage = 'Session expired. Please sign in again.';
+      setError(error instanceof Error ? error.message : 'Unable to restore session.');
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function handleLogin() {
+    busy = true;
+    clearError();
+
+    try {
+      syncBackendUrl(backendUrl);
+      const nextSession = await loginToBackend(backendUrl, email, password);
+      cacheSession(nextSession);
+      localStorage.setItem(EMAIL_STORAGE_KEY, email);
+      await loadRuntimeState(nextSession);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Login failed.');
+      statusMessage = 'Login failed.';
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function refreshDashboard() {
+    if (!session) {
+      return;
+    }
+
+    busy = true;
+    clearError();
+
+    try {
+      await loadRuntimeState(session);
+      if (voiceBootstrap) {
+        voiceBootstrap = await fetchVoiceBootstrap(backendUrl, session.accessToken, roomId);
+      }
+      statusMessage = `Dashboard refreshed at ${lastSyncedAt}`;
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to refresh dashboard.');
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function buildVoiceBootstrap() {
+    if (!session) {
+      return;
+    }
+
+    busy = true;
+    clearError();
+
+    try {
+      voiceBootstrap = await fetchVoiceBootstrap(backendUrl, session.accessToken, roomId);
+      statusMessage = `Voice bootstrap prepared for ${roomId}`;
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to prepare voice bootstrap.');
+    } finally {
+      busy = false;
+    }
+  }
+
+  function signOut() {
+    clearPortalSession();
+    session = null;
+    profile = null;
+    health = null;
+    sla = null;
+    versions = null;
+    voiceBootstrap = null;
+    password = '';
+    statusMessage = 'Signed out.';
+    clearError();
+    view = 'login';
+  }
+
+  function switchBackend() {
+    signOut();
+  }
+
+  function openBackendHealth() {
+    window.open(`${backendUrl}health`, '_blank', 'noopener,noreferrer');
+  }
+
+  onMount(async () => {
+    backendUrl = readBackendUrl();
+    email = localStorage.getItem(EMAIL_STORAGE_KEY) ?? '';
+
+    const savedSession = readPortalSession();
+    if (savedSession) {
+      session = savedSession;
+      await restoreSession();
+      return;
+    }
+
+    view = 'login';
+    statusMessage = `Backend selected: ${backendUrl}`;
+  });
 </script>
 
 <svelte:head>
-  <title>PartyGame Control Deck</title>
+  <title>PartyGame Portal</title>
   <meta
     name="description"
-    content="Management interface for PartyGame: rooms, moderation, anti-cheat, and live operations."
+    content="Login-gated PartyGame portal with configurable backend selection and live operations view."
   />
 </svelte:head>
 
-<div class="shell">
-  <aside class="sidebar panel">
-    <div>
-      <p class="eyebrow mono">ADMIN / CONTROL PLANE</p>
-      <h1>PartyGame Control Deck</h1>
-      <p class="lede">
-        Operational view for rooms, abuse signals, purchase safety, and token health.
-      </p>
+<div class="page-shell">
+  <header class="topbar panel">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <div>
+        <p class="eyebrow mono">PARTYGAME / PORTAL</p>
+        <h1>Control the backend from SvelteKit.</h1>
+      </div>
     </div>
 
-    <nav class="nav">
-      <a href="#rooms">Rooms</a>
-      <a href="#alerts">Alerts</a>
-      <a href="#economy">Economy</a>
-      <a href="#timeline">Timeline</a>
-    </nav>
+    <div class="status-pills">
+      <span class="pill">Backend: {backendUrl}</span>
+      <span class="pill">{session ? `Signed in as ${session.playerName}` : 'Not signed in'}</span>
+    </div>
+  </header>
 
-    <section class="sidebar-card">
-      <span class="mono sidebar-label">Deployment</span>
-      <strong>pages/admin</strong>
-      <p>Static SvelteKit interface deployed separately from the worker backend.</p>
-    </section>
-  </aside>
+  {#if view !== 'home'}
+    <main class="auth-grid">
+      <section class="hero panel">
+        <p class="eyebrow mono">SECURE ENTRY</p>
+        <h2>Login first, then the dashboard appears.</h2>
+        <p>
+          All frontend work lives here in SvelteKit. The worker stays backend-only,
+          and the backend URL can be changed directly in this page.
+        </p>
 
-  <main class="workspace">
-    <header class="topbar panel">
-      <div>
-        <p class="eyebrow mono">LIVE OPERATIONS</p>
-        <h2>Monitor, triage, and intervene without touching the worker runtime.</h2>
-      </div>
-
-      <div class="topbar-actions">
-        <label class="searchbox">
-          <span class="mono">Search room</span>
-          <input bind:value={search} type="search" placeholder="rift-echo" />
-        </label>
-        <button class="cta">Open incident board</button>
-      </div>
-    </header>
-
-    <section class="metrics">
-      {#each metrics as metric}
-        <article class="metric panel">
-          <span class="mono metric-label">{metric.label}</span>
-          <div class="metric-value-row">
-            <strong>{metric.value}</strong>
-            <span class="metric-delta">{metric.delta}</span>
-          </div>
-          <p>{metric.detail}</p>
-        </article>
-      {/each}
-    </section>
-
-    <section class="grid">
-      <article id="rooms" class="panel room-panel">
-        <div class="panel-head">
+        <div class="hero-notes">
           <div>
-            <p class="eyebrow mono">ROOMS</p>
-            <h3>Active room health</h3>
+            <span class="mono">Default backend</span>
+            <strong>{DEFAULT_BACKEND_URL}</strong>
           </div>
-
-          <div class="filters">
-            {#each filters as filter}
-              <button
-                class:selected={selectedFilter === filter}
-                on:click={() => (selectedFilter = filter)}
-              >
-                {filter}
-              </button>
-            {/each}
+          <div>
+            <span class="mono">Stored locally</span>
+            <strong>backend URL + session</strong>
           </div>
         </div>
 
-        <div class="table">
-          {#each visibleRooms as room}
-            <div class="room-row">
+        <div class="hero-banner">
+          <strong>What this portal does</strong>
+          <p>
+            Login gates the homepage, syncs backend health, prepares voice bootstrap
+            data, and keeps the selected backend editable without touching Wrangler.
+          </p>
+        </div>
+      </section>
+
+      <section class="login-card panel">
+        <p class="eyebrow mono">SIGN IN</p>
+        <h2>Enter your backend and authenticate.</h2>
+
+        <form class="login-form" on:submit|preventDefault={handleLogin}>
+          <label>
+            <span>Backend URL</span>
+            <input
+              bind:value={backendUrl}
+              type="url"
+              placeholder="https://partygame-b5j.pages.dev/"
+              on:blur={() => syncBackendUrl(backendUrl)}
+            />
+          </label>
+
+          <label>
+            <span>Email</span>
+            <input bind:value={email} type="email" placeholder="pilot@partygame.dev" required />
+          </label>
+
+          <label>
+            <span>Password</span>
+            <input bind:value={password} type="password" placeholder="••••••••" required />
+          </label>
+
+          <div class="form-actions">
+            <button class="primary" type="submit" disabled={busy}>
+              {busy ? 'Working...' : 'Sign in'}
+            </button>
+            <button class="ghost" type="button" on:click={() => syncBackendUrl(DEFAULT_BACKEND_URL)}>
+              Reset backend
+            </button>
+          </div>
+        </form>
+
+        <div class="status-box">
+          <span class="mono">Status</span>
+          <strong>{statusMessage}</strong>
+          {#if errorMessage}
+            <p class="error">{errorMessage}</p>
+          {/if}
+        </div>
+      </section>
+    </main>
+  {:else}
+    <main class="home-layout">
+      <aside class="sidebar panel">
+        <div>
+          <p class="eyebrow mono">LIVE SESSION</p>
+          <h2>{profile?.playerName}</h2>
+          <p class="lede">
+            {profile?.playerId}
+            <br />
+            {backendUrl}
+          </p>
+        </div>
+
+        <div class="sidebar-stack">
+          <div class="sidebar-card">
+            <span class="mono">Voice chat</span>
+            <strong>{session?.voiceEnabled ? 'Enabled' : 'Disabled'}</strong>
+            <p>Voice bootstrap is generated against the selected backend.</p>
+          </div>
+
+          <div class="sidebar-card">
+            <span class="mono">Backend state</span>
+            <strong>{health?.status ?? 'unknown'}</strong>
+            <p>Health and SLA are pulled from the backend at runtime.</p>
+          </div>
+
+          <div class="sidebar-actions">
+            <button class="ghost full" type="button" on:click={switchBackend}>Switch backend</button>
+            <button class="ghost full" type="button" on:click={openBackendHealth}>Open health</button>
+            <button class="danger full" type="button" on:click={signOut}>Sign out</button>
+          </div>
+        </div>
+      </aside>
+
+      <section class="workspace">
+        <header class="panel workspace-header">
+          <div>
+            <p class="eyebrow mono">CONTROL CENTER</p>
+            <h2>Operational dashboard for the selected backend.</h2>
+          </div>
+
+          <div class="workspace-actions">
+            <label>
+              <span class="mono">Room ID</span>
+              <input bind:value={roomId} type="text" placeholder="control-room" />
+            </label>
+            <button class="primary" type="button" on:click={buildVoiceBootstrap} disabled={busy}>
+              Build voice bootstrap
+            </button>
+            <button class="ghost" type="button" on:click={refreshDashboard} disabled={busy}>
+              Refresh data
+            </button>
+          </div>
+        </header>
+
+        <section class="metric-grid">
+          <article class="metric panel">
+            <span class="mono">Session</span>
+            <strong>{profile?.playerName ?? 'Signed in'}</strong>
+            <p>{profile?.playerId}</p>
+          </article>
+
+          <article class="metric panel">
+            <span class="mono">Backend health</span>
+            <strong>{health?.status ?? 'unknown'}</strong>
+            <p>{health?.timestamp ?? 'Not refreshed yet'}</p>
+          </article>
+
+          <article class="metric panel">
+            <span class="mono">SLA</span>
+            <strong>{sla?.uptime_percent ? `${sla.uptime_percent.toFixed(2)}%` : 'n/a'}</strong>
+            <p>{sla?.meets_sla ? 'Meeting target' : 'Target pending'}</p>
+          </article>
+
+          <article class="metric panel">
+            <span class="mono">API version</span>
+            <strong>{versions?.current ?? 'n/a'}</strong>
+            <p>{versions?.supported?.join(', ') ?? 'No version data yet'}</p>
+          </article>
+        </section>
+
+        <section class="content-grid">
+          <article class="panel card-block">
+            <div class="section-head">
               <div>
-                <strong>{room.name}</strong>
-                <p class="mono">{room.region}</p>
+                <p class="eyebrow mono">RUNTIME STATE</p>
+                <h3>Backend health and readiness</h3>
               </div>
-              <div>
-                <span>{room.players}/{room.maxPlayers}</span>
-                <p class="mono">{room.tick} • {room.ping}</p>
-              </div>
-              <div class={`pill ${room.status}`}>{statusLabel(room.status)}</div>
-              <div class="mono">{room.antiCheat}</div>
+              <span class="pill subtle">{lastSyncedAt ? `Updated ${lastSyncedAt}` : 'Idle'}</span>
             </div>
-          {/each}
-        </div>
-      </article>
 
-      <article id="alerts" class="panel alert-panel">
-        <div class="panel-head">
-          <div>
-            <p class="eyebrow mono">ABUSE SIGNALS</p>
-            <h3>Moderation queue</h3>
-          </div>
-        </div>
-
-        <div class="alert-list">
-          {#each alerts as alert}
-            <article class={`alert ${alert.tone}`}>
-              <strong>{alert.title}</strong>
-              <p>{alert.body}</p>
-            </article>
-          {/each}
-        </div>
-      </article>
-
-      <article id="economy" class="panel economy-panel">
-        <div class="panel-head">
-          <div>
-            <p class="eyebrow mono">ECONOMY</p>
-            <h3>Purchase protection</h3>
-          </div>
-        </div>
-
-        <div class="economy-grid">
-          <div class="economy-card">
-            <span class="mono">Idempotency</span>
-            <strong>Hard fail on duplicate keys</strong>
-            <p>Prevents double spend during retries and flaky mobile connections.</p>
-          </div>
-          <div class="economy-card">
-            <span class="mono">Balance guard</span>
-            <strong>Atomic deductions</strong>
-            <p>Transactions are rejected if the account cannot cover the cost up front.</p>
-          </div>
-        </div>
-      </article>
-
-      <article id="timeline" class="panel timeline-panel">
-        <div class="panel-head">
-          <div>
-            <p class="eyebrow mono">EVENTS</p>
-            <h3>Recent activity</h3>
-          </div>
-        </div>
-
-        <ol class="timeline">
-          {#each events as event}
-            <li>
-              <span class="mono">{event.time}</span>
+            <div class="info-list">
               <div>
-                <strong>{event.title}</strong>
-                <p>{event.detail}</p>
+                <span class="mono">Health</span>
+                <strong>{health?.status ?? 'unknown'}</strong>
               </div>
-            </li>
-          {/each}
-        </ol>
-      </article>
-    </section>
-  </main>
+              <div>
+                <span class="mono">Uptime</span>
+                <strong>{health?.uptime_ms ? `${Math.round(health.uptime_ms / 1000)}s` : 'n/a'}</strong>
+              </div>
+              <div>
+                <span class="mono">SLA target</span>
+                <strong>{sla?.sla_target_uptime ? `${sla.sla_target_uptime}%` : 'n/a'}</strong>
+              </div>
+              <div>
+                <span class="mono">Last incident</span>
+                <strong>{sla?.last_incident ?? 'none'}</strong>
+              </div>
+            </div>
+
+            {#if health?.checks}
+              <div class="chip-row">
+                {#each Object.entries(health.checks) as [name, value]}
+                  <span class:chip={true} class:good={value} class:bad={!value}>
+                    {name}: {value ? 'ok' : 'down'}
+                  </span>
+                {/each}
+              </div>
+            {/if}
+          </article>
+
+          <article class="panel card-block">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow mono">VOICE</p>
+                <h3>RealtimeKit bootstrap manifest</h3>
+              </div>
+              <span class="pill subtle">{session?.voiceEnabled ? 'Available' : 'Disabled'}</span>
+            </div>
+
+            {#if voiceBootstrap}
+              <pre>{JSON.stringify(voiceBootstrap, null, 2)}</pre>
+            {:else}
+              <div class="empty-state">
+                <strong>No bootstrap yet</strong>
+                <p>Click the button above to build a voice room bootstrap for the selected room.</p>
+              </div>
+            {/if}
+          </article>
+
+          <article class="panel card-block wide">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow mono">API SURFACE</p>
+                <h3>Version and support matrix</h3>
+              </div>
+            </div>
+
+            <div class="support-grid">
+              <div>
+                <span class="mono">Current</span>
+                <strong>{versions?.current ?? 'n/a'}</strong>
+              </div>
+              <div>
+                <span class="mono">Supported</span>
+                <strong>{versions?.supported?.length ?? 0}</strong>
+              </div>
+              <div>
+                <span class="mono">Deprecated</span>
+                <strong>{versions?.deprecated?.length ?? 0}</strong>
+              </div>
+              <div>
+                <span class="mono">Backend URL</span>
+                <strong>{backendUrl}</strong>
+              </div>
+            </div>
+          </article>
+
+          <article class="panel card-block">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow mono">OPERATIONS</p>
+                <h3>Quick actions</h3>
+              </div>
+            </div>
+
+            <div class="stack">
+              <button class="ghost" type="button" on:click={refreshDashboard} disabled={busy}>Refresh backend data</button>
+              <button class="ghost" type="button" on:click={openBackendHealth}>Open backend health</button>
+              <button class="ghost" type="button" on:click={() => window.open(`${backendUrl}api-versions`, '_blank', 'noopener,noreferrer')}>Open API versions</button>
+            </div>
+          </article>
+        </section>
+
+        <footer class="status-strip panel">
+          <div>
+            <span class="mono">Portal status</span>
+            <strong>{statusMessage}</strong>
+          </div>
+          {#if errorMessage}
+            <div class="error-badge">{errorMessage}</div>
+          {/if}
+        </footer>
+      </section>
+    </main>
+  {/if}
 </div>
 
 <style>
-  .shell {
-    display: grid;
-    grid-template-columns: 320px minmax(0, 1fr);
-    gap: 24px;
+  .page-shell {
+    position: relative;
     min-height: 100vh;
     padding: 24px;
-    box-sizing: border-box;
   }
 
+  .topbar,
   .panel {
     background: var(--bg-elevated);
     border: 1px solid var(--border);
@@ -198,28 +512,28 @@
     backdrop-filter: blur(18px);
   }
 
-  .sidebar {
-    position: sticky;
-    top: 24px;
+  .topbar {
     display: flex;
-    flex-direction: column;
     justify-content: space-between;
-    gap: 24px;
-    padding: 28px;
+    gap: 18px;
+    align-items: center;
+    padding: 22px 26px;
     border-radius: 28px;
+    margin-bottom: 24px;
   }
 
-  .workspace {
+  .brand {
     display: flex;
-    flex-direction: column;
-    gap: 24px;
+    align-items: center;
+    gap: 14px;
   }
 
-  .eyebrow {
-    margin: 0 0 10px;
-    color: var(--accent);
-    letter-spacing: 0.18em;
-    font-size: 0.72rem;
+  .brand-mark {
+    width: 48px;
+    height: 48px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-warm));
+    box-shadow: 0 16px 34px rgba(124, 240, 255, 0.18);
   }
 
   h1,
@@ -231,318 +545,415 @@
   }
 
   h1 {
-    font-size: clamp(2.4rem, 4vw, 3.4rem);
-    line-height: 0.95;
-    max-width: 10ch;
+    font-size: clamp(1.4rem, 3vw, 2rem);
+    line-height: 1.02;
   }
 
   h2 {
-    font-size: clamp(1.5rem, 2vw, 2.1rem);
-    line-height: 1.05;
+    font-size: clamp(1.6rem, 3vw, 2.6rem);
+    line-height: 1;
   }
 
   h3 {
-    font-size: 1.15rem;
+    font-size: 1.1rem;
   }
 
-  .lede,
-  .sidebar-card p,
-  .metric p,
-  .alert p,
-  .economy-card p,
-  .timeline p {
-    color: var(--muted);
-    line-height: 1.55;
-  }
-
-  .nav {
-    display: grid;
-    gap: 10px;
-  }
-
-  .nav a {
-    padding: 12px 14px;
-    border-radius: 14px;
-    border: 1px solid transparent;
-    color: var(--text);
-    background: rgba(255, 255, 255, 0.02);
-  }
-
-  .nav a:hover {
-    border-color: var(--border);
-    background: rgba(255, 255, 255, 0.05);
-  }
-
-  .sidebar-card {
-    padding: 18px;
-    border-radius: 20px;
-    background: var(--bg-soft);
-    border: 1px solid var(--border);
-  }
-
-  .sidebar-label,
-  .metric-label,
-  .searchbox span,
-  .room-row p,
-  .timeline span {
-    color: var(--muted);
-    font-size: 0.82rem;
-  }
-
-  .topbar {
-    display: flex;
-    justify-content: space-between;
-    gap: 18px;
-    align-items: end;
-    padding: 26px 28px;
-    border-radius: 28px;
-  }
-
-  .topbar-actions {
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-    align-items: end;
-  }
-
-  .searchbox {
-    display: grid;
-    gap: 8px;
-  }
-
-  .searchbox input {
-    min-width: 220px;
-    border-radius: 14px;
-    border: 1px solid var(--border);
-    padding: 12px 14px;
-    color: var(--text);
-    background: rgba(0, 0, 0, 0.18);
-    outline: none;
-  }
-
-  .searchbox input:focus {
-    border-color: rgba(124, 240, 255, 0.6);
-    box-shadow: 0 0 0 3px rgba(124, 240, 255, 0.12);
-  }
-
-  .cta,
-  .filters button {
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 12px 16px;
-    color: var(--text);
-    background: rgba(255, 255, 255, 0.04);
-  }
-
-  .cta {
-    background: linear-gradient(135deg, rgba(124, 240, 255, 0.18), rgba(255, 184, 108, 0.18));
-  }
-
-  .metrics {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 18px;
-  }
-
-  .metric {
-    padding: 20px;
-    border-radius: 24px;
-  }
-
-  .metric-value-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 12px;
-    margin: 12px 0 10px;
-  }
-
-  .metric strong {
-    font-size: clamp(1.9rem, 3vw, 2.7rem);
-  }
-
-  .metric-delta {
+  .eyebrow {
+    margin: 0 0 10px;
     color: var(--accent);
-    font-size: 0.85rem;
-  }
-
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 18px;
-  }
-
-  .room-panel,
-  .alert-panel,
-  .economy-panel,
-  .timeline-panel {
-    padding: 24px;
-    border-radius: 28px;
-  }
-
-  .panel-head {
-    display: flex;
-    justify-content: space-between;
-    gap: 16px;
-    align-items: start;
-    margin-bottom: 18px;
-  }
-
-  .filters {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-
-  .filters button.selected {
-    background: rgba(124, 240, 255, 0.14);
-    border-color: rgba(124, 240, 255, 0.4);
-  }
-
-  .table {
-    display: grid;
-    gap: 12px;
-  }
-
-  .room-row {
-    display: grid;
-    grid-template-columns: minmax(140px, 1.5fr) 1fr 110px 1fr;
-    gap: 12px;
-    align-items: center;
-    padding: 14px;
-    border-radius: 18px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.04);
-  }
-
-  .pill {
-    width: fit-content;
-    padding: 8px 12px;
-    border-radius: 999px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.18em;
     font-size: 0.72rem;
   }
 
-  .pill.healthy {
-    color: var(--success);
-    background: rgba(125, 255, 181, 0.1);
+  .status-pills {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 10px;
   }
 
-  .pill.warning {
-    color: var(--accent-warm);
-    background: rgba(255, 184, 108, 0.1);
+  .pill {
+    padding: 10px 14px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--muted);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  .pill.critical {
-    color: var(--danger);
-    background: rgba(255, 107, 122, 0.1);
+  .pill.subtle {
+    background: rgba(124, 240, 255, 0.08);
+    color: var(--text);
   }
 
-  .alert-list {
+  .auth-grid {
     display: grid;
-    gap: 12px;
+    grid-template-columns: minmax(0, 1.1fr) minmax(360px, 520px);
+    gap: 24px;
   }
 
-  .alert {
+  .hero,
+  .login-card {
+    padding: 28px;
+    border-radius: 28px;
+  }
+
+  .hero {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 18px;
+  }
+
+  .hero > p,
+  .lede,
+  .status-box p,
+  .sidebar-card p,
+  .card-block p,
+  .empty-state p {
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .hero-notes {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .hero-notes > div,
+  .hero-banner,
+  .sidebar-card,
+  .metric,
+  .card-block,
+  .status-strip,
+  .login-card {
+    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .hero-notes > div {
     padding: 16px;
-    border-radius: 18px;
-    border: 1px solid transparent;
   }
 
-  .alert.danger {
-    border-color: rgba(255, 107, 122, 0.25);
+  .hero-notes span,
+  .sidebar-card span,
+  .metric span,
+  .card-block span,
+  .status-strip span,
+  .status-box span {
+    display: block;
+    color: var(--muted);
+    font-size: 0.82rem;
+    margin-bottom: 8px;
+  }
+
+  .hero-banner {
+    padding: 18px;
+  }
+
+  .login-form {
+    display: grid;
+    gap: 14px;
+    margin-top: 18px;
+  }
+
+  label {
+    display: grid;
+    gap: 8px;
+  }
+
+  label span {
+    color: #dfe8ff;
+    font-size: 0.9rem;
+  }
+
+  input {
+    width: 100%;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 14px 16px;
+    color: var(--text);
+    background: rgba(6, 12, 24, 0.8);
+    outline: none;
+  }
+
+  input:focus {
+    border-color: rgba(124, 240, 255, 0.7);
+    box-shadow: 0 0 0 4px rgba(124, 240, 255, 0.12);
+  }
+
+  .form-actions,
+  .workspace-actions,
+  .sidebar-actions,
+  .stack {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .workspace-actions {
+    justify-content: flex-end;
+    align-items: end;
+  }
+
+  .workspace-actions label {
+    min-width: 240px;
+  }
+
+  button {
+    border: 0;
+    border-radius: 16px;
+    padding: 13px 16px;
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    cursor: pointer;
+    font: inherit;
+    transition: transform 0.18s ease, opacity 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  button:hover {
+    transform: translateY(-1px);
+  }
+
+  button:disabled {
+    opacity: 0.65;
+    cursor: progress;
+  }
+
+  .primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #05131d;
+    font-weight: 700;
+    box-shadow: 0 18px 34px rgba(124, 240, 255, 0.12);
+  }
+
+  .ghost {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .danger {
     background: rgba(255, 107, 122, 0.08);
+    border-color: rgba(255, 107, 122, 0.24);
+    color: #ffdce1;
   }
 
-  .alert.warning {
-    border-color: rgba(255, 184, 108, 0.22);
-    background: rgba(255, 184, 108, 0.08);
+  .full {
+    width: 100%;
+    justify-content: center;
   }
 
-  .alert.info {
-    border-color: rgba(124, 240, 255, 0.18);
-    background: rgba(124, 240, 255, 0.06);
-  }
-
-  .economy-grid {
-    display: grid;
-    gap: 12px;
-  }
-
-  .economy-card {
+  .status-box,
+  .sidebar-card,
+  .empty-state {
     padding: 16px;
+    border-radius: 20px;
+  }
+
+  .status-box {
+    margin-top: 20px;
+  }
+
+  .error {
+    color: #ffb6bf;
+    margin-top: 8px;
+  }
+
+  .home-layout {
+    display: grid;
+    grid-template-columns: 320px minmax(0, 1fr);
+    gap: 24px;
+  }
+
+  .sidebar {
+    position: sticky;
+    top: 24px;
+    padding: 24px;
+    border-radius: 28px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 24px;
+  }
+
+  .sidebar-stack {
+    display: grid;
+    gap: 14px;
+  }
+
+  .sidebar-card strong,
+  .metric strong,
+  .card-block strong,
+  .status-strip strong {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 1.05rem;
+  }
+
+  .workspace {
+    display: grid;
+    gap: 20px;
+  }
+
+  .workspace-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    align-items: end;
+    padding: 22px 24px;
+    border-radius: 28px;
+  }
+
+  .metric-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .metric {
+    padding: 18px;
+  }
+
+  .content-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .card-block {
+    padding: 20px;
+  }
+
+  .card-block.wide {
+    grid-column: 1 / -1;
+  }
+
+  .section-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: start;
+    margin-bottom: 16px;
+  }
+
+  .info-list,
+  .support-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .info-list > div,
+  .support-grid > div {
+    padding: 14px;
     border-radius: 18px;
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.05);
   }
 
-  .economy-card strong {
-    display: block;
-    margin: 8px 0;
+  .chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 16px;
   }
 
-  .timeline {
-    list-style: none;
+  .chip {
+    padding: 8px 10px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+  }
+
+  .chip.good {
+    background: rgba(125, 255, 181, 0.08);
+    border-color: rgba(125, 255, 181, 0.18);
+    color: #d7ffe9;
+  }
+
+  .chip.bad {
+    background: rgba(255, 107, 122, 0.08);
+    border-color: rgba(255, 107, 122, 0.18);
+    color: #ffdbe0;
+  }
+
+  pre {
     margin: 0;
-    padding: 0;
+    padding: 18px;
+    border-radius: 20px;
+    background: rgba(2, 8, 18, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    overflow: auto;
+    color: #bfe8ff;
+    font-size: 0.84rem;
+    line-height: 1.5;
+  }
+
+  .empty-state {
+    min-height: 152px;
     display: grid;
+    align-content: center;
+    gap: 8px;
+  }
+
+  .status-strip {
+    display: flex;
+    justify-content: space-between;
     gap: 14px;
+    align-items: center;
+    padding: 18px 22px;
+    border-radius: 24px;
   }
 
-  .timeline li {
-    display: grid;
-    grid-template-columns: 72px 1fr;
-    gap: 12px;
-    align-items: start;
-    padding: 14px;
-    border-radius: 18px;
-    background: rgba(255, 255, 255, 0.03);
+  .error-badge {
+    padding: 10px 12px;
+    border-radius: 16px;
+    background: rgba(255, 107, 122, 0.08);
+    border: 1px solid rgba(255, 107, 122, 0.18);
+    color: #ffdbe0;
   }
 
-  @media (max-width: 1080px) {
-    .shell {
+  @media (max-width: 1100px) {
+    .auth-grid,
+    .home-layout,
+    .metric-grid,
+    .content-grid,
+    .info-list,
+    .support-grid {
       grid-template-columns: 1fr;
+    }
+
+    .workspace-header,
+    .topbar,
+    .status-strip {
+      flex-direction: column;
+      align-items: stretch;
     }
 
     .sidebar {
       position: static;
     }
-
-    .metrics,
-    .grid {
-      grid-template-columns: 1fr;
-    }
   }
 
   @media (max-width: 720px) {
-    .shell {
+    .page-shell {
       padding: 14px;
     }
 
-    .topbar,
-    .room-panel,
-    .alert-panel,
-    .economy-panel,
-    .timeline-panel,
+    .hero,
+    .login-card,
+    .sidebar,
+    .workspace-header,
+    .card-block,
     .metric,
-    .sidebar {
+    .status-strip,
+    .topbar {
       border-radius: 22px;
       padding: 18px;
-    }
-
-    .room-row {
-      grid-template-columns: 1fr;
-    }
-
-    .topbar-actions {
-      width: 100%;
-    }
-
-    .searchbox input {
-      min-width: 0;
-      width: 100%;
-      box-sizing: border-box;
     }
   }
 </style>
