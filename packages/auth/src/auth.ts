@@ -1,7 +1,130 @@
 import { betterAuth } from "better-auth";
 import { Hono } from "hono";
+import { SignJWT, createRemoteJWKSet, jwtVerify } from "jose";
 
-export function createAuth(db: any) {
+export interface AuthBindings {
+  DB: D1Database;
+  GOOGLE_CLIENT_ID?: string;
+  APPLE_CLIENT_ID?: string;
+  AUTH_SESSION_SECRET?: string;
+}
+
+type NativeProvider = "google" | "apple";
+
+type VerifiedIdentity = {
+  userId: string;
+  provider: NativeProvider;
+  email?: string;
+};
+
+type NativeSessionClaims = {
+  provider: NativeProvider;
+  email?: string;
+};
+
+function getSessionSecret(env: AuthBindings) {
+  if (!env.AUTH_SESSION_SECRET) {
+    throw new Error("Missing AUTH_SESSION_SECRET configuration.");
+  }
+
+  return new TextEncoder().encode(env.AUTH_SESSION_SECRET);
+}
+
+async function issueNativeSessionToken(
+  identity: VerifiedIdentity,
+  env: AuthBindings,
+) {
+  return new SignJWT({
+    provider: identity.provider,
+    email: identity.email,
+  })
+    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setSubject(identity.userId)
+    .setIssuedAt()
+    .setExpirationTime("15m")
+    .sign(getSessionSecret(env));
+}
+
+async function verifyNativeSessionToken(
+  token: string,
+  env: AuthBindings,
+): Promise<VerifiedIdentity> {
+  const { payload } = await jwtVerify(token, getSessionSecret(env), {
+    algorithms: ["HS256"],
+  });
+
+  if (typeof payload.sub !== "string" || payload.sub.length === 0) {
+    throw new Error("Session token is missing a subject.");
+  }
+
+  const sessionClaims = payload as NativeSessionClaims;
+
+  if (
+    sessionClaims.provider !== "google" &&
+    sessionClaims.provider !== "apple"
+  ) {
+    throw new Error("Session token is missing a provider.");
+  }
+
+  return {
+    userId: payload.sub,
+    provider: sessionClaims.provider,
+    email:
+      typeof sessionClaims.email === "string" ? sessionClaims.email : undefined,
+  };
+}
+
+function getProviderConfig(provider: NativeProvider, env: AuthBindings) {
+  if (provider === "google") {
+    return {
+      audience: env.GOOGLE_CLIENT_ID,
+      issuer: "https://accounts.google.com",
+      jwksUrl: "https://www.googleapis.com/oauth2/v3/certs",
+    };
+  }
+
+  return {
+    audience: env.APPLE_CLIENT_ID,
+    issuer: "https://appleid.apple.com",
+    jwksUrl: "https://appleid.apple.com/auth/keys",
+  };
+}
+
+async function verifyNativeIdToken(
+  provider: NativeProvider,
+  idToken: string,
+  env: AuthBindings,
+): Promise<VerifiedIdentity> {
+  const config = getProviderConfig(provider, env);
+
+  if (!config.audience) {
+    throw new Error(
+      `Missing ${provider.toUpperCase()} client ID configuration.`,
+    );
+  }
+
+  const { payload } = await jwtVerify(
+    idToken,
+    createRemoteJWKSet(new URL(config.jwksUrl)),
+    {
+      audience: config.audience,
+      issuer: config.issuer,
+      algorithms: ["RS256"],
+    },
+  );
+
+  if (typeof payload.sub !== "string" || payload.sub.length === 0) {
+    throw new Error("Token payload is missing a subject.");
+  }
+
+  return {
+    userId: `${provider}:${payload.sub}`,
+    provider,
+    email: typeof payload.email === "string" ? payload.email : undefined,
+  };
+}
+
+export function createAuth() {
   return betterAuth({
     database: {
       provider: "sqlite",
@@ -9,94 +132,76 @@ export function createAuth(db: any) {
   });
 }
 
-export const authRouter = new Hono<{ Bindings: { DB: any } }>();
+export const authRouter = new Hono<{ Bindings: AuthBindings }>();
 
-// Task 3: Game Identity & Stateless Token Flow (Better Auth + Hono Integration)
 authRouter.post("/api/auth/login/native", async (c) => {
-  const body = await c.req.json();
-  const idToken = body.idToken;
-  const provider = body.provider; // "google" or "apple"
+  const body = (await c.req.json().catch(() => null)) as {
+    idToken?: unknown;
+    provider?: unknown;
+  } | null;
 
-  if (!idToken || !provider) {
-    return c.json({ success: false, error: "Missing idToken or provider" }, 400);
+  if (
+    !body ||
+    typeof body.idToken !== "string" ||
+    typeof body.provider !== "string"
+  ) {
+    return c.json(
+      { success: false, error: "Missing idToken or provider" },
+      400,
+    );
+  }
+
+  if (body.provider !== "google" && body.provider !== "apple") {
+    return c.json({ success: false, error: "Unsupported provider" }, 400);
   }
 
   try {
-    const auth = createAuth(c.env.DB);
-    
-    // 1. Native ID Token Endpoint
-    // We use Better Auth's programmatic verification API.
-    // In a real environment, this might be a plugin or custom credential verification
-    // Here we simulate validating the token and creating the session without OAuth web redirects.
-    let userId: string;
-    if (provider === "google") {
-      // Validate Google ID Token via provider APIs or Better Auth plugin
-      userId = "google-verified-user-id";
-    } else if (provider === "apple") {
-      userId = "apple-verified-user-id";
-    } else {
-      return c.json({ success: false, error: "Unsupported provider" }, 400);
-    }
+    const identity = await verifyNativeIdToken(
+      body.provider,
+      body.idToken,
+      c.env,
+    );
+    const token = await issueNativeSessionToken(identity, c.env);
 
-    // 2. Cookie Bypass Middleware
-    // Use Better Auth to programmatically create the session for the verified user.
-    // By invoking createSession internally and passing empty headers or extracting the token,
-    // we bypass the standard browser Set-Cookie response and instead capture the raw token.
-    const session = await auth.api.createSession({
-      body: {
-        userId,
-      },
-      headers: new Headers(), // Prevents standard cookie emission internally
-    });
-
-    // 3. Return the stateless sessionToken directly to the native game client
     return c.json({
       success: true,
-      token: session.token,
+      token,
+      provider: identity.provider,
+      email: identity.email,
     });
   } catch (error) {
-    return c.json({ success: false, error: "Authentication failed" }, 401);
+    const message =
+      error instanceof Error ? error.message : "Authentication failed";
+    return c.json({ success: false, error: message }, 401);
   }
 });
 
-// Refresh Token Bridge
-// Games don't have cookies, so when the session token expires, they send it
-// back here (or a separate refresh token) to get a new session.
 authRouter.post("/api/auth/refresh", async (c) => {
-  const body = await c.req.json();
-  const oldToken = body.token;
+  const body = (await c.req.json().catch(() => null)) as {
+    token?: unknown;
+  } | null;
 
-  if (!oldToken) {
+  if (!body || typeof body.token !== "string" || body.token.length === 0) {
     return c.json({ success: false, error: "Missing session token" }, 400);
   }
 
   try {
-    const auth = createAuth(c.env.DB);
-    // 1. Verify the old session manually
-    // In Better Auth, you would typically validate it using their internal API
-    // and if valid/expired-but-refreshable, issue a new one.
-    // For this example, we assume we extract the userId from it and create a new one.
-    
-    // Simulate verification
-    const userId = "extracted-user-id"; // This would come from auth.api.getSession() or similar
-    
-    // 2. Issue new session without cookies
-    const newSession = await auth.api.createSession({
-      body: { userId },
-      headers: new Headers(), // Cookie bypass
-    });
+    const identity = await verifyNativeSessionToken(body.token, c.env);
+    const token = await issueNativeSessionToken(identity, c.env);
 
     return c.json({
       success: true,
-      token: newSession.token,
+      token,
+      provider: identity.provider,
+      email: identity.email,
     });
   } catch (error) {
-    return c.json({ success: false, error: "Refresh failed" }, 401);
+    const message = error instanceof Error ? error.message : "Refresh failed";
+    return c.json({ success: false, error: message }, 401);
   }
 });
 
-// Standard Better Auth handler for web interfaces (fallback)
 authRouter.all("/api/auth/*", (c) => {
-  const auth = createAuth(c.env.DB);
+  const auth = createAuth();
   return auth.handler(c.req.raw);
 });

@@ -2,11 +2,18 @@
   "name": "@partygame/core",
   "version": "0.0.1",
   "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
   "dependencies": {
+    "drizzle-orm": "^0.41.0",
     "partyserver": "^0.0.40"
   },
   "devDependencies": {
-    "typescript": "^5.4.5",
-    "@cloudflare/workers-types": "^4.20240512.0"
+    "@cloudflare/workers-types": "^4.20240512.0",
+    "typescript": "^5.4.5"
   }
 }

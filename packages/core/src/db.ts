@@ -29,7 +29,7 @@ export const transactions = sqliteTable("transactions", {
 /**
  * Purchases an item for a player, deducting the cost from their balance
  * and adding the item to their inventory.
- * 
+ *
  * Includes Idempotency Check to prevent double charges on network retries.
  */
 export async function purchaseItem(
@@ -37,50 +37,77 @@ export async function purchaseItem(
   playerId: string,
   itemId: string,
   cost: number,
-  idempotencyKey: string
+  idempotencyKey: string,
 ): Promise<{ success: boolean; message: string }> {
   const db = drizzle(d1db);
+
+  if (!Number.isInteger(cost) || cost <= 0) {
+    return { success: false, message: "Invalid purchase cost." };
+  }
+
+  if (
+    typeof playerId !== "string" ||
+    playerId.trim().length === 0 ||
+    typeof itemId !== "string" ||
+    itemId.trim().length === 0 ||
+    typeof idempotencyKey !== "string" ||
+    idempotencyKey.trim().length === 0
+  ) {
+    return { success: false, message: "Invalid purchase request." };
+  }
 
   try {
     const success = await db.transaction(async (tx) => {
       // 0. Idempotency Check
-      const existingTx = await tx.select().from(transactions).where(eq(transactions.idempotencyKey, idempotencyKey)).get();
+      const existingTx = await tx
+        .select()
+        .from(transactions)
+        .where(eq(transactions.idempotencyKey, idempotencyKey))
+        .get();
       if (existingTx) {
         // If the transaction already exists and was successful, return true without doing anything.
-        if (existingTx.status === 'success') return true;
+        if (existingTx.status === "success") return true;
         tx.rollback();
         return false;
       }
 
       // 1. Atomic Balance Deduction
-      const updateResult = await tx.update(users)
+      const updateResult = await tx
+        .update(users)
         .set({ balance: sql`${users.balance} - ${cost}` })
-        .where(
-          and(
-            eq(users.id, playerId),
-            gte(users.balance, cost) 
-          )
-        )
+        .where(and(eq(users.id, playerId), gte(users.balance, cost)))
         .returning({ updatedId: users.id });
 
       if (updateResult.length === 0) {
         // Record failed transaction to prevent retries from doing anything else
-        await tx.insert(transactions).values({ idempotencyKey, playerId, status: 'failed', createdAt: Date.now() });
+        await tx
+          .insert(transactions)
+          .values({
+            idempotencyKey,
+            playerId,
+            status: "failed",
+            createdAt: Date.now(),
+          });
         tx.rollback();
         return false;
       }
 
       // 2. Insert or update the purchased item in the inventory (ignoring soft-deleted items)
-      const existingItem = await tx.select().from(inventory).where(
-        and(
-          eq(inventory.playerId, playerId),
-          eq(inventory.itemId, itemId),
-          sql`${inventory.deletedAt} IS NULL`
+      const existingItem = await tx
+        .select()
+        .from(inventory)
+        .where(
+          and(
+            eq(inventory.playerId, playerId),
+            eq(inventory.itemId, itemId),
+            sql`${inventory.deletedAt} IS NULL`,
+          ),
         )
-      ).get();
+        .get();
 
       if (existingItem) {
-        await tx.update(inventory)
+        await tx
+          .update(inventory)
           .set({ quantity: sql`${inventory.quantity} + 1` })
           .where(eq(inventory.id, existingItem.id));
       } else {
@@ -92,13 +119,23 @@ export async function purchaseItem(
       }
 
       // 3. Record successful transaction
-      await tx.insert(transactions).values({ idempotencyKey, playerId, status: 'success', createdAt: Date.now() });
+      await tx
+        .insert(transactions)
+        .values({
+          idempotencyKey,
+          playerId,
+          status: "success",
+          createdAt: Date.now(),
+        });
 
       return true;
     });
 
     if (!success) {
-      return { success: false, message: "Transaction failed: Insufficient balance or invalid state." };
+      return {
+        success: false,
+        message: "Transaction failed: Insufficient balance or invalid state.",
+      };
     }
 
     return { success: true, message: "Purchase successful." };
@@ -110,5 +147,3 @@ export async function purchaseItem(
     return { success: false, message: "Transaction error." };
   }
 }
-
-

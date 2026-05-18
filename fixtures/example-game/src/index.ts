@@ -1,14 +1,12 @@
 import { Hono } from "hono";
 // Import the base GameRoom from the core package
-// @ts-ignore - for now since workspace might not be built
-import { GameRoom } from "@partygame/core/src/room";
-// @ts-ignore
-import { authRouter } from "@partygame/auth/src/auth";
+import { GameRoom } from "@partygame/core";
+import { authRouter } from "@partygame/auth";
 
 // Export the Durable Object so Cloudflare can bind to it
 export { GameRoom };
 
-const app = new Hono<{ Bindings: { DB: any, GAME_ROOM: any } }>();
+const app = new Hono<{ Bindings: { DB: any; GAME_ROOM: any } }>();
 
 // Mount the Auth Router
 app.route("/", authRouter);
@@ -28,5 +26,5 @@ app.get("/rooms/:id", (c) => {
 export default {
   fetch(request: Request, env: any, ctx: ExecutionContext) {
     return app.fetch(request, env, ctx);
-  }
+  },
 };

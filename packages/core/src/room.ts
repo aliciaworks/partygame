@@ -1,45 +1,21 @@
 import { Server } from "partyserver";
 import type { Connection } from "partyserver";
-
-// --- Game Types ---
-
-export interface Vector2 {
-  x: number;
-  y: number;
-}
-
-export interface PlayerState {
-  id: string;
-  position: Vector2;
-  lastUpdated: number;
-  lastPing: number;
-}
-
-export interface RoomState {
-  players: Record<string, PlayerState>;
-}
-
-export interface MovePayload {
-  x: number;
-  y: number;
-}
-
-export interface ClientMessage {
-  type: "MOVE" | "PING";
-  payload?: any;
-}
-
-// --- Configuration ---
-
-const TICK_RATE_HZ = 20;
-const TICK_INTERVAL_MS = 1000 / TICK_RATE_HZ; // 50ms
-const MAX_SPEED_PER_TICK = 10.0; // Maximum allowed distance a player can travel in one tick
-const CLIENT_TIMEOUT_MS = 15000; // Disconnect clients silent for 15 seconds
+import {
+  CLIENT_TIMEOUT_MS,
+  MAX_SPEED_PER_TICK,
+  TICK_INTERVAL_MS,
+  createPlayerState,
+  isMoveWithinBounds,
+  isPlayerTimedOut,
+  normalizeMovePayload,
+  parseClientMessage,
+  type RoomState,
+} from "./room-logic";
 
 /**
  * The core authoritative GameRoom built on Cloudflare Durable Objects.
  */
-export class GameRoom extends Server {
+export class GameRoom extends Server<any> {
   private state: RoomState = { players: {} };
   private tickInterval: ReturnType<typeof setInterval> | null = null;
   private pendingMutations = false;
@@ -57,16 +33,13 @@ export class GameRoom extends Server {
    */
   onConnect(connection: Connection) {
     // Initialize player state
-    this.state.players[connection.id] = {
-      id: connection.id,
-      position: { x: 0, y: 0 },
-      lastUpdated: Date.now(),
-      lastPing: Date.now(),
-    };
+    this.state.players[connection.id] = createPlayerState(connection.id);
     this.pendingMutations = true;
-    
+
     // Welcome the new player with the initial state
-    connection.send(JSON.stringify({ type: "INIT_STATE", payload: this.state }));
+    connection.send(
+      JSON.stringify({ type: "INIT_STATE", payload: this.state }),
+    );
   }
 
   /**
@@ -81,20 +54,21 @@ export class GameRoom extends Server {
    * Intercepts and processes inbound messages from clients.
    */
   onMessage(connection: Connection, message: string | ArrayBuffer) {
-    try {
-      // In a production scenario, you would handle ArrayBuffer for Protobuf.
-      // For this implementation, we assume JSON serialization over strings.
-      if (typeof message !== "string") return;
+    if (typeof message !== "string") {
+      return;
+    }
 
-      const parsedMessage = JSON.parse(message) as ClientMessage;
+    const parsedMessage = parseClientMessage(message);
 
-      if (parsedMessage.type === "MOVE") {
-        this.handlePlayerMove(connection, parsedMessage.payload);
-      } else if (parsedMessage.type === "PING") {
-        this.handlePing(connection);
-      }
-    } catch (error) {
-      console.error("Failed to parse incoming message:", error);
+    if (!parsedMessage) {
+      console.warn(`[Protocol] Ignoring invalid message from ${connection.id}`);
+      return;
+    }
+
+    if (parsedMessage.type === "MOVE") {
+      this.handlePlayerMove(connection, parsedMessage.payload);
+    } else if (parsedMessage.type === "PING") {
+      this.handlePing(connection);
     }
   }
 
@@ -106,32 +80,43 @@ export class GameRoom extends Server {
     if (player) {
       player.lastPing = Date.now();
     }
-    connection.send(JSON.stringify({ type: "PONG", payload: { serverTime: Date.now() } }));
+    connection.send(
+      JSON.stringify({ type: "PONG", payload: { serverTime: Date.now() } }),
+    );
   }
 
   /**
    * Anti-Cheat Hook: Validates movement against a maximum allowed speed.
    */
-  private handlePlayerMove(connection: Connection, payload: MovePayload) {
+  private handlePlayerMove(connection: Connection, payload: unknown) {
     const player = this.state.players[connection.id];
     if (!player) return;
 
-    const currentPos = player.position;
-    const targetPos = payload;
+    const targetPos = normalizeMovePayload(payload);
+    if (!targetPos) {
+      connection.send(
+        JSON.stringify({
+          type: "INVALID_MOVE",
+          payload: { reason: "Malformed payload" },
+        }),
+      );
+      return;
+    }
 
-    // Calculate distance squared (more efficient than full distance with Math.sqrt)
-    const dx = targetPos.x - currentPos.x;
-    const dy = targetPos.y - currentPos.y;
-    const distanceSq = dx * dx + dy * dy;
+    const currentPos = player.position;
 
     // Validate distance against our MAX_SPEED
-    if (distanceSq > MAX_SPEED_PER_TICK * MAX_SPEED_PER_TICK) {
+    if (!isMoveWithinBounds(currentPos, targetPos, MAX_SPEED_PER_TICK)) {
       // Cheat detected or lag spike: Reject mutation and rubberband the client
-      console.warn(`[Anti-Cheat] Player ${connection.id} moved too fast. Rubberbanding.`);
-      connection.send(JSON.stringify({
-        type: "RUBBERBAND",
-        payload: { position: currentPos }
-      }));
+      console.warn(
+        `[Anti-Cheat] Player ${connection.id} moved too fast. Rubberbanding.`,
+      );
+      connection.send(
+        JSON.stringify({
+          type: "RUBBERBAND",
+          payload: { position: currentPos },
+        }),
+      );
       return;
     }
 
@@ -161,7 +146,7 @@ export class GameRoom extends Server {
 
     // Check for stale connections (Timeout)
     for (const [id, player] of Object.entries(this.state.players)) {
-      if (now - player.lastPing > CLIENT_TIMEOUT_MS) {
+      if (isPlayerTimedOut(player.lastPing, now, CLIENT_TIMEOUT_MS)) {
         console.log(`[Timeout] Disconnecting stale player ${id}`);
         const connection = this.getConnection(id);
         if (connection) {
@@ -181,14 +166,13 @@ export class GameRoom extends Server {
 
     const snapshotMessage = JSON.stringify({
       type: "ROOM_STATE",
-      payload: this.state
+      payload: this.state,
     });
 
     // Broadcast absolute state snapshot to all connected clients
     this.broadcast(snapshotMessage);
-    
+
     // Reset mutations flag
     this.pendingMutations = false;
   }
 }
-
