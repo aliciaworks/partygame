@@ -1,6 +1,8 @@
 import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 
+const tsRecommended = tseslint.configs.recommended;
+
 export default tseslint.config(
   {
     ignores: [
@@ -8,11 +10,12 @@ export default tseslint.config(
       "dist/**",
       "node_modules/**",
       ".wrangler/**",
+      "pages/**",
       "package-lock.json",
     ],
   },
   js.configs.recommended,
-  ...tseslint.configs.recommended,
+  ...tsRecommended,
   {
     files: ["**/*.ts", "**/*.tsx"],
     languageOptions: {

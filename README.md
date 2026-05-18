@@ -37,9 +37,16 @@ This repository uses a native `npm` workspace monorepo structure:
 3. Configure your database bindings in `fixtures/example-game/wrangler.toml`.
 
 4. Run the development server for the example game:
+
    ```bash
    cd fixtures/example-game
    npx wrangler dev
+   ```
+
+5. Run the admin control plane separately:
+   ```bash
+   cd pages/admin
+   npm run dev
    ```
 
 ## Quality Gates
@@ -53,6 +60,10 @@ npm run lint
 npm run test
 npm run format
 ```
+
+## Admin UI
+
+The management interface now lives in [pages/admin](pages/admin). It is a separate SvelteKit workspace that is built for Pages-style deployment rather than the Worker runtime, so the control plane stays isolated from the game backend.
 
 ## Native Auth
 

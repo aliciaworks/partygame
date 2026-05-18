@@ -80,14 +80,12 @@ export async function purchaseItem(
 
       if (updateResult.length === 0) {
         // Record failed transaction to prevent retries from doing anything else
-        await tx
-          .insert(transactions)
-          .values({
-            idempotencyKey,
-            playerId,
-            status: "failed",
-            createdAt: Date.now(),
-          });
+        await tx.insert(transactions).values({
+          idempotencyKey,
+          playerId,
+          status: "failed",
+          createdAt: Date.now(),
+        });
         tx.rollback();
         return false;
       }
@@ -119,14 +117,12 @@ export async function purchaseItem(
       }
 
       // 3. Record successful transaction
-      await tx
-        .insert(transactions)
-        .values({
-          idempotencyKey,
-          playerId,
-          status: "success",
-          createdAt: Date.now(),
-        });
+      await tx.insert(transactions).values({
+        idempotencyKey,
+        playerId,
+        status: "success",
+        createdAt: Date.now(),
+      });
 
       return true;
     });
