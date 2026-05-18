@@ -1,7 +1,12 @@
 import { Hono } from "hono";
-// Import the base GameRoom from the core package
-import { GameRoom } from "@partygame/core";
-import { authRouter } from "@partygame/auth";
+import {
+  GameRoom,
+  generateTokenPair,
+  initializeJWT,
+  verifyAccessToken,
+  type JWTPayload,
+} from "@partygame/core";
+import { renderPortalHtml, DEFAULT_BACKEND_URL } from "./frontend";
 import {
   buildVoiceRoomBootstrap,
   isRouteAllowed,
@@ -14,15 +19,59 @@ import {
   type PlatformBindings,
 } from "./platform-controls";
 
-// Export the Durable Object so Cloudflare can bind to it
+// Export the Durable Object so Cloudflare can bind to it.
 export { GameRoom };
 
 type ExampleEnv = {
   DB: any;
   GAME_ROOM: any;
+  JWT_SECRET?: string;
+  JWT_REFRESH_SECRET?: string;
+  FRONTEND_BACKEND_URL?: string;
 } & PlatformBindings;
 
 const app = new Hono<{ Bindings: ExampleEnv }>();
+
+let jwtConfigured = false;
+
+function ensureJwtConfigured(env: ExampleEnv) {
+  if (jwtConfigured) {
+    return;
+  }
+
+  initializeJWT({
+    secret: env.JWT_SECRET || "dev-secret-key",
+    refreshSecret: env.JWT_REFRESH_SECRET || "dev-refresh-secret",
+    accessTokenExpiry: "15m",
+    refreshTokenExpiry: "7d",
+  });
+
+  jwtConfigured = true;
+}
+
+function buildCorsHeaders(): Headers {
+  return new Headers({
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Admin-Token",
+    "Access-Control-Expose-Headers": "Content-Type",
+  });
+}
+
+app.use("*", async (c, next) => {
+  if (c.req.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: buildCorsHeaders(),
+    });
+  }
+
+  await next();
+  const headers = buildCorsHeaders();
+  headers.forEach((value, key) => {
+    c.res.headers.set(key, value);
+  });
+});
 
 app.use("/api/*", async (c, next) => {
   const controls = await loadPlatformControls(c.env.CONTROLS_BUCKET);
@@ -55,17 +104,90 @@ app.use("/admin/*", async (c, next) => {
   return next();
 });
 
-// Mount the Auth Router
-app.route("/", authRouter);
+app.get("/", (c) => {
+  const backendUrl = c.env.FRONTEND_BACKEND_URL || DEFAULT_BACKEND_URL;
+  return c.html(renderPortalHtml(backendUrl));
+});
 
-// Basic HTTP endpoint to create or join a room
+app.get("/home", (c) => {
+  const backendUrl = c.env.FRONTEND_BACKEND_URL || DEFAULT_BACKEND_URL;
+  return c.html(renderPortalHtml(backendUrl));
+});
+
+app.post("/api/session/login", async (c) => {
+  ensureJwtConfigured(c.env);
+
+  const body = (await c.req.json().catch(() => null)) as {
+    email?: unknown;
+    password?: unknown;
+  } | null;
+
+  if (!body || typeof body.email !== "string" || typeof body.password !== "string") {
+    return c.json(
+      {
+        error: "Email and password are required",
+      },
+      400
+    );
+  }
+
+  const playerName = body.email.split("@")[0] || "player";
+  const playerId = `player-${playerName}-${Date.now()}`;
+  const tokens = await generateTokenPair({
+    playerId,
+    playerName,
+    email: body.email,
+  });
+
+  const controls = await loadPlatformControls(c.env.CONTROLS_BUCKET);
+
+  return c.json({
+    ...tokens,
+    playerId,
+    playerName,
+    voiceEnabled: controls.voiceChatEnabled,
+  });
+});
+
+app.get("/api/session/me", async (c) => {
+  ensureJwtConfigured(c.env);
+
+  const authorization = c.req.header("authorization") || "";
+  const token = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+
+  if (!token) {
+    return c.json(
+      {
+        error: "Missing bearer token",
+      },
+      401
+    );
+  }
+
+  const payload = await verifyAccessToken(token);
+  if (!payload) {
+    return c.json(
+      {
+        error: "Invalid or expired token",
+      },
+      401
+    );
+  }
+
+  const controls = await loadPlatformControls(c.env.CONTROLS_BUCKET);
+
+  return c.json({
+    playerId: payload.playerId,
+    playerName: payload.playerName,
+    email: payload.email ?? null,
+    voiceEnabled: controls.voiceChatEnabled,
+    backendHealthy: true,
+  });
+});
+
+// Basic HTTP endpoint to create or join a room.
 app.get("/rooms/:id", (c) => {
   const roomId = c.req.param("id");
-
-  // The actual connection logic would upgrade the request to a WebSocket
-  // and route it to the GameRoom durable object.
-  // Using partyserver's route helper:
-  // return routePartykitRequest(c.req.raw, c.env);
 
   return c.text(`Connect via WS to room ${roomId}`);
 });
@@ -207,7 +329,7 @@ app.post("/admin/updates", async (c) => {
 });
 
 export default {
-  fetch(request: Request, env: any, ctx: ExecutionContext) {
+  fetch(request: Request, env: ExampleEnv, ctx: ExecutionContext) {
     return app.fetch(request, env, ctx);
   },
 };

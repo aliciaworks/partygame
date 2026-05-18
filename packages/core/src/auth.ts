@@ -1,11 +1,11 @@
 /**
  * JWT Session Management
  * Handles player authentication, token generation, and refresh logic
- * Replaces the existing basic auth with proper token-based security
+ * Uses Web Crypto so the worker can run without nodejs_compat.
  */
 
-import { sign, verify } from 'jsonwebtoken';
 import { Context } from 'hono';
+import { signJwt, verifyJwt } from './crypto-utils';
 
 export interface JWTPayload {
   playerId: string;
@@ -48,33 +48,27 @@ export function initializeJWT(config: {
 /**
  * Generate a new access token
  */
-export function generateAccessToken(payload: Omit<JWTPayload, 'iat' | 'exp'>): string {
+export async function generateAccessToken(payload: Omit<JWTPayload, 'iat' | 'exp'>): Promise<string> {
   if (!jwtSecret) throw new Error('JWT not initialized');
 
-  return sign(payload, jwtSecret, {
-    expiresIn: accessTokenExpiry,
-    algorithm: 'HS256',
-  });
+  return signJwt(payload, jwtSecret, accessTokenExpiry);
 }
 
 /**
  * Generate a new refresh token
  */
-export function generateRefreshToken(playerId: string): string {
+export async function generateRefreshToken(playerId: string): Promise<string> {
   if (!jwtRefreshSecret) throw new Error('JWT not initialized');
 
-  return sign({ playerId }, jwtRefreshSecret, {
-    expiresIn: refreshTokenExpiry,
-    algorithm: 'HS256',
-  });
+  return signJwt({ playerId }, jwtRefreshSecret, refreshTokenExpiry);
 }
 
 /**
  * Generate both access and refresh tokens
  */
-export function generateTokenPair(payload: Omit<JWTPayload, 'iat' | 'exp'>): TokenPair {
-  const accessToken = generateAccessToken(payload);
-  const refreshToken = generateRefreshToken(payload.playerId);
+export async function generateTokenPair(payload: Omit<JWTPayload, 'iat' | 'exp'>): Promise<TokenPair> {
+  const accessToken = await generateAccessToken(payload);
+  const refreshToken = await generateRefreshToken(payload.playerId);
 
   return {
     accessToken,
@@ -86,11 +80,11 @@ export function generateTokenPair(payload: Omit<JWTPayload, 'iat' | 'exp'>): Tok
 /**
  * Verify and decode access token
  */
-export function verifyAccessToken(token: string): JWTPayload | null {
+export async function verifyAccessToken(token: string): Promise<JWTPayload | null> {
   if (!jwtSecret) throw new Error('JWT not initialized');
 
   try {
-    return verify(token, jwtSecret, { algorithms: ['HS256'] }) as JWTPayload;
+    return await verifyJwt<JWTPayload>(token, jwtSecret);
   } catch {
     return null;
   }
@@ -99,11 +93,11 @@ export function verifyAccessToken(token: string): JWTPayload | null {
 /**
  * Verify and decode refresh token
  */
-export function verifyRefreshToken(token: string): { playerId: string } | null {
+export async function verifyRefreshToken(token: string): Promise<{ playerId: string } | null> {
   if (!jwtRefreshSecret) throw new Error('JWT not initialized');
 
   try {
-    return verify(token, jwtRefreshSecret, { algorithms: ['HS256'] }) as { playerId: string };
+    return await verifyJwt<{ playerId: string }>(token, jwtRefreshSecret);
   } catch {
     return null;
   }
@@ -140,7 +134,7 @@ export async function authMiddleware(c: Context, next: () => Promise<void>) {
     );
   }
 
-  const payload = verifyAccessToken(token);
+  const payload = await verifyAccessToken(token);
   if (!payload) {
     return c.json(
       {

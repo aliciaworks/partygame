@@ -11,7 +11,6 @@ export * from "./validation";
 
 // Phase 1: Security & Monitoring
 export * from "./auth";
-export * from "./metrics";
 export * from "./request-signing";
 export * from "./protocol-version";
 

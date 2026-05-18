@@ -1,11 +1,6 @@
 name = "partygame"
 main = "src/index.ts"
-compatibility_date = "2026-05-14"
-
-[[d1_databases]]
-binding = "DB"
-database_name = "game-db"
-database_id = "your-database-id"
+compatibility_date = "2026-05-18"
 
 [[durable_objects.bindings]]
 name = "GAME_ROOM"
@@ -13,4 +8,4 @@ class_name = "GameRoom"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["GameRoom"]
+new_sqlite_classes = ["GameRoom"]

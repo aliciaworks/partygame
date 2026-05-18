@@ -16,7 +16,8 @@
     "nanoid": "^4.0.2",
     "pino": "^9.0.0",
     "pino-http": "^10.0.0",
-    "partyserver": "^0.0.40"
+    "partyserver": "^0.0.40",
+    "zod": "^3.23.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20240512.0",

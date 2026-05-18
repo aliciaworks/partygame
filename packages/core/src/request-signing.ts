@@ -1,12 +1,12 @@
 /**
  * Request Signing & Verification
- * HMAC-SHA256 based request authentication to prevent tampering
- * Clients must sign requests with their secret key
+ * HMAC-SHA256 based request authentication to prevent tampering.
+ * Clients must sign requests with their secret key.
  */
 
-import crypto from 'crypto';
 import { Context } from 'hono';
 import { getLogger } from './logger';
+import { createHmacHexSignature } from './crypto-utils';
 
 const logger = getLogger();
 
@@ -14,24 +14,24 @@ const logger = getLogger();
  * Generate HMAC signature for request
  * Algorithm: HMAC-SHA256(method + path + body + timestamp, secret)
  */
-export function generateRequestSignature(
+export async function generateRequestSignature(
   method: string,
   path: string,
   body: string | null,
   timestamp: number,
   secret: string
-): string {
+): Promise<string> {
   const bodyStr = body ?? '';
   const message = `${method}|${path}|${bodyStr}|${timestamp}`;
 
-  return crypto.createHmac('sha256', secret).update(message).digest('hex');
+  return createHmacHexSignature(message, secret);
 }
 
 /**
  * Verify HMAC signature in request
  * Returns true if signature is valid and timestamp is recent (within 5 minutes)
  */
-export function verifyRequestSignature(
+export async function verifyRequestSignature(
   method: string,
   path: string,
   body: string | null,
@@ -39,7 +39,7 @@ export function verifyRequestSignature(
   signature: string,
   secret: string,
   maxAgeSeconds = 300 // 5 minutes
-): boolean {
+): Promise<boolean> {
   // Check timestamp is recent
   const now = Math.floor(Date.now() / 1000);
   if (Math.abs(now - timestamp) > maxAgeSeconds) {
@@ -56,10 +56,9 @@ export function verifyRequestSignature(
   }
 
   // Generate expected signature
-  const expectedSignature = generateRequestSignature(method, path, body, timestamp, secret);
+  const expectedSignature = await generateRequestSignature(method, path, body, timestamp, secret);
 
-  // Constant-time comparison to prevent timing attacks
-  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
+  return expectedSignature.length === signature.length && expectedSignature === signature;
 }
 
 /**
@@ -147,7 +146,7 @@ export async function requestSigningMiddleware(
   // Verify signature
   const method = c.req.method;
   const pathStr = new URL(c.req.url).pathname;
-  if (!verifyRequestSignature(method, pathStr, bodyStr || null, timestamp, signature, secret)) {
+  if (!(await verifyRequestSignature(method, pathStr, bodyStr || null, timestamp, signature, secret))) {
     logger.warn(
       { clientId, method, path: pathStr },
       'Invalid request signature'
