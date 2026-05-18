@@ -9,7 +9,11 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@sentry/node": "^8.0.0",
     "drizzle-orm": "^0.41.0",
+    "hono": "^4.2.0",
+    "pino": "^9.0.0",
+    "pino-http": "^10.0.0",
     "partyserver": "^0.0.40"
   },
   "devDependencies": {

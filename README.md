@@ -8,7 +8,10 @@ An open-source, out-of-the-box Serverless Game Backend Framework built natively 
 - **ACID-Compliant Transactions (`@partygame/core/db`)**: Built with Drizzle ORM and Cloudflare D1. Features strict transactional logic for game inventory loops. Includes built-in **Idempotency Key** validation to prevent double-spending on network retries, and **Soft Deletes** for safe inventory management.
 - **Game Identity (`@partygame/auth`)**: Powered by `better-auth`. Seamlessly bypasses cookie dependency, providing explicit stateless Session Token extraction for native game engines. Includes a dedicated Refresh Token bridge for persistent login states without relying on web cookies.
 - **Cross-Engine Type Generation (`@partygame/shared`)**: Single source of truth. Define your networking models and database schemas in TypeScript (Zod), and automatically generate `C#` for Unity, `GDScript` for Godot, and `C++ Structs` for Unreal Engine simultaneously.
-- **Security Middleware (`@partygame/core/middleware`)**: Built-in API Rate Limiting for Hono routes to prevent abuse of the Serverless backend.
+- **Security Middleware (`@partygame/core/middleware`)**: Built-in API Rate Limiting for Hono routes. **NEW**: Player-aware and room-aware rate limiting to prevent per-player/per-room flooding.
+- **Structured Logging & Error Tracking**: Pino-based structured logging with Sentry integration support for production error tracking and incident response.
+- **Comprehensive API Documentation**: Auto-generated OpenAPI 3.1 spec for all endpoints. Health checks, metrics, and SLA tracking for operational visibility.
+- **Input Validation**: Zod-based request body and query parameter validation with security headers (CSP, HSTS, X-Frame-Options).
 
 ## Project Structure
 
@@ -118,3 +121,112 @@ The refresh endpoint is still intentionally conservative and returns `501` until
 ## Notes On Abuse Resistance
 
 `@partygame/core` now includes stricter message parsing, movement validation, and purchase request validation. The current rate limiter is still in-memory and should be replaced with a distributed store for production deployments that span multiple isolates or regions.
+
+## Phase 0 Engineering Improvements (v0.0.1)
+
+### Observability
+
+- **Structured Logging**: Pino-based logging with context propagation (request ID, room ID, player ID)
+- **Error Tracking**: Sentry integration ready (set `SENTRY_DSN` env var in production)
+- **Metrics Endpoint**: Prometheus `/metrics` endpoint for monitoring (uptime, active rooms, requests)
+- **Health Checks**: Liveness (`/health`) and readiness (`/ready`) probes for load balancers
+- **SLA Tracking**: `/sla` endpoint to monitor uptime vs. SLA targets
+
+### Security
+
+- **Enhanced Rate Limiting**: IP-based, player-based, and room-based rate limit buckets
+- **Input Validation**: Zod schemas for all HTTP payloads with detailed error messages
+- **Security Headers**: CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy
+- **Request Size Limits**: Maximum body size enforcement to prevent DoS
+- **Rate Limit Response Headers**: `X-RateLimit-*` headers for client-side backoff
+
+### Testing
+
+- **Integration Tests**: Room lifecycle testing (join, move, disconnect, state sync)
+- **Test Fixtures**: Reusable TestGameRoom class for future multiplayer tests
+- **Chaos Testing Preparation**: Foundation for disconnect/network partition scenarios
+
+### API Documentation
+
+- **OpenAPI 3.1 Spec**: Machine-readable API definition in `@partygame/core/openapi.ts`
+- **Endpoint Coverage**: Auth, Room, Inventory, Health, Metrics all documented
+- **Schema Documentation**: Request/response schemas with validation rules
+- **Error Code Catalog**: Standardized error responses (400, 401, 429, 503, etc.)
+
+### Operations
+
+- **Disaster Recovery Plan**: See [BACKUP_STRATEGY.md](BACKUP_STRATEGY.md) for backup procedures, recovery playbooks, and monthly DR drills
+- **Database Snapshots**: Snapshot logic for Durable Object state recovery
+- **Log Retention Strategy**: Audit logging for compliance (GDPR, SOC 2)
+
+## Using Phase 0 Features
+
+### Initialize Logging
+
+```typescript
+import { initializeLogger, createChildLogger } from "@partygame/core";
+
+// At app startup
+initializeLogger({
+  isDev: process.env.ENV === "development",
+  serviceName: "partygame-worker",
+});
+
+// In handlers
+const logger = createChildLogger({ roomId, playerId, requestId });
+logger.info({ event: "player_joined", playerId });
+```
+
+### Add Rate Limiting to Routes
+
+```typescript
+import { playerRateLimiter, roomRateLimiter } from "@partygame/core";
+
+// Protect player endpoints
+app.post("/api/purchase", playerRateLimiter, handlePurchase);
+
+// Protect room endpoints
+app.ws("/rooms/:id", roomRateLimiter, handleRoomSocket);
+```
+
+### Validate Inputs
+
+```typescript
+import { validateJsonBody, PurchaseRequestSchema } from "@partygame/core";
+
+app.post(
+  "/api/purchase",
+  validateJsonBody(PurchaseRequestSchema),
+  async (c) => {
+    const body = c.get("validatedBody");
+    // body is now type-safe: { itemId, quantity, playerId, idempotencyKey }
+  }
+);
+```
+
+### Health & Metrics
+
+```bash
+# Check service health
+curl http://localhost:8787/health
+# {"status":"healthy","timestamp":"2026-05-18T...","uptime_ms":12345}
+
+# Prometheus metrics
+curl http://localhost:8787/metrics
+# partygame_uptime_ms 12345
+# partygame_active_rooms 5
+# partygame_active_players 42
+
+# SLA status
+curl http://localhost:8787/sla
+# {"uptime_percent":99.95,"meets_sla":true,...}
+```
+
+## Roadmap
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) (coming Phase 1) for the complete multi-phase roadmap. Current focus:
+
+- **Phase 0** (✅ In Progress): Foundation (logging, testing, API docs, health checks)
+- **Phase 1** (📋 Planned): Quality gates (test coverage, CI/CD, performance regression detection)
+- **Phase 2** (📋 Planned): Multiplayer features (matchmaking, chat, leaderboards, social)
+- **Phase 3** (📋 Planned): Advanced (replays, spectator mode, monetization, multi-region)
