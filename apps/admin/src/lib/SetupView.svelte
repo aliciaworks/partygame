@@ -3,10 +3,10 @@
     backendUrl, 
     busy, 
     email, 
-    errorMessage, 
     password, 
-    statusMessage, 
-    clearError, 
+    errorMessage, 
+    statusMessage,
+    clearError,
     setError,
     view,
     session,
@@ -20,16 +20,16 @@
     DEFAULT_BACKEND_URL, 
     normalizeBackendUrl, 
     saveBackendUrl,
-    loginToBackend,
     savePortalSession,
     fetchBackendHealth,
     fetchBackendSla,
     fetchApiVersions,
-    fetchSessionProfile,
-    EMAIL_STORAGE_KEY
+    fetchSessionProfile
   } from './portal';
 
-  async function handleLogin() {
+  let adminName = 'Admin';
+
+  async function handleCreateAdmin() {
     busy.set(true);
     clearError();
 
@@ -38,92 +38,94 @@
       backendUrl.set(normalized);
       saveBackendUrl(normalized);
 
-      const nextSession = await loginToBackend(normalized, $email, $password);
-      session.set(nextSession);
-      savePortalSession(nextSession);
-      localStorage.setItem(EMAIL_STORAGE_KEY, $email);
+      // Test backend connection
+      const testHealth = await fetchBackendHealth(normalized);
+      
+      if (!testHealth) {
+        throw new Error('Backend is not responding. Make sure it is running and the URL is correct.');
+      }
 
-      // Load runtime state
-      const [nextHealth, nextSla, nextVersions] = await Promise.all([
-        fetchBackendHealth(normalized),
-        fetchBackendSla(normalized),
-        fetchApiVersions(normalized),
-      ]);
-
-      health.set(nextHealth);
-      sla.set(nextSla);
-      versions.set(nextVersions);
-
-      const syncTime = new Date().toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-      lastSyncedAt.set(syncTime);
-
-      const nextProfile = await fetchSessionProfile(normalized, nextSession.accessToken);
-      profile.set(nextProfile);
-      statusMessage.set(`Signed in as ${nextProfile.playerName}`);
-      view.set('home');
+      statusMessage.set(`Backend is ready. You can now sign in with your credentials.`);
+      view.set('login');
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Login failed.');
-      statusMessage.set('Login failed.');
+      setError(error instanceof Error ? error.message : 'Failed to connect to backend.');
     } finally {
       busy.set(false);
     }
   }
 
-  function resetBackend() {
-    backendUrl.set(normalizeBackendUrl(DEFAULT_BACKEND_URL));
-    saveBackendUrl($backendUrl);
+  async function testBackendConnection() {
+    busy.set(true);
+    clearError();
+
+    try {
+      const normalized = normalizeBackendUrl($backendUrl);
+      const health = await fetchBackendHealth(normalized);
+      statusMessage.set('✓ Backend connection successful!');
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to connect to backend.');
+    } finally {
+      busy.set(false);
+    }
   }
 
-  function goToSetup() {
-    view.set('setup');
+  function goToLogin() {
+    view.set('login');
   }
 </script>
 
-<main class="login-container">
-  <div class="login-wrapper">
-    <div class="login-header">
-      <h1>Party Game Portal</h1>
-      <p class="subtitle">Backend Administration</p>
+<main class="setup-container">
+  <div class="setup-wrapper">
+    <div class="setup-header">
+      <h1>Party Game Setup</h1>
+      <p class="subtitle">Configure your backend to get started</p>
     </div>
 
-    <form class="login-form" on:submit|preventDefault={handleLogin}>
+    <section class="setup-section">
+      <h2>Step 1: Backend Configuration</h2>
+      <p class="description">Enter your backend URL to connect the admin portal.</p>
+
       <div class="form-group">
         <label for="backend-url">Backend URL</label>
         <input
           id="backend-url"
           bind:value={$backendUrl}
           type="url"
-          placeholder="https://partygame.aliciaworks.workers.dev"
-          on:blur={() => backendUrl.set(normalizeBackendUrl($backendUrl))}
+          placeholder="https://partygame.workers.dev"
         />
+        <span class="hint">Make sure the backend is running and accessible</span>
       </div>
 
-      <div class="form-group">
-        <label for="email">Email</label>
-        <input id="email" bind:value={$email} type="email" placeholder="admin@partygame.dev" required />
-      </div>
-
-      <div class="form-group">
-        <label for="password">Password</label>
-        <input id="password" bind:value={$password} type="password" placeholder="••••••••" required />
-      </div>
-
-      <button class="btn-primary" type="submit" disabled={$busy}>
-        {$busy ? 'Signing in...' : 'Sign in'}
+      <button class="btn-secondary" on:click={testBackendConnection} disabled={$busy}>
+        {$busy ? 'Testing...' : 'Test Connection'}
       </button>
+    </section>
 
-      <div class="button-row">
-        <button class="btn-secondary" type="button" on:click={resetBackend}>
-          Reset to default
-        </button>
-        <button class="btn-secondary" type="button" on:click={goToSetup}>
-          Configure backend
-        </button>
+    <section class="setup-section">
+      <h2>Step 2: Verify Admin Account</h2>
+      <p class="description">
+        Use your backend to create an admin account if one doesn't exist. 
+        This is typically done through your backend's initialization or database setup.
+      </p>
+
+      <div class="info-box">
+        <p><strong>Default admin credentials:</strong></p>
+        <p>Email: <code>admin@partygame.dev</code></p>
+        <p>Password: <code>default-password</code></p>
+        <p style="font-size: 0.85rem; color: var(--muted); margin-top: 8px;">
+          Change these immediately after first login for security.
+        </p>
       </div>
-    </form>
+    </section>
+
+    <section class="setup-section">
+      <h2>Step 3: Sign In</h2>
+      <p class="description">Once your backend is set up and you have admin credentials, you can proceed to login.</p>
+
+      <button class="btn-primary" on:click={goToLogin} disabled={$busy}>
+        Ready to Sign In
+      </button>
+    </section>
 
     {#if $errorMessage}
       <div class="error-box">
@@ -140,7 +142,7 @@
 </main>
 
 <style>
-  .login-container {
+  .setup-container {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -149,17 +151,17 @@
     background: linear-gradient(135deg, #0a0f1f 0%, #0d1428 50%, #0a1220 100%);
   }
 
-  .login-wrapper {
+  .setup-wrapper {
     width: 100%;
-    max-width: 420px;
+    max-width: 560px;
   }
 
-  .login-header {
+  .setup-header {
     text-align: center;
     margin-bottom: 40px;
   }
 
-  .login-header h1 {
+  .setup-header h1 {
     font-size: 28px;
     font-weight: 700;
     margin: 0 0 8px 0;
@@ -176,19 +178,36 @@
     letter-spacing: 0.5px;
   }
 
-  .login-form {
-    display: grid;
-    gap: 16px;
-    margin-bottom: 24px;
+  .setup-section {
+    margin-bottom: 32px;
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid rgba(124, 240, 255, 0.1);
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .setup-section h2 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 8px 0;
+    color: var(--text);
+  }
+
+  .description {
+    font-size: 13px;
+    color: var(--muted);
+    margin: 0 0 16px 0;
+    line-height: 1.5;
   }
 
   .form-group {
     display: grid;
     gap: 6px;
+    margin-bottom: 12px;
   }
 
   .form-group label {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     color: #dfe8ff;
     text-transform: uppercase;
@@ -217,8 +236,42 @@
     box-shadow: 0 0 0 3px rgba(124, 240, 255, 0.1);
   }
 
+  .hint {
+    display: block;
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+
+  .info-box {
+    padding: 14px;
+    border-radius: 10px;
+    background: rgba(124, 240, 255, 0.08);
+    border: 1px solid rgba(124, 240, 255, 0.2);
+    margin-bottom: 16px;
+  }
+
+  .info-box p {
+    margin: 0 0 8px 0;
+    font-size: 13px;
+    color: #dfe8ff;
+  }
+
+  .info-box p:last-child {
+    margin-bottom: 0;
+  }
+
+  .info-box code {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Monaco', 'Menlo', monospace;
+    font-size: 12px;
+  }
+
   .btn-primary,
   .btn-secondary {
+    width: 100%;
     padding: 12px 16px;
     border-radius: 10px;
     border: none;
@@ -261,14 +314,9 @@
     cursor: not-allowed;
   }
 
-  .button-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-  }
-
   .error-box,
   .success-box {
+    margin-top: 20px;
     padding: 12px 14px;
     border-radius: 10px;
     font-size: 13px;
@@ -296,16 +344,17 @@
   }
 
   @media (max-width: 480px) {
-    .login-header {
+    .setup-header {
       margin-bottom: 32px;
     }
 
-    .login-header h1 {
+    .setup-header h1 {
       font-size: 24px;
     }
 
-    .login-form {
-      gap: 14px;
+    .setup-section {
+      margin-bottom: 24px;
+      padding: 16px;
     }
   }
 </style>

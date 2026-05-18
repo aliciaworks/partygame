@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import LoginView from '$lib/LoginView.svelte';
   import HomeView from '$lib/HomeView.svelte';
+  import SetupView from '$lib/SetupView.svelte';
   import {
     view,
     busy,
@@ -16,7 +17,8 @@
   } from '$lib/portal';
 
   onMount(async () => {
-    backendUrl.set(readBackendUrl());
+    const savedBackendUrl = readBackendUrl();
+    backendUrl.set(savedBackendUrl);
     email.set(localStorage.getItem('portal-email') ?? '');
 
     const savedSession = readPortalSession();
@@ -26,8 +28,15 @@
       return;
     }
 
-    view.set('login');
-    statusMessage.set(`Backend selected: ${readBackendUrl()}`);
+    // Check if backend URL is set (not the default)
+    // If it's default, show setup view
+    if (!savedBackendUrl || savedBackendUrl.includes('aliciaworks.workers.dev')) {
+      view.set('setup');
+      statusMessage.set('Welcome! Configure your backend to get started.');
+    } else {
+      view.set('login');
+      statusMessage.set(`Backend selected: ${savedBackendUrl}`);
+    }
   });
 </script>
 
@@ -55,7 +64,9 @@
     </div>
   </header>
 
-  {#if $view === 'login'}
+  {#if $view === 'setup'}
+    <SetupView />
+  {:else if $view === 'login'}
     <LoginView />
   {:else if $view === 'home'}
     <HomeView />

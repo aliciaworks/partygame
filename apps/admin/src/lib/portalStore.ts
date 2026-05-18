@@ -1,7 +1,7 @@
 import { writable } from 'svelte/store';
 import type { PortalSession, SessionProfile, BackendHealth, BackendSla, ApiVersions, VoiceBootstrap } from './portal';
 
-export type ViewMode = 'boot' | 'login' | 'home';
+export type ViewMode = 'boot' | 'setup' | 'login' | 'home';
 
 export const view = writable<ViewMode>('boot');
 export const busy = writable(false);

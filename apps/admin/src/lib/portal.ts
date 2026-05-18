@@ -122,6 +122,13 @@ async function fetchJson<T>(backendUrl: string, path: string, init?: RequestInit
   try {
     data = text ? (JSON.parse(text) as T) : ({} as T);
   } catch (parseError) {
+    // Handle non-JSON responses (like 404 HTML pages)
+    if (response.status === 404) {
+      throw new Error(
+        `Backend endpoint not found (404). Check your backend URL and ensure the API is running. ` +
+        `URL: ${backendUrl}${path}`
+      );
+    }
     throw new Error(
       `Invalid JSON response from server: ${parseError instanceof Error ? parseError.message : 'Unknown error'}. ` +
       `Response text: "${text.substring(0, 100)}"`
