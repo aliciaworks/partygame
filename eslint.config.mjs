@@ -6,11 +6,11 @@ const tsRecommended = tseslint.configs.recommended;
 export default tseslint.config(
   {
     ignores: [
-      "clients/**",
+      "engines/**",
       "dist/**",
       "node_modules/**",
       ".wrangler/**",
-      "pages/**",
+      "apps/**",
       "package-lock.json",
     ],
   },

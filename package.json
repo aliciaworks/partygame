@@ -4,9 +4,8 @@
   "private": true,
   "workspaces": [
     "packages/*",
-    "fixtures/*",
-    "pages/*",
-    "clients/*"
+    "apps/*",
+    "engines/*"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",

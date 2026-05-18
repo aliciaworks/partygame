@@ -17,8 +17,9 @@ This repository uses a native `npm` workspace monorepo structure:
 - `packages/core`: The framework server engine (GameRoom, Networking, Database Logic, Middleware).
 - `packages/auth`: Better Auth integration and token bypass endpoints.
 - `packages/shared`: Shared Zod schemas and the cross-engine code generation scripts.
-- `fixtures/example-game`: An example Cloudflare Worker project tying the framework components together.
-- `clients/`: Auto-generated client SDKs and native structural types for Unity, Godot, and Unreal Engine.
+- `apps/example-game`: An example Cloudflare Worker project tying the framework components together.
+- `apps/admin`: Admin control plane (SvelteKit + Cloudflare Pages).
+- `engines/`: Auto-generated client SDKs and native structural types for Unity, Godot, and Unreal Engine.
 
 ## Getting Started
 
@@ -34,18 +35,18 @@ This repository uses a native `npm` workspace monorepo structure:
    npm run generate:types --workspace=@partygame/shared
    ```
 
-3. Configure your database bindings in `fixtures/example-game/wrangler.toml`.
+3. Configure your database bindings in `apps/example-game/wrangler.toml`.
 
 4. Run the development server for the example game:
 
    ```bash
-   cd fixtures/example-game
+   cd apps/example-game
    npx wrangler dev
    ```
 
 5. Run the admin control plane separately:
    ```bash
-   cd pages/admin
+   cd apps/admin
    npm run dev
    ```
 
@@ -53,10 +54,10 @@ This repository uses a native `npm` workspace monorepo structure:
 
 ### Worker backend
 
-The worker entrypoint is the example game in [fixtures/example-game](fixtures/example-game). Deploy it with Wrangler from that directory:
+The worker entrypoint is the example game in [apps/example-game](apps/example-game). Deploy it with Wrangler from that directory:
 
 ```bash
-cd fixtures/example-game
+cd apps/example-game
 npm run deploy
 ```
 
@@ -69,10 +70,10 @@ If you changed the Durable Object class name or schema, create and apply a new m
 
 ### Pages admin app
 
-The admin UI lives in [pages/admin](pages/admin) and deploys separately as a Cloudflare Pages site:
+The admin UI lives in [apps/admin](apps/admin) and deploys separately as a Cloudflare Pages site:
 
 ```bash
-cd pages/admin
+cd apps/admin
 npm run build
 npx wrangler pages deploy build --project-name partygame-admin
 ```
@@ -103,7 +104,7 @@ npm run format
 
 ## Admin UI
 
-The management interface now lives in [pages/admin](pages/admin). It is a separate SvelteKit workspace that is built for Pages-style deployment rather than the Worker runtime, so the control plane stays isolated from the game backend.
+The management interface now lives in [apps/admin](apps/admin). It is a separate SvelteKit workspace that is built for Pages-style deployment rather than the Worker runtime, so the control plane stays isolated from the game backend.
 
 ## Native Auth
 

@@ -5,7 +5,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { buildGeneratedArtifacts } from "../src/typegen";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
-const OUT_DIR = path.join(SCRIPT_DIR, "../../../clients");
+const OUT_DIR = path.join(SCRIPT_DIR, "../../../engines");
 
 export function writeGeneratedArtifacts() {
   const artifacts = buildGeneratedArtifacts();
