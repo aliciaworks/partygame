@@ -1,4 +1,4 @@
-name = "example-game"
+name = "partygame"
 main = "src/index.ts"
 compatibility_date = "2024-05-12"
 
