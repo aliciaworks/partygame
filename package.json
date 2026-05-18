@@ -1,0 +1,12 @@
+{
+  "name": "edgepulse-monorepo",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "build": "pnpm -r run build",
+    "dev": "pnpm -r run dev"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}

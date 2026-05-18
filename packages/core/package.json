@@ -1,0 +1,12 @@
+{
+  "name": "@edgepulse/core",
+  "version": "0.0.1",
+  "main": "src/index.ts",
+  "dependencies": {
+    "partyserver": "^0.0.40"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "@cloudflare/workers-types": "^4.20240512.0"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "example-game",
+  "version": "0.0.1",
+  "private": true,
+  "main": "src/index.ts",
+  "dependencies": {
+    "@edgepulse/core": "workspace:*",
+    "@edgepulse/auth": "workspace:*",
+    "hono": "^4.2.0",
+    "partyserver": "^0.0.40"
+  },
+  "devDependencies": {
+    "wrangler": "^3.57.0",
+    "typescript": "^5.4.5"
+  }
+}
