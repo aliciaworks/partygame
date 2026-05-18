@@ -143,3 +143,24 @@ export async function purchaseItem(
     return { success: false, message: "Transaction error." };
   }
 }
+
+/**
+ * Global database instance
+ * Initialize with setDatabase() before using database operations
+ */
+let globalDatabase: D1Database | null = null;
+
+/**
+ * Initialize global database instance
+ */
+export function initializeDatabase(db: D1Database): void {
+  globalDatabase = db;
+}
+
+/**
+ * Get current database instance
+ * Returns null if not initialized
+ */
+export function getDatabase(): D1Database | null {
+  return globalDatabase;
+}

@@ -12,12 +12,15 @@
     "@sentry/node": "^8.0.0",
     "drizzle-orm": "^0.41.0",
     "hono": "^4.2.0",
+    "jsonwebtoken": "^9.0.2",
+    "nanoid": "^4.0.2",
     "pino": "^9.0.0",
     "pino-http": "^10.0.0",
     "partyserver": "^0.0.40"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20240512.0",
+    "@types/jsonwebtoken": "^9.0.5",
     "typescript": "^5.4.5"
   }
 }
