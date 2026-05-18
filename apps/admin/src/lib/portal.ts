@@ -1,4 +1,4 @@
-export const DEFAULT_BACKEND_URL = "https://partygame-b5j.pages.dev/";
+export const DEFAULT_BACKEND_URL = "https://partygame.aliciaworks.workers.dev";
 
 export const BACKEND_STORAGE_KEY = "partygame.portal.backendUrl";
 export const SESSION_STORAGE_KEY = "partygame.portal.session";
@@ -117,7 +117,16 @@ async function fetchJson<T>(backendUrl: string, path: string, init?: RequestInit
   });
 
   const text = await response.text();
-  const data = text ? (JSON.parse(text) as T) : ({} as T);
+  let data: T;
+
+  try {
+    data = text ? (JSON.parse(text) as T) : ({} as T);
+  } catch (parseError) {
+    throw new Error(
+      `Invalid JSON response from server: ${parseError instanceof Error ? parseError.message : 'Unknown error'}. ` +
+      `Response text: "${text.substring(0, 100)}"`
+    );
+  }
 
   if (!response.ok) {
     const error = (data as { error?: string }).error ?? `Request failed with ${response.status}`;

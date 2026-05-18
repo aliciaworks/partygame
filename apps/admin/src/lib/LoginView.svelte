@@ -78,219 +78,219 @@
   }
 </script>
 
-<main class="auth-grid">
-  <section class="hero panel">
-    <p class="eyebrow mono">SECURE ENTRY</p>
-    <h2>Login first, then the dashboard appears.</h2>
-    <p>
-      All frontend work lives here in SvelteKit. The worker stays backend-only,
-      and the backend URL can be changed directly in this page.
-    </p>
-
-    <div class="hero-notes">
-      <div>
-        <span class="mono">Default backend</span>
-        <strong>{DEFAULT_BACKEND_URL}</strong>
-      </div>
-      <div>
-        <span class="mono">Stored locally</span>
-        <strong>backend URL + session</strong>
-      </div>
+<main class="login-container">
+  <div class="login-wrapper">
+    <div class="login-header">
+      <h1>Party Game Portal</h1>
+      <p class="subtitle">Backend Administration</p>
     </div>
-
-    <div class="hero-banner">
-      <strong>What this portal does</strong>
-      <p>
-        Login gates the homepage, syncs backend health, prepares voice bootstrap
-        data, and keeps the selected backend editable without touching Wrangler.
-      </p>
-    </div>
-  </section>
-
-  <section class="login-card panel">
-    <p class="eyebrow mono">SIGN IN</p>
-    <h2>Enter your backend and authenticate.</h2>
 
     <form class="login-form" on:submit|preventDefault={handleLogin}>
-      <label>
-        <span>Backend URL</span>
+      <div class="form-group">
+        <label for="backend-url">Backend URL</label>
         <input
+          id="backend-url"
           bind:value={$backendUrl}
           type="url"
-          placeholder="https://partygame-b5j.pages.dev/"
+          placeholder="https://partygame.aliciaworks.workers.dev"
           on:blur={() => backendUrl.set(normalizeBackendUrl($backendUrl))}
         />
-      </label>
-
-      <label>
-        <span>Email</span>
-        <input bind:value={$email} type="email" placeholder="pilot@partygame.dev" required />
-      </label>
-
-      <label>
-        <span>Password</span>
-        <input bind:value={$password} type="password" placeholder="••••••••" required />
-      </label>
-
-      <div class="form-actions">
-        <button class="primary" type="submit" disabled={$busy}>
-          {$busy ? 'Working...' : 'Sign in'}
-        </button>
-        <button class="ghost" type="button" on:click={resetBackend}>
-          Reset backend
-        </button>
       </div>
+
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input id="email" bind:value={$email} type="email" placeholder="admin@partygame.dev" required />
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input id="password" bind:value={$password} type="password" placeholder="••••••••" required />
+      </div>
+
+      <button class="btn-primary" type="submit" disabled={$busy}>
+        {$busy ? 'Signing in...' : 'Sign in'}
+      </button>
+
+      <button class="btn-secondary" type="button" on:click={resetBackend}>
+        Use default backend
+      </button>
     </form>
 
-    <div class="status-box">
-      <span class="mono">Status</span>
-      <strong>{$statusMessage}</strong>
-      {#if $errorMessage}
-        <p class="error">{$errorMessage}</p>
-      {/if}
-    </div>
-  </section>
+    {#if $errorMessage}
+      <div class="error-box">
+        <p>{$errorMessage}</p>
+      </div>
+    {/if}
+
+    {#if $statusMessage && !$errorMessage}
+      <div class="success-box">
+        <p>{$statusMessage}</p>
+      </div>
+    {/if}
+  </div>
 </main>
 
 <style>
-  .auth-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1.1fr) minmax(360px, 520px);
-    gap: 24px;
-  }
-
-  .hero,
-  .login-card {
-    padding: 28px;
-    border-radius: 28px;
-  }
-
-  .hero {
+  .login-container {
     display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    gap: 18px;
-  }
-
-  .hero > p {
-    color: var(--muted);
-    line-height: 1.6;
-  }
-
-  .hero-notes {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
-  }
-
-  .hero-notes > div,
-  .hero-banner {
-    border-radius: 24px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
     padding: 16px;
+    background: linear-gradient(135deg, #0a0f1f 0%, #0d1428 50%, #0a1220 100%);
   }
 
-  .hero-notes span {
-    display: block;
+  .login-wrapper {
+    width: 100%;
+    max-width: 420px;
+  }
+
+  .login-header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+
+  .login-header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    margin: 0 0 8px 0;
+    background: linear-gradient(135deg, #7cf0ff, #ff7cf0);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .subtitle {
     color: var(--muted);
-    font-size: 0.82rem;
-    margin-bottom: 8px;
+    font-size: 14px;
+    margin: 0;
+    letter-spacing: 0.5px;
   }
 
   .login-form {
     display: grid;
-    gap: 14px;
-    margin-top: 18px;
+    gap: 16px;
+    margin-bottom: 24px;
   }
 
-  label {
+  .form-group {
     display: grid;
-    gap: 8px;
+    gap: 6px;
   }
 
-  label span {
+  .form-group label {
+    font-size: 13px;
+    font-weight: 600;
     color: #dfe8ff;
-    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
   }
 
-  input {
+  .form-group input {
     width: 100%;
-    border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    padding: 14px 16px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid rgba(124, 240, 255, 0.15);
+    background: rgba(6, 12, 24, 0.5);
     color: var(--text);
-    background: rgba(6, 12, 24, 0.8);
+    font-size: 14px;
+    transition: all 0.2s ease;
     outline: none;
   }
 
-  input:focus {
-    border-color: rgba(124, 240, 255, 0.7);
-    box-shadow: 0 0 0 4px rgba(124, 240, 255, 0.12);
+  .form-group input::placeholder {
+    color: var(--muted);
   }
 
-  .form-actions {
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-    margin-top: 4px;
+  .form-group input:focus {
+    border-color: rgba(124, 240, 255, 0.5);
+    background: rgba(6, 12, 24, 0.8);
+    box-shadow: 0 0 0 3px rgba(124, 240, 255, 0.1);
   }
 
-  button {
-    border: 0;
-    border-radius: 16px;
-    padding: 13px 16px;
-    color: var(--text);
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+  .btn-primary,
+  .btn-secondary {
+    padding: 12px 16px;
+    border-radius: 10px;
+    border: none;
+    font-size: 14px;
+    font-weight: 600;
     cursor: pointer;
-    font: inherit;
-    transition: transform 0.18s ease, opacity 0.18s ease;
+    transition: all 0.2s ease;
+    outline: none;
   }
 
-  button:hover {
-    transform: translateY(-1px);
-  }
-
-  button:disabled {
-    opacity: 0.65;
-    cursor: progress;
-  }
-
-  .primary {
+  .btn-primary {
     background: linear-gradient(135deg, var(--accent), var(--accent-2));
     color: #05131d;
-    font-weight: 700;
-    box-shadow: 0 18px 34px rgba(124, 240, 255, 0.12);
+    box-shadow: 0 8px 24px rgba(124, 240, 255, 0.15);
   }
 
-  .ghost {
+  .btn-primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(124, 240, 255, 0.2);
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+  }
+
+  .btn-secondary {
     background: rgba(255, 255, 255, 0.05);
+    color: var(--text);
+    border: 1px solid rgba(255, 255, 255, 0.1);
   }
 
-  .status-box {
-    padding: 16px;
-    border-radius: 20px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    margin-top: 20px;
+  .btn-secondary:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
   }
 
-  .status-box span {
-    display: block;
-    color: var(--muted);
-    font-size: 0.82rem;
-    margin-bottom: 8px;
+  .btn-secondary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
-  .error {
+  .error-box,
+  .success-box {
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .error-box {
+    background: rgba(255, 182, 191, 0.1);
+    border: 1px solid rgba(255, 182, 191, 0.3);
     color: #ffb6bf;
-    margin-top: 8px;
   }
 
-  @media (max-width: 1100px) {
-    .auth-grid {
-      grid-template-columns: 1fr;
+  .error-box p {
+    margin: 0;
+  }
+
+  .success-box {
+    background: rgba(124, 240, 255, 0.1);
+    border: 1px solid rgba(124, 240, 255, 0.3);
+    color: #7cf0ff;
+  }
+
+  .success-box p {
+    margin: 0;
+  }
+
+  @media (max-width: 480px) {
+    .login-header {
+      margin-bottom: 32px;
+    }
+
+    .login-header h1 {
+      font-size: 24px;
+    }
+
+    .login-form {
+      gap: 14px;
     }
   }
 </style>
