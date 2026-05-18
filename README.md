@@ -1,4 +1,4 @@
-# PartyGame (Serverless Game Backend Framework)
+# PartyGame - A Serverless Game Backend Framework
 
 An open-source, out-of-the-box Serverless Game Backend Framework built natively for Cloudflare Workers, Durable Objects, and D1. It is designed to bridge the gap between web-native infrastructure and traditional game engines (Unity, Godot, and Unreal Engine).
 
