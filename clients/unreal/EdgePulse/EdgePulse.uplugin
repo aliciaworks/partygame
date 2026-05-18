@@ -1,0 +1,20 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.0.1",
+  "FriendlyName": "PartyGame SDK",
+  "Description": "Auto-generated PartyGame multiplayer types and client SDK.",
+  "Category": "Networking",
+  "CreatedBy": "PartyGame",
+  "CanContainContent": true,
+  "IsBetaVersion": false,
+  "IsExperimentalVersion": false,
+  "Installed": false,
+  "Modules": [
+    {
+      "Name": "PartyGame",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    }
+  ]
+}

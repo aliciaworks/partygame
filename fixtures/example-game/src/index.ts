@@ -1,9 +1,9 @@
 import { Hono } from "hono";
 // Import the base GameRoom from the core package
 // @ts-ignore - for now since workspace might not be built
-import { GameRoom } from "@edgepulse/core/src/room";
+import { GameRoom } from "@partygame/core/src/room";
 // @ts-ignore
-import { authRouter } from "@edgepulse/auth/src/auth";
+import { authRouter } from "@partygame/auth/src/auth";
 
 // Export the Durable Object so Cloudflare can bind to it
 export { GameRoom };
@@ -16,12 +16,12 @@ app.route("/", authRouter);
 // Basic HTTP endpoint to create or join a room
 app.get("/rooms/:id", (c) => {
   const roomId = c.req.param("id");
-  
+
   // The actual connection logic would upgrade the request to a WebSocket
   // and route it to the GameRoom durable object.
   // Using partyserver's route helper:
   // return routePartykitRequest(c.req.raw, c.env);
-  
+
   return c.text(`Connect via WS to room ${roomId}`);
 });
 

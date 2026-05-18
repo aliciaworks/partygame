@@ -1,5 +1,5 @@
 {
-  "name": "@edgepulse/auth",
+  "name": "@partygame/auth",
   "version": "0.0.1",
   "main": "src/auth.ts",
   "dependencies": {

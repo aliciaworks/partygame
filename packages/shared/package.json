@@ -1,5 +1,5 @@
 {
-  "name": "@edgepulse/shared",
+  "name": "@partygame/shared",
   "version": "0.0.1",
   "private": true,
   "main": "src/index.ts",
