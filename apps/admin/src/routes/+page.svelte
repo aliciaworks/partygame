@@ -1,42 +1,18 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import LoginView from '$lib/LoginView.svelte';
   import HomeView from '$lib/HomeView.svelte';
-  import SetupView from '$lib/SetupView.svelte';
   import {
-    view,
-    busy,
-    statusMessage,
     backendUrl,
-    email,
-    session,
+    statusMessage,
   } from '$lib/portalStore';
   import {
     readBackendUrl,
-    readPortalSession,
   } from '$lib/portal';
 
   onMount(async () => {
     const savedBackendUrl = readBackendUrl();
     backendUrl.set(savedBackendUrl);
-    email.set(localStorage.getItem('portal-email') ?? '');
-
-    const savedSession = readPortalSession();
-    if (savedSession) {
-      session.set(savedSession);
-      view.set('home');
-      return;
-    }
-
-    // Check if backend URL is set (not the default)
-    // If it's default, show setup view
-    if (!savedBackendUrl || savedBackendUrl.includes('aliciaworks.workers.dev')) {
-      view.set('setup');
-      statusMessage.set('Welcome! Configure your backend to get started.');
-    } else {
-      view.set('login');
-      statusMessage.set(`Backend selected: ${savedBackendUrl}`);
-    }
+    statusMessage.set(`Backend: ${savedBackendUrl}`);
   });
 </script>
 
@@ -60,17 +36,10 @@
 
     <div class="status-pills">
       <span class="pill">Backend: {$backendUrl}</span>
-      <span class="pill">{$session ? `Signed in as ${$session.playerName}` : 'Not signed in'}</span>
     </div>
   </header>
 
-  {#if $view === 'setup'}
-    <SetupView />
-  {:else if $view === 'login'}
-    <LoginView />
-  {:else if $view === 'home'}
-    <HomeView />
-  {/if}
+  <HomeView />
 </div>
 
 <style>

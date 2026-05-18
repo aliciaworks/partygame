@@ -1,8 +1,7 @@
 <script lang="ts">
-  import type { VoiceBootstrap, PortalSession } from '$lib/portal';
+  import type { VoiceBootstrap } from '$lib/portal';
 
   export let voiceBootstrap: VoiceBootstrap | null = null;
-  export let session: PortalSession | null = null;
 </script>
 
 <article class="panel card-block">
@@ -11,7 +10,6 @@
       <p class="eyebrow mono">VOICE</p>
       <h3>RealtimeKit bootstrap manifest</h3>
     </div>
-    <span class="pill subtle">{session?.voiceEnabled ? 'Available' : 'Disabled'}</span>
   </div>
 
   {#if voiceBootstrap}
@@ -50,19 +48,6 @@
   h3 {
     font-size: 1.1rem;
     margin: 0;
-  }
-
-  .pill {
-    padding: 10px 14px;
-    border-radius: 999px;
-    background: rgba(124, 240, 255, 0.08);
-    border: 1px solid rgba(124, 240, 255, 0.18);
-    color: var(--text);
-  }
-
-  .pill.subtle {
-    background: rgba(124, 240, 255, 0.08);
-    color: var(--text);
   }
 
   pre {

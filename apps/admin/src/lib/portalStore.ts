@@ -1,16 +1,11 @@
 import { writable } from 'svelte/store';
 import type { PortalSession, SessionProfile, BackendHealth, BackendSla, ApiVersions, VoiceBootstrap } from './portal';
 
-export type ViewMode = 'boot' | 'setup' | 'login' | 'home';
-
-export const view = writable<ViewMode>('boot');
 export const busy = writable(false);
 export const statusMessage = writable('Loading portal...');
 export const errorMessage = writable('');
 
 export const backendUrl = writable('');
-export const email = writable('');
-export const password = writable('');
 export const roomId = writable('control-room');
 
 export const session = writable<PortalSession | null>(null);

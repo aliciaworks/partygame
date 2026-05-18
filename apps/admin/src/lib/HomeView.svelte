@@ -3,8 +3,6 @@
     backendUrl, 
     busy, 
     roomId, 
-    session, 
-    profile, 
     health, 
     sla, 
     versions, 
@@ -12,8 +10,6 @@
     statusMessage,
     errorMessage,
     voiceBootstrap,
-    view,
-    password,
     clearError,
     setError
   } from './portalStore';
@@ -21,9 +17,7 @@
     fetchBackendHealth, 
     fetchBackendSla, 
     fetchApiVersions, 
-    fetchSessionProfile,
-    fetchVoiceBootstrap,
-    clearPortalSession
+    fetchVoiceBootstrap
   } from './portal';
   import MetricsGrid from './MetricsGrid.svelte';
   import RuntimeState from './RuntimeState.svelte';
@@ -32,8 +26,6 @@
   import OperationsCard from './OperationsCard.svelte';
 
   async function refreshDashboard() {
-    if (!$session) return;
-
     busy.set(true);
     clearError();
 
@@ -55,7 +47,7 @@
       lastSyncedAt.set(syncTime);
 
       if ($voiceBootstrap) {
-        voiceBootstrap.set(await fetchVoiceBootstrap($backendUrl, $session.accessToken, $roomId));
+        voiceBootstrap.set(await fetchVoiceBootstrap($backendUrl, $roomId));
       }
 
       statusMessage.set(`Dashboard refreshed at ${syncTime}`);
@@ -67,13 +59,11 @@
   }
 
   async function buildVoiceBootstrap() {
-    if (!$session) return;
-
     busy.set(true);
     clearError();
 
     try {
-      const bootstrap = await fetchVoiceBootstrap($backendUrl, $session.accessToken, $roomId);
+      const bootstrap = await fetchVoiceBootstrap($backendUrl, $roomId);
       voiceBootstrap.set(bootstrap);
       statusMessage.set(`Voice bootstrap prepared for ${$roomId}`);
     } catch (error) {
@@ -83,57 +73,27 @@
     }
   }
 
-  function switchBackend() {
-    clearPortalSession();
-    session.set(null);
-    profile.set(null);
-    health.set(null);
-    sla.set(null);
-    versions.set(null);
-    voiceBootstrap.set(null);
-    statusMessage.set('Switching backend...');
-    clearError();
-    view.set('login');
-  }
-
-  function signOut() {
-    clearPortalSession();
-    session.set(null);
-    profile.set(null);
-    health.set(null);
-    sla.set(null);
-    versions.set(null);
-    voiceBootstrap.set(null);
-    password.set('');
-    statusMessage.set('Signed out.');
-    clearError();
-    view.set('login');
-  }
-
   function openBackendHealth() {
     window.open(`${$backendUrl}health`, '_blank', 'noopener,noreferrer');
   }
+
+  function openApiVersions() {
+    window.open(`${$backendUrl}api-versions`, '_blank', 'noopener,noreferrer');
+  }
+
 </script>
 
 <main class="home-layout">
   <aside class="sidebar panel">
     <div>
-      <p class="eyebrow mono">LIVE SESSION</p>
-      <h2>{$profile?.playerName}</h2>
+      <p class="eyebrow mono">BACKEND</p>
+      <h2>Control Center</h2>
       <p class="lede">
-        {$profile?.playerId}
-        <br />
         {$backendUrl}
       </p>
     </div>
 
     <div class="sidebar-stack">
-      <div class="sidebar-card">
-        <span class="mono">Voice chat</span>
-        <strong>{$session?.voiceEnabled ? 'Enabled' : 'Disabled'}</strong>
-        <p>Voice bootstrap is generated against the selected backend.</p>
-      </div>
-
       <div class="sidebar-card">
         <span class="mono">Backend state</span>
         <strong>{$health?.status ?? 'unknown'}</strong>
@@ -141,9 +101,8 @@
       </div>
 
       <div class="sidebar-actions">
-        <button class="ghost full" on:click={switchBackend}>Switch backend</button>
         <button class="ghost full" on:click={openBackendHealth}>Open health</button>
-        <button class="danger full" on:click={signOut}>Sign out</button>
+        <button class="ghost full" on:click={openApiVersions}>Open API versions</button>
       </div>
     </div>
   </aside>
@@ -170,14 +129,14 @@
     </header>
 
     <section class="metric-grid">
-      <MetricsGrid profile={$profile} health={$health} sla={$sla} versions={$versions} />
+      <MetricsGrid health={$health} sla={$sla} versions={$versions} />
     </section>
 
     <section class="content-grid">
       <RuntimeState health={$health} sla={$sla} lastSyncedAt={$lastSyncedAt} />
-      <VoiceBootstrapCard voiceBootstrap={$voiceBootstrap} session={$session} />
+      <VoiceBootstrapCard voiceBootstrap={$voiceBootstrap} />
       <ApiSurfaceCard versions={$versions} backendUrl={$backendUrl} />
-      <OperationsCard />
+      <OperationsCard on:refresh={refreshDashboard} />
     </section>
 
     <footer class="status-strip panel">
@@ -326,12 +285,6 @@
 
   .ghost {
     background: rgba(255, 255, 255, 0.05);
-  }
-
-  .danger {
-    background: rgba(255, 107, 122, 0.08);
-    border-color: rgba(255, 107, 122, 0.24);
-    color: #ffdce1;
   }
 
   .full {

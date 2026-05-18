@@ -1,7 +1,6 @@
 <script lang="ts">
-  import type { SessionProfile, BackendHealth, BackendSla, ApiVersions } from '$lib/portal';
+  import type { BackendHealth, BackendSla, ApiVersions } from '$lib/portal';
 
-  export let profile: SessionProfile | null = null;
   export let health: BackendHealth | null = null;
   export let sla: BackendSla | null = null;
   export let versions: ApiVersions | null = null;
@@ -9,9 +8,9 @@
 
 <section class="metric-grid">
   <article class="metric panel">
-    <span class="mono">Session</span>
-    <strong>{profile?.playerName ?? 'Signed in'}</strong>
-    <p>{profile?.playerId}</p>
+    <span class="mono">Uptime</span>
+    <strong>{sla?.uptime_percent ? `${sla.uptime_percent.toFixed(2)}%` : 'n/a'}</strong>
+    <p>{sla?.meets_sla ? 'Meeting SLA' : 'SLA pending'}</p>
   </article>
 
   <article class="metric panel">
@@ -21,15 +20,15 @@
   </article>
 
   <article class="metric panel">
-    <span class="mono">SLA</span>
-    <strong>{sla?.uptime_percent ? `${sla.uptime_percent.toFixed(2)}%` : 'n/a'}</strong>
-    <p>{sla?.meets_sla ? 'Meeting target' : 'Target pending'}</p>
+    <span class="mono">Error rate</span>
+    <strong>{sla?.error_rate_percent ? `${sla.error_rate_percent.toFixed(2)}%` : 'n/a'}</strong>
+    <p>30-day average</p>
   </article>
 
   <article class="metric panel">
     <span class="mono">API version</span>
     <strong>{versions?.current ?? 'n/a'}</strong>
-    <p>{versions?.supported?.join(', ') ?? 'No version data yet'}</p>
+    <p>{versions?.supported?.length ?? 0} supported</p>
   </article>
 </section>
 
