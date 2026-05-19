@@ -39,7 +39,6 @@ class PartyGameApp {
     const gameMenu = document.getElementById("gameMenu");
     const gameCards = document.querySelectorAll(".game-card");
     const playButton = document.getElementById("playButton");
-    const backButton = document.getElementById("backButton");
 
     const initialCard = document.querySelector(
       '.game-card[data-game="moba"]',
@@ -70,16 +69,9 @@ class PartyGameApp {
 
       // Start game
       gameMenu?.classList.remove("active");
-      backButton?.classList.remove("hidden");
       await this.startGame(playerName, DEFAULT_BACKEND_URL, gameType);
     });
 
-    // Back button
-    backButton?.addEventListener("click", () => {
-      this.stopGame();
-      gameMenu?.classList.add("active");
-      backButton?.classList.add("hidden");
-    });
 
     // Show menu initially
     gameMenu?.classList.add("active");

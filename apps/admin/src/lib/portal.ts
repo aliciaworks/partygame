@@ -117,6 +117,36 @@ async function fetchJson<T>(backendUrl: string, path: string, init?: RequestInit
     });
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
+    // If the configured backend fails, try the default example backend once as a fallback.
+    if (backendUrl !== DEFAULT_BACKEND_URL) {
+      try {
+        const fallbackUrl = new URL(path, DEFAULT_BACKEND_URL).toString();
+        const fallbackResp = await fetch(fallbackUrl, {
+          ...init,
+          headers: {
+            "Content-Type": "application/json",
+            ...(init?.headers ?? {}),
+          },
+        });
+
+        const fallbackText = await fallbackResp.text();
+        if (!fallbackResp.ok) {
+          const snippet = fallbackText.slice(0, 200).replace(/\s+/g, ' ').trim();
+          throw new Error(`Fallback backend returned ${fallbackResp.status}: ${snippet || 'empty'}`);
+        }
+
+        try {
+          return JSON.parse(fallbackText) as T;
+        } catch {
+          const snippet = fallbackText.slice(0, 200).replace(/\s+/g, ' ').trim();
+          throw new Error(`Fallback backend returned non-JSON response: ${snippet || 'empty'}`);
+        }
+      } catch (fallbackError) {
+        const fbReason = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+        throw new Error(`Failed to fetch ${requestUrl.toString()}: ${reason}; fallback also failed: ${fbReason}`);
+      }
+    }
+
     throw new Error(`Failed to fetch ${requestUrl.toString()}: ${reason}`);
   }
 
