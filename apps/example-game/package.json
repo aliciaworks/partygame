@@ -10,12 +10,12 @@
     "deploy": "wrangler pages deploy dist"
   },
   "dependencies": {
-    "@babylon/core": "^7.0.0",
-    "@babylon/gui": "^7.0.0",
-    "@babylon/inspector": "^7.0.0",
-    "@babylon/loaders": "^7.0.0",
-    "@babylon/materials": "^7.0.0",
-    "@babylon/procedural-textures": "^7.0.0",
+    "@babylonjs/core": "^7.0.0",
+    "@babylonjs/gui": "^7.0.0",
+    "@babylonjs/inspector": "^7.0.0",
+    "@babylonjs/loaders": "^7.0.0",
+    "@babylonjs/materials": "^7.0.0",
+    "@babylonjs/procedural-textures": "^7.0.0",
     "@partygame/shared": "file:../../packages/shared",
     "zod": "^3.22.0"
   },
