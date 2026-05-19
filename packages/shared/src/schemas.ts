@@ -50,7 +50,7 @@ export const EntityStateUpdateSchema = z.object({
   components: z.array(
     z.object({
       type: z.string(),
-      data: z.record(z.unknown()),
+      data: z.record(z.string(), z.unknown()),
     })
   ),
 });
@@ -70,7 +70,7 @@ export const GameTickUpdateSchema = z.object({
 export const PlayerInputCommandSchema = z.object({
   type: z.enum(["MOVE", "JUMP", "ATTACK", "ABILITY"]),
   playerId: z.string(),
-  data: z.record(z.unknown()),
+  data: z.record(z.string(), z.unknown()),
 });
 
 // ============================================================================

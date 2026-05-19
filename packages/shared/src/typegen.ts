@@ -1,8 +1,11 @@
 import {
-  Vector3Schema,
-  PlayerStateSchema,
-  PurchaseRequestSchema,
+  TransformComponentSchema,
+  HealthComponentSchema,
+  VelocityComponentSchema,
+  InputComponentSchema,
 } from "./schemas";
+
+import { z } from "zod";
 
 type PrimitiveKind = "string" | "number" | "boolean";
 
@@ -26,32 +29,59 @@ type SchemaDescriptor = {
 
 const schemaTargets = new Map<unknown, TargetNames>([
   [
-    Vector3Schema,
-    { csharp: "Vector3", godot: "Vector3State", unreal: "FPartyGameVector3" },
-  ],
-  [
-    PlayerStateSchema,
+    TransformComponentSchema,
     {
-      csharp: "PlayerState",
-      godot: "PlayerState",
-      unreal: "FPartyGamePlayerState",
+      csharp: "TransformComponent",
+      godot: "TransformComponent",
+      unreal: "FPartyGameTransformComponent",
     },
   ],
   [
-    PurchaseRequestSchema,
+    HealthComponentSchema,
     {
-      csharp: "PurchaseRequest",
-      godot: "PurchaseRequest",
-      unreal: "FPartyGamePurchaseRequest",
+      csharp: "HealthComponent",
+      godot: "HealthComponent",
+      unreal: "FPartyGameHealthComponent",
+    },
+  ],
+  [
+    VelocityComponentSchema,
+    {
+      csharp: "VelocityComponent",
+      godot: "VelocityComponent",
+      unreal: "FPartyGameVelocityComponent",
+    },
+  ],
+  [
+    InputComponentSchema,
+    {
+      csharp: "InputComponent",
+      godot: "InputComponent",
+      unreal: "FPartyGameInputComponent",
     },
   ],
 ] as const);
 
 const rootSchemas = [
-  { name: "Vector3", schema: Vector3Schema },
-  { name: "PlayerState", schema: PlayerStateSchema },
-  { name: "PurchaseRequest", schema: PurchaseRequestSchema },
+  { name: "TransformComponent", schema: TransformComponentSchema },
+  { name: "HealthComponent", schema: HealthComponentSchema },
+  { name: "VelocityComponent", schema: VelocityComponentSchema },
+  { name: "InputComponent", schema: InputComponentSchema },
 ] as const;
+
+function unwrapSchema(schema: unknown): unknown {
+  let current = schema as { _def?: { innerType?: unknown; schema?: unknown } };
+
+  while (current && typeof current === "object") {
+    const next = current._def?.innerType ?? current._def?.schema;
+    if (!next) {
+      break;
+    }
+    current = next as { _def?: { innerType?: unknown; schema?: unknown } };
+  }
+
+  return current;
+}
 
 function toSnakeCase(value: string): string {
   return value
@@ -61,41 +91,50 @@ function toSnakeCase(value: string): string {
 }
 
 function describeField(fieldSchema: unknown): FieldDescriptor {
-  if (!fieldSchema || typeof fieldSchema !== "object") {
+  const unwrapped = unwrapSchema(fieldSchema);
+
+  if (!unwrapped || typeof unwrapped !== "object") {
     throw new Error("Unsupported schema field.");
   }
 
-  const descriptor = fieldSchema as { _def?: { typeName?: string } };
-  const typeName = descriptor._def?.typeName;
-
-  if (typeName === "ZodString") {
+  if (unwrapped instanceof z.ZodString) {
     return { name: "", kind: "string" };
   }
 
-  if (typeName === "ZodNumber") {
+  if (unwrapped instanceof z.ZodNumber) {
     return { name: "", kind: "number" };
   }
 
-  if (typeName === "ZodBoolean") {
+  if (unwrapped instanceof z.ZodBoolean) {
     return { name: "", kind: "boolean" };
   }
 
-  const target = schemaTargets.get(fieldSchema as never);
+  const target = schemaTargets.get(unwrapped as never);
   if (target) {
     return { name: "", kind: "object", reference: target };
   }
 
+  const descriptor = unwrapped as { _def?: { typeName?: string } };
+  const typeName = descriptor._def?.typeName;
   throw new Error(`Unsupported schema field type: ${String(typeName)}`);
 }
 
 function describeSchema(
   name: string,
-  schema:
-    | typeof Vector3Schema
-    | typeof PlayerStateSchema
-    | typeof PurchaseRequestSchema,
+  schema: z.ZodTypeAny,
 ): SchemaDescriptor {
-  const shape = schema._def.shape();
+  const def = schema as unknown as {
+    _def?: { shape?: Record<string, unknown> | (() => Record<string, unknown>) };
+  };
+
+  const shapeValue =
+    typeof def._def?.shape === "function" ? def._def.shape() : def._def?.shape;
+
+  if (!shapeValue || typeof shapeValue !== "object") {
+    throw new Error(`Schema ${name} is not an object schema.`);
+  }
+
+  const shape = shapeValue as Record<string, unknown>;
   const fields = Object.entries(shape).map(([fieldName, fieldSchema]) => {
     const field = describeField(fieldSchema);
     return {
