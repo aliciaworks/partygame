@@ -94,7 +94,8 @@ export function saveBackendUrl(backendUrl: string): string {
 }
 
 async function fetchJson<T>(backendUrl: string, path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${backendUrl}${path.replace(/^\//, "")}`, {
+  const requestUrl = new URL(path, backendUrl);
+  const response = await fetch(requestUrl, {
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -109,9 +110,9 @@ async function fetchJson<T>(backendUrl: string, path: string, init?: RequestInit
     data = text ? (JSON.parse(text) as T) : ({} as T);
   } catch (parseError) {
     if (response.status === 404) {
-      throw new Error(`Backend endpoint not found (404): ${backendUrl}${path}`);
+      throw new Error(`Backend endpoint not found (404): ${requestUrl.toString()}`);
     }
-    throw new Error(`Backend returned non-JSON response for ${backendUrl}${path}. Check the backend URL or route.`);
+    throw new Error(`Backend returned non-JSON response for ${requestUrl.toString()}. Check the backend URL or route.`);
   }
 
   if (!response.ok) {
