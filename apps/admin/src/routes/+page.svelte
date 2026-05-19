@@ -20,7 +20,6 @@
   onMount(() => {
     const savedBackendUrl = readBackendUrl();
     backendUrl.set(savedBackendUrl);
-    statusMessage.set(`${$translate('topbar.backend')} ${savedBackendUrl}`);
     siteName.set(readSiteName());
   });
 </script>
@@ -36,14 +35,7 @@
       <div class="brand-mark"></div>
       <div>
         <p class="eyebrow mono">{$translate('topbar.brand')}</p>
-        <input
-          class="site-name"
-          bind:value={$siteName}
-          on:blur={() => {
-            saveSiteName($siteName);
-            statusMessage.set(`${$translate('topbar.site')} ${$siteName}`);
-          }}
-        />
+        <input class="site-name" bind:value={$siteName} on:blur={() => saveSiteName($siteName)} />
       </div>
     </div>
   </header>

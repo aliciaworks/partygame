@@ -118,31 +118,32 @@
 </script>
 
 <main class="home-layout">
+  <aside class="sidebar panel" class:collapsed={!sidebarOpen} aria-hidden={!sidebarOpen}>
+    <div class="sidebar-top">
+      <button class="collapse-btn" on:click={toggleSidebar} aria-label="Toggle sidebar">{sidebarOpen ? '‹' : '›'}</button>
+    </div>
+
+    <nav class="sidebar-stack">
+      <ul class="category-list">
+        <li><button class:active={activeCategory === 'dashboard'} class="category-item" on:click={() => selectCategory('dashboard')}>{$translate('sidebar.dashboard')}</button></li>
+        <li><button class:active={activeCategory === 'operations'} class="category-item" on:click={() => selectCategory('operations')}>{$translate('sidebar.operations')}</button></li>
+        <li><button class:active={activeCategory === 'settings'} class="category-item" on:click={() => selectCategory('settings')}>{$translate('sidebar.settings')}</button></li>
+        <li><button class:active={activeCategory === 'users'} class="category-item" on:click={() => selectCategory('users')}>{$translate('sidebar.users')}</button></li>
+        <li><button class:active={activeCategory === 'logs'} class="category-item" on:click={() => selectCategory('logs')}>{$translate('sidebar.logs')}</button></li>
+      </ul>
+    </nav>
+
+    <div class="sidebar-actions">
+      <label for="lang-select" class="mono">{$translate('language.label')}</label>
+      <select id="lang-select" value={$locale} on:change={setLocale}>
+        {#each availableLocales as opt}
+          <option value={opt.value} selected={opt.value === $locale}>{opt.label}</option>
+        {/each}
+      </select>
+    </div>
+  </aside>
+
   <section class="workspace">
-    <aside class="sidebar" class:collapsed={!sidebarOpen} aria-hidden={!sidebarOpen}>
-      <div class="sidebar-top">
-        <button class="collapse-btn" on:click={toggleSidebar} aria-label="Toggle sidebar">{sidebarOpen ? '‹' : '›'}</button>
-      </div>
-      <nav class="sidebar-stack">
-        <ul class="category-list">
-          <li><button class:active={activeCategory==='dashboard'} class="category-item" on:click={() => selectCategory('dashboard')}>{$translate('sidebar.dashboard')}</button></li>
-          <li><button class:active={activeCategory==='operations'} class="category-item" on:click={() => selectCategory('operations')}>{$translate('sidebar.operations')}</button></li>
-          <li><button class:active={activeCategory==='settings'} class="category-item" on:click={() => selectCategory('settings')}>{$translate('sidebar.settings')}</button></li>
-          <li><button class:active={activeCategory==='users'} class="category-item" on:click={() => selectCategory('users')}>{$translate('sidebar.users')}</button></li>
-          <li><button class:active={activeCategory==='logs'} class="category-item" on:click={() => selectCategory('logs')}>{$translate('sidebar.logs')}</button></li>
-        </ul>
-      </nav>
-
-      <div class="sidebar-actions">
-        <label for="lang-select" class="mono">{$translate('language.label')}</label>
-        <select id="lang-select" value={$locale} on:change={setLocale}>
-          {#each availableLocales as opt}
-            <option value={opt.value} selected={opt.value === $locale}>{opt.label}</option>
-          {/each}
-        </select>
-      </div>
-    </aside>
-
     <div class="action-bar panel">
       <div class="room-selector">
         <label for="room-id" class="mono">{$translate('label.room')}</label>
@@ -174,7 +175,8 @@
     </div>
 
     <footer class="status-bar">
-      <span class="mono">{$statusMessage}</span>
+      <span class="mono">{$translate('topbar.backend')} {$backendUrl}</span>
+      <span class:status-muted={!$statusMessage || $statusMessage === 'Loading portal...'}>{$statusMessage}</span>
       {#if $errorMessage}
         <span class="error-text">{$errorMessage}</span>
       {/if}
@@ -185,33 +187,95 @@
 <style>
   .home-layout {
     display: grid;
-    grid-template-columns: 320px minmax(0, 1fr);
+    grid-template-columns: 280px minmax(0, 1fr);
     gap: 24px;
+    align-items: start;
+  }
+
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px;
+    border-radius: 24px;
+    position: sticky;
+    top: 24px;
+    align-self: start;
+    min-height: calc(100vh - 48px);
+  }
+
+  .sidebar.collapsed {
+    width: 72px;
+    padding-inline: 10px;
+  }
+
+  .sidebar-top {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .collapse-btn {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--muted);
+    border-radius: 10px;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+  }
+
+  .sidebar-stack {
+    display: block;
+  }
+
+  .category-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .category-item {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+    font: inherit;
+  }
+
+  .category-item.active,
+  .category-item:hover,
+  .category-item:focus-visible {
+    background: rgba(124, 240, 255, 0.12);
+    border-color: rgba(124, 240, 255, 0.3);
+  }
+
+  .sidebar-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: auto;
+  }
+
+  .sidebar-actions select,
+  .room-selector input {
+    width: 100%;
   }
 
   .workspace {
     display: grid;
     gap: 20px;
+    min-width: 0;
   }
 
   input {
-    gap: 12px;
     border-radius: 16px;
-
-  .sidebar.collapsed {
-    width: 72px;
-    padding-left: 8px;
-    padding-right: 8px;
-  }
-
-  .sidebar .collapse-btn {
-    background: transparent;
-    border: none;
-    color: var(--muted);
-    font-size: 18px;
-    cursor: pointer;
-  }
-
     border: 1px solid rgba(255, 255, 255, 0.08);
     padding: 14px 16px;
     color: var(--text);
@@ -225,21 +289,6 @@
   }
 
   button {
-  .category-item {
-    padding: 8px 10px;
-    border-radius: 6px;
-    background: transparent;
-    border: none;
-    text-align: left;
-    width: 100%;
-    cursor: pointer;
-  }
-
-  .category-item.active,
-  .category-item:focus,
-  .category-item:hover {
-    background: rgba(0,0,0,0.04);
-  }
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.08);
     cursor: pointer;
@@ -273,14 +322,41 @@
     gap: 16px;
   }
 
+  .status-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .status-muted {
+    color: var(--muted);
+  }
+
+  .error-text {
+    color: var(--danger, #ff9d7a);
+  }
+
   @media (max-width: 1100px) {
     .home-layout,
     .content-grid {
       grid-template-columns: 1fr;
     }
 
+    .sidebar {
+      position: static;
+      min-height: auto;
+    }
+
     .content-grid {
       grid-auto-flow: row;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .home-layout {
+      grid-template-columns: 1fr;
     }
   }
 </style>
