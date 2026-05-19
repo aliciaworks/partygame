@@ -94,8 +94,24 @@ export function saveBackendUrl(backendUrl: string): string {
 }
 
 async function fetchJson<T>(backendUrl: string, path: string, init?: RequestInit): Promise<T> {
-  const requestUrl = new URL(path, backendUrl);
-  const response = await fetch(requestUrl, {
+  let requestUrl: URL;
+  try {
+    requestUrl = new URL(path, backendUrl);
+  } catch (err) {
+    // try to salvage a URL if someone accidentally stored a labeled string
+    const maybe = String(backendUrl).match(/https?:\/\/[^\s"']+/)?.[0];
+    if (maybe) {
+      try {
+        requestUrl = new URL(path, maybe);
+      } catch (err2) {
+        throw new Error(`Invalid backend base URL: ${backendUrl}`);
+      }
+    } else {
+      throw new Error(`Invalid backend base URL: ${backendUrl}`);
+    }
+  }
+
+  const response = await fetch(requestUrl.toString(), {
     ...init,
     headers: {
       "Content-Type": "application/json",
