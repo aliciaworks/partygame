@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@sentry/node": "^8.0.0",
-    "drizzle-orm": "^0.41.0",
+    "drizzle-orm": "^0.45.2",
     "hono": "^4.2.0",
     "jsonwebtoken": "^9.0.2",
     "nanoid": "^4.0.2",
