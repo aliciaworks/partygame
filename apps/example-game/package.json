@@ -16,7 +16,7 @@
     "@babylon/loaders": "^7.0.0",
     "@babylon/materials": "^7.0.0",
     "@babylon/procedural-textures": "^7.0.0",
-    "@partygame/shared": "workspace:*",
+    "@partygame/shared": "file:../../packages/shared",
     "zod": "^3.22.0"
   },
   "devDependencies": {
