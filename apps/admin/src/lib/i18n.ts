@@ -2,7 +2,11 @@ import { writable, derived } from 'svelte/store';
 
 const STORAGE_KEY = 'partygame.locale';
 
-export const locale = writable<string>(localStorage.getItem(STORAGE_KEY) || 'en');
+function isBrowser() {
+  return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+}
+
+export const locale = writable<string>('en');
 
 const messages = writable<Record<string, string>>({});
 
@@ -16,13 +20,21 @@ async function loadLocale(l: string) {
   }
 }
 
-// load initial
-loadLocale(localStorage.getItem(STORAGE_KEY) || 'en');
+// initialize only in browser to avoid SSR errors
+if (isBrowser()) {
+  const initial = window.localStorage.getItem(STORAGE_KEY) || 'en';
+  locale.set(initial);
+  loadLocale(initial);
 
-locale.subscribe((l) => {
-  localStorage.setItem(STORAGE_KEY, l);
-  loadLocale(l);
-});
+  locale.subscribe((l) => {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, l);
+    } catch (e) {
+      // ignore quota errors
+    }
+    loadLocale(l);
+  });
+}
 
 export const translate = derived(messages, ($messages) => {
   return (key: string) => $messages[key] ?? key;
