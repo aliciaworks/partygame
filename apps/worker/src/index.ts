@@ -13,6 +13,19 @@ type Env = {
   CONTROLS_BUCKET?: any;
 };
 
+export class GameRoom {
+  constructor(
+    private readonly state: DurableObjectState,
+    private readonly env: Env,
+  ) {}
+
+  async fetch(_request: Request): Promise<Response> {
+    return new Response("GameRoom Durable Object is alive", {
+      headers: { "content-type": "text/plain; charset=utf-8" },
+    });
+  }
+}
+
 // Game room storage - maps roomId to RoomGame instance
 const gameRooms = new Map<string, RoomGame>();
 
@@ -299,3 +312,4 @@ app.get("/", (c) => {
 // ============================================================================
 
 export default app;
+
