@@ -14,8 +14,9 @@ type Env = {
 };
 
 export class GameRoom {
+  // Use `any` for Durable Object state type to avoid environment typing mismatches
   constructor(
-    private readonly state: DurableObjectState,
+    private readonly state: any,
     private readonly env: Env,
   ) {}
 
@@ -154,8 +155,8 @@ app.get(
       console.log(`[ROOM ${roomId}] Created and started game loop`);
     }
 
-    // Get WebSocket from raw request
-    const ws = c.req.raw.webSocket;
+    // Get WebSocket from raw request (cast to any for typing compatibility)
+    const ws = (c.req.raw as any).webSocket;
 
     // Add player to room
     roomGame.addPlayer(playerId, ws);
@@ -180,10 +181,12 @@ app.get(
 
       onMessage(message) {
         try {
-          const data = JSON.parse(message);
+          // Hono/WebSocket message may be a string or MessageEvent-like object
+          const raw = typeof message === "string" ? message : (message && (message as any).data) ? (message as any).data : message;
+          const data = typeof raw === "string" ? JSON.parse(raw) : raw;
 
           // Handle player input
-          if (data.type === "input") {
+          if (data && data.type === "input") {
             const command: PlayerInputCommand = {
               type: data.inputType || "MOVE",
               playerId,
@@ -254,9 +257,9 @@ app.get("/admin/rooms", async (c) => {
   const rooms = Array.from(gameRooms.entries()).map(([roomId, game]) => ({
     roomId,
     playerCount: game.getPlayerCount(),
-    worldStats: {
-      entityCount: game.getWorld().getEntityCount(),
-      systemCount: game.getWorld().getSystemCount(),
+      worldStats: {
+      entityCount: game.getWorld().entities.size,
+      systemCount: game.getWorld().getSystems().length,
     },
   }));
 

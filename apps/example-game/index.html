@@ -1,418 +1,120 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PartyGame - Web Game</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PartyGame - Web Game</title>
+    <style>
+      :root {
+        --bg: #07111f;
+        --bg-elevated: rgba(9, 18, 35, 0.86);
+        --text: #e8eefc;
+        --muted: #9fb0d0;
+        --border: rgba(255, 255, 255, 0.09);
+        --accent: #4ade80;
+        --accent-warm: #fbbf24;
+        --danger: #ef4444;
+      }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-      background: #0a0e27;
-      color: #e0e0e0;
-      overflow: hidden;
-    }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { height: 100%; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(74, 222, 128, 0.06), transparent 28%),
+          radial-gradient(circle at bottom right, rgba(251, 191, 36, 0.04), transparent 22%),
+          var(--bg);
+        color: var(--text);
+        overflow: hidden;
+      }
 
-    canvas {
-      display: block;
-      width: 100vw;
-      height: 100vh;
-      background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
-    }
+      canvas { display: block; width: 100vw; height: 100vh; background: linear-gradient(135deg, #08111f 0%, #111a2e 100%); }
 
-    #ui {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      right: 20px;
-      font-size: 14px;
-      z-index: 10;
-    }
+      /* Game Menu */
+      #gameMenu { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 24px; z-index: 20; background: linear-gradient(135deg, rgba(6,10,22,0.9), rgba(10,16,30,0.88)); backdrop-filter: blur(12px); }
+      #gameMenu:not(.active){ display:none; }
+      .menu-card { width: min(1080px, 100%); border-radius: 20px; padding: 28px; background: var(--bg-elevated); border: 1px solid var(--border); box-shadow: 0 20px 60px rgba(0,0,0,0.35); }
+      .menu-kicker { display:inline-flex; gap:10px; padding:8px 12px; border-radius:999px; background: rgba(74,222,128,0.08); color:var(--accent); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.12em; margin-bottom:12px; }
+      .menu-title { font-size: clamp(1.6rem, 4.5vw, 3rem); line-height:1; margin-bottom:10px; }
+      .menu-description { color:var(--muted); margin-bottom:18px; max-width:60ch; }
+      .game-grid { display:grid; grid-template-columns: repeat(2, 1fr); gap:14px; margin-bottom:18px; }
+      .game-card { padding:16px; border-radius:14px; background: rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); cursor:pointer; }
+      .game-card.active { transform: translateY(-4px); border-color: rgba(74,222,128,0.4); box-shadow:0 12px 30px rgba(0,0,0,0.25); }
+      .game-tag { display:inline-block; padding:4px 8px; border-radius:999px; background: rgba(74,222,128,0.08); color:var(--accent); font-size:0.72rem; text-transform:uppercase; margin-bottom:8px; }
+      .launcher-row { display:flex; gap:12px; margin-bottom:8px; }
+      .primary-button, .secondary-button { border: none; border-radius: 12px; padding:10px 14px; font-weight:700; cursor:pointer; }
+      .primary-button { background: linear-gradient(135deg, var(--accent), #22c55e); color:#07111f; }
+      .secondary-button { background: rgba(255,255,255,0.04); color:var(--text); border:1px solid var(--border); }
 
-    .hud {
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>PartyGame - Web Game</title>
-        <style>
-          * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-          }
+      .backend-note { margin-top:10px; color:var(--muted); font-size:0.92rem; }
 
-          :root {
-            --bg: #07111f;
-            --bg-elevated: rgba(9, 18, 35, 0.86);
-            --text: #e8eefc;
-            --muted: #9fb0d0;
-            --border: rgba(255, 255, 255, 0.09);
-            --accent: #4ade80;
-            --accent-warm: #fbbf24;
-            --danger: #ef4444;
-          }
+      /* HUD */
+      #ui { position:absolute; top:20px; left:20px; right:20px; z-index:10; pointer-events: none; }
+      .hud { background: rgba(9,18,35,0.82); border:1px solid rgba(255,255,255,0.07); border-radius:14px; padding:12px 14px; backdrop-filter: blur(8px); }
+      .hud-row { display:flex; gap:18px; align-items:center; }
+      .hud-item { display:flex; gap:8px; align-items:center; }
+      .health-bar { width:160px; height:8px; background: rgba(255,255,255,0.06); border-radius:999px; overflow:hidden; }
+      .health-fill { height:100%; background: linear-gradient(90deg,#4ade80,#22c55e); width:100%; transition: width 0.12s ease; }
 
-          body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background:
-              radial-gradient(circle at top left, rgba(74, 222, 128, 0.12), transparent 28%),
-              radial-gradient(circle at bottom right, rgba(251, 191, 36, 0.08), transparent 22%),
-              var(--bg);
-            color: var(--text);
-            overflow: hidden;
-          }
+      #statusBar { position:absolute; bottom:20px; right:20px; padding:8px 12px; border-radius:999px; border:1px solid var(--border); background: rgba(9,18,35,0.84); font-size:12px; z-index:10; }
+      #statusBar.connected { color:#4ade80; border-color: rgba(74,222,128,0.45); }
+      #statusBar.disconnected { color:#ef4444; border-color: rgba(239,68,68,0.45); }
+      .status-indicator { display:inline-block; width:8px; height:8px; margin-right:8px; border-radius:999px; background:#fbbf24; vertical-align:middle; }
+      .status-indicator.connected { background:#4ade80; }
+      .status-indicator.disconnected { background:#ef4444; }
 
-          canvas {
-            display: block;
-            width: 100vw;
-            height: 100vh;
-            background: linear-gradient(135deg, #08111f 0%, #111a2e 100%);
-          }
+      @media (max-width:900px){ .game-grid{ grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <div id="gameMenu" class="active">
+      <div class="menu-card">
+        <div class="menu-kicker">Example game launcher</div>
+        <h1 class="menu-title">Choose a demo mode</h1>
+        <p class="menu-description">Select one of the sample games below and launch into the fixed example backend. A player name is generated automatically.</p>
 
-          #gameMenu {
-            position: absolute;
-            inset: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 24px;
-            z-index: 20;
-            background: linear-gradient(135deg, rgba(6, 10, 22, 0.9), rgba(10, 16, 30, 0.88));
-            backdrop-filter: blur(16px);
-          }
-
-          #gameMenu:not(.active) {
-            display: none;
-          }
-
-          .menu-card {
-            width: min(1080px, 100%);
-            border-radius: 28px;
-            padding: 30px;
-            background: var(--bg-elevated);
-            border: 1px solid var(--border);
-            box-shadow: 0 26px 70px rgba(0, 0, 0, 0.38);
-          }
-
-          .menu-kicker {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            padding: 8px 14px;
-            border-radius: 999px;
-            background: rgba(74, 222, 128, 0.12);
-            color: var(--accent);
-            font-size: 0.78rem;
-            letter-spacing: 0.14em;
-            text-transform: uppercase;
-            margin-bottom: 18px;
-          }
-
-          .menu-title {
-            font-size: clamp(2rem, 5vw, 4rem);
-            line-height: 0.95;
-            margin-bottom: 16px;
-            max-width: 13ch;
-          }
-
-          .menu-description {
-            max-width: 60ch;
-            color: var(--muted);
-            line-height: 1.7;
-            margin-bottom: 28px;
-            font-size: 1.03rem;
-          }
-
-          .game-grid {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 16px;
-            margin-bottom: 22px;
-          }
-
-          .game-card {
-            padding: 20px;
-            border-radius: 20px;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            cursor: pointer;
-            transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-          }
-
-          .game-card:hover,
-          .game-card.active {
-            transform: translateY(-3px);
-            border-color: rgba(74, 222, 128, 0.45);
-            box-shadow: 0 16px 34px rgba(0, 0, 0, 0.26);
-          }
-
-          .game-tag {
-            display: inline-flex;
-            margin-bottom: 12px;
-            padding: 5px 10px;
-            border-radius: 999px;
-            background: rgba(74, 222, 128, 0.12);
-            color: var(--accent);
-            font-size: 0.74rem;
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
-          }
-
-          .game-card h3 {
-            font-size: 1.25rem;
-            margin-bottom: 8px;
-          }
-
-          .game-card p {
-            color: var(--muted);
-            line-height: 1.55;
-          }
-
-          .launcher-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            align-items: center;
-            margin-bottom: 14px;
-          }
-
-          .primary-button,
-          .secondary-button {
-            border: none;
-            border-radius: 14px;
-            padding: 13px 18px;
-            font-weight: 700;
-            cursor: pointer;
-            font-size: 0.98rem;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-          }
-
-          .primary-button {
-            background: linear-gradient(135deg, var(--accent), #22c55e);
-            color: #07111f;
-            box-shadow: 0 12px 26px rgba(74, 222, 128, 0.22);
-          }
-
-          .secondary-button {
-            background: rgba(255, 255, 255, 0.05);
-            color: var(--text);
-            border: 1px solid var(--border);
-          }
-
-          .primary-button:hover,
-          .secondary-button:hover {
-            transform: translateY(-1px);
-          }
-
-          .backend-note {
-            margin-top: 14px;
-            color: var(--muted);
-            font-size: 0.92rem;
-          }
-
-          #error {
-            display: none;
-            margin-top: 16px;
-            color: var(--danger);
-            min-height: 1.25rem;
-          }
-
-          #ui {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            right: 20px;
-            z-index: 10;
-            pointer-events: none;
-          }
-
-          .hud {
-            background: rgba(9, 18, 35, 0.82);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 18px;
-            padding: 16px 18px;
-            backdrop-filter: blur(12px);
-          }
-
-          .hud-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 18px;
-            margin-bottom: 8px;
-          }
-
-          .hud-row:last-child {
-            margin-bottom: 0;
-          }
-
-          .hud-item {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-          }
-
-          .health-bar {
-            width: 160px;
-            height: 8px;
-            background: rgba(255, 255, 255, 0.08);
-            border-radius: 999px;
-            overflow: hidden;
-          }
-
-          .health-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #4ade80, #22c55e);
-            transition: width 0.1s ease-out;
-          }
-
-          #statusBar {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            padding: 8px 14px;
-            border-radius: 999px;
-            border: 1px solid var(--border);
-            background: rgba(9, 18, 35, 0.84);
-            font-size: 12px;
-            font-weight: 600;
-            z-index: 10;
-          }
-
-          #statusBar.connected {
-            color: #4ade80;
-            border-color: rgba(74, 222, 128, 0.45);
-          }
-
-          #statusBar.disconnected {
-            color: #ef4444;
-            border-color: rgba(239, 68, 68, 0.45);
-          }
-
-          .status-indicator {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            margin-right: 8px;
-            border-radius: 999px;
-            background: #fbbf24;
-            vertical-align: middle;
-          }
-
-          .status-indicator.connected {
-            background: #4ade80;
-          }
-
-          .status-indicator.disconnected {
-            background: #ef4444;
-          }
-
-          .hidden {
-            display: none !important;
-          }
-
-          @media (max-width: 900px) {
-            .game-grid {
-              grid-template-columns: 1fr;
-            }
-
-            .launcher-row {
-              grid-template-columns: 1fr;
-            }
-
-            .menu-card {
-              padding: 22px;
-            }
-          }
-
-          @media (max-width: 640px) {
-            #gameMenu {
-              padding: 14px;
-            }
-
-            .menu-card {
-              padding: 18px;
-              border-radius: 22px;
-            }
-
-            .hud {
-              padding: 14px;
-              border-radius: 16px;
-            }
-
-            #statusBar {
-              right: 14px;
-              bottom: 14px;
-            }
-          }
-        </style>
-      </head>
-      <body>
-        <div id="gameMenu" class="active">
-          <div class="menu-card">
-            <div class="menu-kicker">Example game launcher</div>
-            <h1 class="menu-title">Choose a demo mode</h1>
-            <p class="menu-description">
-              Select one of the sample games below and launch into the fixed example backend. A player name is generated automatically.
-            </p>
-
-            <div class="game-grid">
-              <div class="game-card active" data-game="moba">
-                <div class="game-tag">MOBA</div>
-                <h3>Arena Wars</h3>
-                <p>Isometric team battles with movement, lane pressure, and shared objectives.</p>
-              </div>
-
-              <div class="game-card" data-game="fps">
-                <div class="game-tag">FPS</div>
-                <h3>CyberArena</h3>
-                <p>First-person combat with sprinting, jumping, and a neon-lit arena.</p>
-              </div>
-            </div>
-
-            <div class="launcher-row">
-              <button id="playButton" class="primary-button">Join Game</button>
-              <button id="backButton" class="secondary-button hidden">Back to menu</button>
-            </div>
-
-            <div class="backend-note">Backend locked to https://partygame-example-backend.aliciaworks.workers.dev/</div>
-            <div class="backend-note">Player name is auto-generated the first time you launch.</div>
-            <div id="error"></div>
+        <div class="game-grid">
+          <div class="game-card active" data-game="moba">
+            <div class="game-tag">MOBA</div>
+            <h3>Arena Wars</h3>
+            <p style="color:var(--muted)">Isometric team battles with movement, lane pressure, and shared objectives.</p>
+          </div>
+          <div class="game-card" data-game="fps">
+            <div class="game-tag">FPS</div>
+            <h3>CyberArena</h3>
+            <p style="color:var(--muted)">First-person combat with sprinting, jumping, and a neon-lit arena.</p>
           </div>
         </div>
 
-        <canvas id="renderCanvas"></canvas>
-
-        <div id="ui">
-          <div class="hud">
-            <div class="hud-row">
-              <div class="hud-item">
-                <span>Health:</span>
-                <div class="health-bar">
-                  <div class="health-fill" id="health-fill" style="width: 100%"></div>
-                </div>
-                <span id="health-text">100/100</span>
-              </div>
-              <div class="hud-item">
-                <span>Position:</span>
-                <span id="position-text">0, 0</span>
-              </div>
-              <div class="hud-item">
-                <span>Players Online:</span>
-                <span id="players-text">0</span>
-              </div>
-            </div>
-          </div>
+        <div class="launcher-row">
+          <button id="playButton" class="primary-button">Join Game</button>
+          <button id="backButton" class="secondary-button hidden">Back to menu</button>
         </div>
 
-        <div id="statusBar" class="disconnected"><span class="status-indicator disconnected"></span><span id="statusText">Disconnected</span></div>
+        <div class="backend-note">Backend locked to https://partygame-example-backend.aliciaworks.workers.dev/</div>
+        <div class="backend-note">Player name is auto-generated the first time you launch.</div>
+        <div id="error"></div>
+      </div>
+    </div>
 
-        <script type="module" src="/src/main.ts"></script>
-      </body>
-      </html>
+    <canvas id="renderCanvas"></canvas>
+
+    <div id="ui">
+      <div class="hud">
+        <div class="hud-row">
+          <div class="hud-item">
+            <span>Health:</span>
+            <div class="health-bar"><div class="health-fill" id="health-fill" style="width:100%"></div></div>
+            <span id="health-text">100/100</span>
+          </div>
+          <div class="hud-item"><span>Position:</span><span id="position-text">0, 0</span></div>
+          <div class="hud-item"><span>Players Online:</span><span id="players-text">0</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="statusBar" class="disconnected"><span class="status-indicator disconnected"></span><span id="statusText">Disconnected</span></div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

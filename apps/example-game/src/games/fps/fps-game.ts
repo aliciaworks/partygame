@@ -11,7 +11,7 @@ export class FPSGame extends BaseGame {
   private playerMeshes: Map<string, BABYLON.AbstractMesh> = new Map();
   private inputState = { moveX: 0, moveY: 0, isSprinting: false };
   private isJumping = false;
-  private jumpPower = 15;
+  // Jump physics value removed until used — keep jump behavior via `isJumping` flag
   private groundContact = false;
 
   constructor(scene: BABYLON.Scene, networkManager: NetworkManager) {
@@ -124,12 +124,13 @@ export class FPSGame extends BaseGame {
     const blueLight = new BABYLON.PointLight("blueLight", new BABYLON.Vector3(50, 20, 50), this.scene);
     blueLight.intensity = 0.4;
     blueLight.range = 150;
-    blueLight.diffuse = new BABYLON.Color3(0, 0.5, 1);
+    // newer Babylon typings prefer setting diffuse color via 'diffuse' alias may be unavailable; set via 'diffuse' if present
+    (blueLight as any).diffuse = new BABYLON.Color3(0, 0.5, 1);
 
     const redLight = new BABYLON.PointLight("redLight", new BABYLON.Vector3(-50, 20, -50), this.scene);
     redLight.intensity = 0.3;
     redLight.range = 150;
-    redLight.diffuse = new BABYLON.Color3(1, 0, 0.5);
+    (redLight as any).diffuse = new BABYLON.Color3(1, 0, 0.5);
   }
 
   private setupEnvironment(): void {
@@ -141,8 +142,8 @@ export class FPSGame extends BaseGame {
     );
 
     const floorMat = new BABYLON.StandardMaterial("floorMat", this.scene);
-    floorMat.diffuse = new BABYLON.Color3(0.1, 0.1, 0.15);
-    floorMat.roughness = 0.8;
+    floorMat.diffuseColor = new BABYLON.Color3(0.1, 0.1, 0.15);
+    (floorMat as any).roughness = 0.8;
     floor.material = floorMat;
 
     // Add physics
@@ -157,7 +158,7 @@ export class FPSGame extends BaseGame {
     const wall1 = BABYLON.MeshBuilder.CreateBox("wall1", { width: 100, height: 20, depth: 2 }, this.scene);
     wall1.position = new BABYLON.Vector3(0, 10, -80);
     const wallMat = new BABYLON.StandardMaterial("wallMat", this.scene);
-    wallMat.diffuse = new BABYLON.Color3(0.3, 0.2, 0.3);
+    wallMat.diffuseColor = new BABYLON.Color3(0.3, 0.2, 0.3);
     wall1.material = wallMat;
     wall1.physicsImpostor = new BABYLON.PhysicsImpostor(
       wall1,
@@ -170,7 +171,7 @@ export class FPSGame extends BaseGame {
     const tower = BABYLON.MeshBuilder.CreateCylinder("tower", { height: 30, diameter: 15 }, this.scene);
     tower.position = new BABYLON.Vector3(0, 15, 0);
     const towerMat = new BABYLON.StandardMaterial("towerMat", this.scene);
-    towerMat.diffuse = new BABYLON.Color3(0.5, 0.3, 0.8);
+    towerMat.diffuseColor = new BABYLON.Color3(0.5, 0.3, 0.8);
     towerMat.emissiveColor = new BABYLON.Color3(0.3, 0.1, 0.5);
     tower.material = towerMat;
     tower.physicsImpostor = new BABYLON.PhysicsImpostor(
@@ -187,7 +188,9 @@ export class FPSGame extends BaseGame {
 
     // FPS controls
     this.camera.inertia = 0.7;
-    this.camera.angularSensibility = 500;
+    // newer typings use angularSensibilityX/Y
+    (this.camera as any).angularSensibilityX = 500;
+    (this.camera as any).angularSensibilityY = 500;
     this.camera.speed = 0;
     this.camera.keysUp = [];
     this.camera.keysDown = [];
@@ -195,8 +198,10 @@ export class FPSGame extends BaseGame {
     this.camera.keysRight = [];
 
     // Add physics to camera
-    this.camera.physicsImpostor = new BABYLON.PhysicsImpostor(
-      this.camera,
+    // Assigning a physics impostor to the camera has differing typings across Babylon versions.
+    // Cast to any to avoid type errors while retaining runtime behavior for physics engines.
+    (this.camera as any).physicsImpostor = new BABYLON.PhysicsImpostor(
+      this.camera as any,
       BABYLON.PhysicsImpostor.SphereImpostor,
       { mass: 1, restitution: 0 },
       this.scene,
@@ -286,7 +291,7 @@ export class FPSGame extends BaseGame {
 
     // Create material
     const material = new BABYLON.StandardMaterial(`mat-${entityId}`, this.scene);
-    material.diffuse = new BABYLON.Color3(1, 0.3, 0.3);
+    material.diffuseColor = new BABYLON.Color3(1, 0.3, 0.3);
     material.specularColor = new BABYLON.Color3(1, 0, 0);
     capsule.material = material;
 

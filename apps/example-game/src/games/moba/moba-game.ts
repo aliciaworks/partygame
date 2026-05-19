@@ -109,7 +109,7 @@ export class MOBAGame extends BaseGame {
     );
 
     this.groundMaterial = new BABYLON.StandardMaterial("groundMat", this.scene);
-    (this.groundMaterial as BABYLON.StandardMaterial).diffuse =
+    (this.groundMaterial as BABYLON.StandardMaterial).diffuseColor =
       new BABYLON.Color3(0.2, 0.3, 0.4);
     ground.material = this.groundMaterial;
 
@@ -139,18 +139,20 @@ export class MOBAGame extends BaseGame {
 
   private setupCamera(): void {
     // Top-down isometric camera
-    const camera = new BABYLON.UniversalCamera(
+    // Use ArcRotateCamera for a stable isometric/top-down view
+    const camera = new BABYLON.ArcRotateCamera(
       "camera",
-      new BABYLON.Vector3(0, 50, 50),
+      Math.PI / 4,
+      Math.PI / 4,
+      70,
+      new BABYLON.Vector3(0, 0, 0),
       this.scene,
     );
     camera.attachControl(this.scene.getEngine().getRenderingCanvas(), true);
     camera.inertia = 0.8;
-    camera.angularSensibility = 1000;
-
-    // Lock vertical rotation for isometric view
-    camera.lowerBetaLimit = Math.PI / 4;
-    camera.upperBetaLimit = Math.PI / 4;
+    // ArcRotateCamera uses angularSensibilityX/Y in newer typings
+    (camera as any).angularSensibilityX = 1000;
+    (camera as any).angularSensibilityY = 1000;
   }
 
   private setupInput(): void {
@@ -197,15 +199,14 @@ export class MOBAGame extends BaseGame {
     // Create sphere for player
     const sphere = BABYLON.MeshBuilder.CreateSphere(
       `player-${entityId}`,
-      16,
-      2,
+      { diameter: 2, segments: 16 },
       this.scene,
     );
     sphere.position.y = 1;
 
     // Create material
     const material = new BABYLON.StandardMaterial(`mat-${entityId}`, this.scene);
-    material.diffuse = this.getTeamColor(entityId);
+    material.diffuseColor = this.getTeamColor(entityId);
     material.specularColor = new BABYLON.Color3(1, 1, 1);
     sphere.material = material;
 

@@ -52,7 +52,7 @@ export class RoomGame {
     this.playerWebSockets.set(playerId, ws);
 
     // Create player entity in ECS world
-    const entity = this.world.addEntity(playerId);
+    const entity = this.world.createEntity(playerId);
     entity.addComponent(new TransformComponent());
     entity.addComponent(new HealthComponent());
     entity.addComponent(new VelocityComponent());
