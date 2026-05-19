@@ -1,6 +1,8 @@
 export const DEFAULT_BACKEND_URL = "https://partygame.aliciaworks.workers.dev";
 
 export const BACKEND_STORAGE_KEY = "partygame.portal.backendUrl";
+export const SITE_NAME_STORAGE_KEY = "partygame.portal.siteName";
+export const DEFAULT_SITE_NAME = "PartyGame Portal";
 
 export type PortalSession = {
   accessToken: string;
@@ -72,6 +74,17 @@ export function normalizeBackendUrl(value: string | null | undefined): string {
 
 export function readBackendUrl(): string {
   return normalizeBackendUrl(localStorage.getItem(BACKEND_STORAGE_KEY));
+}
+
+export function readSiteName(): string {
+  const v = localStorage.getItem(SITE_NAME_STORAGE_KEY);
+  return v?.trim() || DEFAULT_SITE_NAME;
+}
+
+export function saveSiteName(name: string): string {
+  const trimmed = name?.trim() || DEFAULT_SITE_NAME;
+  localStorage.setItem(SITE_NAME_STORAGE_KEY, trimmed);
+  return trimmed;
 }
 
 export function saveBackendUrl(backendUrl: string): string {

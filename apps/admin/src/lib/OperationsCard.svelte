@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
+  import { translate } from './i18n';
 
   export let busy = false;
 
@@ -27,9 +28,9 @@
   </div>
 
   <div class="stack">
-    <button class="ghost" on:click={handleRefresh} disabled={busy}>Refresh backend data</button>
-    <button class="ghost" on:click={handleOpenHealth}>Open backend health</button>
-    <button class="ghost" on:click={handleOpenApiVersions}>Open API versions</button>
+    <button class="ghost" on:click={handleRefresh} disabled={busy}>{$translate('ops.refresh_backend')}</button>
+    <button class="ghost" on:click={handleOpenHealth}>{$translate('ops.open_health')}</button>
+    <button class="ghost" on:click={handleOpenApiVersions}>{$translate('ops.open_versions')}</button>
   </div>
 </article>
 

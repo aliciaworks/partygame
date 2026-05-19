@@ -7,6 +7,7 @@ export const errorMessage = writable('');
 
 export const backendUrl = writable('');
 export const roomId = writable('control-room');
+export const siteName = writable('');
 
 export const session = writable<PortalSession | null>(null);
 export const profile = writable<SessionProfile | null>(null);

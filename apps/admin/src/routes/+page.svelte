@@ -4,15 +4,34 @@
   import {
     backendUrl,
     statusMessage,
+    siteName,
   } from '$lib/portalStore';
+  import { translate } from '$lib/i18n';
   import {
     readBackendUrl,
+    readSiteName,
+    saveSiteName,
   } from '$lib/portal';
+  
+
+  let showZeroTrustHint = true;
+
+  onMount(() => {
+    const dismissed = localStorage.getItem('partygame.zeroTrustHintDismissed');
+    showZeroTrustHint = dismissed !== '1';
+  });
+
+  function dismissZeroTrustHint() {
+    localStorage.setItem('partygame.zeroTrustHintDismissed', '1');
+    showZeroTrustHint = false;
+  }
 
   onMount(async () => {
     const savedBackendUrl = readBackendUrl();
     backendUrl.set(savedBackendUrl);
     statusMessage.set(`Backend: ${savedBackendUrl}`);
+    // populate friendly site name
+    siteName.set(readSiteName());
   });
 </script>
 
@@ -29,11 +48,24 @@
     <div class="brand">
       <div class="brand-mark"></div>
       <div>
-        <p class="eyebrow mono">PARTYGAME / ADMIN</p>
-        <h1>{$backendUrl}</h1>
-      </div>
+          <p class="eyebrow mono">{$translate('topbar.brand')}</p>
+          <input class="site-name" bind:value={$siteName} on:blur={() => { saveSiteName($siteName); statusMessage.set(`Site: ${$siteName}`); }} />
+        </div>
     </div>
   </header>
+
+  {#if showZeroTrustHint}
+    <div class="zero-trust-banner panel">
+      <div class="zt-content">
+        <strong>{$translate('zeroTrust.title')}</strong>
+        <span>{$translate('zeroTrust.desc')}</span>
+      </div>
+      <div class="zt-actions">
+        <button class="ghost" on:click={() => window.open('https://developers.cloudflare.com/cloudflare-one/', '_blank', 'noopener,noreferrer')}>{$translate('zeroTrust.learn')}</button>
+        <button class="ghost" on:click={dismissZeroTrustHint}>{$translate('zeroTrust.dismiss')}</button>
+      </div>
+    </div>
+  {/if}
 
   <HomeView />
 </div>
@@ -80,14 +112,45 @@
     box-shadow: 0 16px 34px rgba(124, 240, 255, 0.18);
   }
 
-  h1,
-  p {
-    margin: 0;
+  .site-name {
+    font-size: clamp(1rem, 2vw, 1.2rem);
+    background: transparent;
+    border: 0;
+    color: var(--text);
+    padding: 0;
+    outline: none;
   }
 
-  h1 {
-    font-size: clamp(1.4rem, 3vw, 2rem);
-    line-height: 1.02;
+  .zero-trust-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    margin-bottom: 18px;
+    border-radius: 12px;
+    background: linear-gradient(90deg, rgba(6,12,24,0.85), rgba(10,18,32,0.85));
+    border: 1px solid rgba(124,240,255,0.06);
+  }
+
+  .zero-trust-banner .zt-content {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .zero-trust-banner .zt-content span {
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+
+  .zt-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  p {
+    margin: 0;
   }
 
   .eyebrow {
@@ -97,24 +160,7 @@
     font-size: 0.72rem;
   }
 
-  .status-pills {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    gap: 10px;
-  }
-
-  .pill {
-    padding: 10px 14px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    color: var(--muted);
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
+  /* topbar pills removed to avoid duplicating backend info */
 
   @media (max-width: 1100px) {
     .page-shell {
@@ -128,9 +174,7 @@
       padding: 18px;
     }
 
-    .status-pills {
-      justify-content: stretch;
-    }
+    /* status-pills removed */
   }
 
   @media (max-width: 720px) {
@@ -143,9 +187,7 @@
       padding: 16px;
     }
 
-    h1 {
-      font-size: 1.2rem;
-    }
+    /* h1 removed in favor of editable site-name input */
 
     .brand {
       gap: 10px;

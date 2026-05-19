@@ -2,6 +2,7 @@
   import type { VoiceBootstrap } from '$lib/portal';
 
   export let voiceBootstrap: VoiceBootstrap | null = null;
+  import { translate } from './i18n';
 </script>
 
 <article class="panel card-block">
@@ -16,8 +17,8 @@
     <pre>{JSON.stringify(voiceBootstrap, null, 2)}</pre>
   {:else}
     <div class="empty-state">
-      <strong>No bootstrap yet</strong>
-      <p>Click the button above to build a voice room bootstrap for the selected room.</p>
+      <strong>{$translate('voice.empty')}</strong>
+      <p>{$translate('voice.empty_help')}</p>
     </div>
   {/if}
 </article>

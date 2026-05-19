@@ -29,6 +29,11 @@
   import VoiceBootstrapCard from './VoiceBootstrapCard.svelte';
   import ApiSurfaceCard from './ApiSurfaceCard.svelte';
   import OperationsCard from './OperationsCard.svelte';
+  import { locale, translate, availableLocales } from './i18n';
+  function setLocale(e: Event) {
+    const v = (e.target as HTMLSelectElement)?.value;
+    if (v) locale.set(v);
+  }
 
   async function refreshDashboard() {
     busy.set(true);
@@ -90,18 +95,38 @@
 
 <main class="home-layout">
   <section class="workspace">
-    <div class="action-bar panel">
-      <div class="room-selector">
-        <label for="room-id" class="mono">ROOM</label>
-        <input id="room-id" bind:value={$roomId} type="text" placeholder="control-room" />
+    <aside class="sidebar">
+      <nav class="sidebar-stack">
+        <ul class="category-list">
+          <li class="category-item">{$translate('sidebar.dashboard')}</li>
+          <li class="category-item">{$translate('sidebar.operations')}</li>
+          <li class="category-item">{$translate('sidebar.settings')}</li>
+          <li class="category-item">{$translate('sidebar.users')}</li>
+          <li class="category-item">{$translate('sidebar.logs')}</li>
+        </ul>
+      </nav>
+
+      <div class="sidebar-actions">
+        <label for="lang-select" class="mono">Language</label>
+        <select id="lang-select" value={$locale} on:change={setLocale}>
+          {#each availableLocales as opt}
+            <option value={opt.value} selected={opt.value === $locale}>{opt.label}</option>
+          {/each}
+        </select>
       </div>
+    </aside>
+    <div class="action-bar panel">
+        <div class="room-selector">
+          <label for="room-id" class="mono">{$translate('label.room')}</label>
+          <input id="room-id" bind:value={$roomId} type="text" placeholder={$translate('placeholder.room')} />
+        </div>
       
       <div class="actions">
         <button class="primary" on:click={buildVoiceBootstrap} disabled={$busy}>
-          {$busy ? '...' : 'Build Voice Manifest'}
+          {$busy ? '...' : $translate('button.build')}
         </button>
         <button class="ghost" on:click={refreshDashboard} disabled={$busy}>
-          Refresh
+          {$translate('button.refresh')}
         </button>
       </div>
     </div>
@@ -136,86 +161,9 @@
     gap: 24px;
   }
 
-  .sidebar {
-    position: sticky;
-    top: 24px;
-    padding: 24px;
-    border-radius: 28px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    gap: 24px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-  }
-
-  .sidebar-stack {
-    display: grid;
-    gap: 14px;
-  }
-
-  .sidebar-card {
-    padding: 16px;
-    border-radius: 20px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-  }
-
-  .sidebar-card span,
-  .sidebar-card p {
-    display: block;
-  }
-
-  .sidebar-card span {
-    color: var(--muted);
-    font-size: 0.82rem;
-    margin-bottom: 8px;
-  }
-
-  .sidebar-card p {
-    color: var(--muted);
-    line-height: 1.6;
-  }
-
-  .sidebar-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
   .workspace {
     display: grid;
     gap: 20px;
-  }
-
-  .workspace-header {
-    display: flex;
-    justify-content: space-between;
-    gap: 18px;
-    align-items: end;
-    padding: 22px 24px;
-    border-radius: 28px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-  }
-
-  .workspace-actions {
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    align-items: end;
-  }
-
-  .workspace-actions label {
-    min-width: 240px;
-  }
-
-  .workspace-actions label span {
-    display: block;
-    color: var(--muted);
-    font-size: 0.82rem;
-    margin-bottom: 8px;
   }
 
   input {
@@ -265,16 +213,9 @@
     background: rgba(255, 255, 255, 0.05);
   }
 
-  .full {
-    width: 100%;
-    justify-content: center;
-  }
+  /* removed unused .full selector */
 
-  .metric-grid {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 16px;
-  }
+  /* Metrics grid styles are defined inside MetricsGrid.svelte */
 
   .content-grid {
     display: grid;
@@ -282,72 +223,15 @@
     gap: 16px;
   }
 
-  .status-strip {
-    display: flex;
-    justify-content: space-between;
-    gap: 14px;
-    align-items: center;
-    padding: 18px 22px;
-    border-radius: 24px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-  }
-
-  .status-strip span,
-  .status-strip strong {
-    display: block;
-  }
-
-  .status-strip span {
-    color: var(--muted);
-    font-size: 0.82rem;
-    margin-bottom: 8px;
-  }
-
-  .error-badge {
-    padding: 10px 12px;
-    border-radius: 16px;
-    background: rgba(255, 107, 122, 0.08);
-    border: 1px solid rgba(255, 107, 122, 0.18);
-    color: #ffdbe0;
-  }
-
-  .eyebrow {
-    margin: 0 0 10px;
-    color: var(--accent);
-    letter-spacing: 0.18em;
-    font-size: 0.72rem;
-  }
-
-  h2 {
-    margin: 0;
-  }
-
-  h2 {
-    font-size: clamp(1.6rem, 3vw, 2.6rem);
-    line-height: 1;
-  }
-
-  .lede {
-    color: var(--muted);
-    line-height: 1.6;
-  }
 
   @media (max-width: 1100px) {
     .home-layout,
-    .metric-grid,
     .content-grid {
       grid-template-columns: 1fr;
     }
 
-    .workspace-header,
-    .status-strip {
-      flex-direction: column;
-      align-items: stretch;
-    }
-
-    .sidebar {
-      position: static;
+    .content-grid {
+      grid-auto-flow: row;
     }
   }
 </style>

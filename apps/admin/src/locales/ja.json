@@ -1,0 +1,33 @@
+{
+  "sidebar.dashboard": "ダッシュボード",
+  "sidebar.operations": "オペレーション",
+  "sidebar.settings": "設定",
+  "sidebar.users": "ユーザー",
+  "sidebar.logs": "ログ",
+
+  "label.room": "ルームID",
+  "placeholder.room": "ルームIDを入力",
+
+  "button.build": "ビルド",
+  "button.refresh": "更新",
+
+  "api.title": "API サーフェス",
+  "api.current": "現在",
+  "api.supported": "サポート済み",
+  "api.deprecated": "非推奨",
+  "empty.api": "利用可能な API バージョンはありません",
+
+  "ops.refresh_backend": "バックエンドを更新",
+  "ops.open_health": "ヘルスを開く",
+  "ops.open_versions": "バージョンを開く",
+
+  "metrics.uptime": "稼働時間",
+  "sla.at_risk": "SLA リスクあり",
+
+  "topbar.brand": "PARTYGAME / 管理",
+
+  "zeroTrust.title": "セキュリティの推奨",
+  "zeroTrust.desc": "Cloudflare Zero Trust を有効にして、この管理ポータルを保護し、信頼されたアカウントへのアクセスを制限してください。",
+  "zeroTrust.learn": "方法を見る",
+  "zeroTrust.dismiss": "閉じる"
+}

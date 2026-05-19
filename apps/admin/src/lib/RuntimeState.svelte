@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { BackendHealth, BackendSla } from '$lib/portal';
+  import { translate } from './i18n';
 
   export let health: BackendHealth | null = null;
   export let sla: BackendSla | null = null;
@@ -9,8 +10,8 @@
 <article class="panel card-block">
   <div class="section-head">
     <div>
-      <p class="eyebrow mono">RUNTIME STATE</p>
-      <h3>Backend health and readiness</h3>
+      <p class="eyebrow mono">{$translate('runtime.title')}</p>
+      <h3>{$translate('runtime.title')}</h3>
     </div>
     <span class="pill subtle">{lastSyncedAt ? `Updated ${lastSyncedAt}` : 'Idle'}</span>
   </div>
@@ -18,19 +19,19 @@
   {#if health || sla}
     <div class="info-list">
       <div>
-        <span class="mono">Health</span>
+        <span class="mono">{$translate('label.health')}</span>
         <strong>{health?.status ?? '—'}</strong>
       </div>
       <div>
-        <span class="mono">Uptime</span>
+        <span class="mono">{$translate('label.uptime')}</span>
         <strong>{health?.uptime_ms ? `${Math.round(health.uptime_ms / 1000)}s` : '—'}</strong>
       </div>
       <div>
-        <span class="mono">SLA target</span>
+        <span class="mono">{$translate('label.sla_target')}</span>
         <strong>{typeof sla?.sla_target_uptime === 'number' ? `${sla!.sla_target_uptime}%` : '—'}</strong>
       </div>
       <div>
-        <span class="mono">Last incident</span>
+        <span class="mono">{$translate('label.last_incident')}</span>
         <strong>{sla?.last_incident ?? '—'}</strong>
       </div>
     </div>

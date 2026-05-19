@@ -1,0 +1,33 @@
+{
+  "sidebar.dashboard": "儀表板",
+  "sidebar.operations": "操作",
+  "sidebar.settings": "設定",
+  "sidebar.users": "使用者",
+  "sidebar.logs": "日誌",
+
+  "label.room": "房間 ID",
+  "placeholder.room": "輸入房間 ID",
+
+  "button.build": "建置",
+  "button.refresh": "重新整理",
+
+  "api.title": "API 概觀",
+  "api.current": "目前",
+  "api.supported": "支援",
+  "api.deprecated": "已棄用",
+  "empty.api": "沒有可用的 API 版本",
+
+  "ops.refresh_backend": "重新整理後端",
+  "ops.open_health": "打開健康頁",
+  "ops.open_versions": "打開版本",
+
+  "metrics.uptime": "運行時間",
+  "sla.at_risk": "SLA 風險",
+
+  "topbar.brand": "PARTYGAME / 管理",
+
+  "zeroTrust.title": "安全建議",
+  "zeroTrust.desc": "啟用 Cloudflare Zero Trust 來保護此管理入口並將存取限制為受信任的帳戶。",
+  "zeroTrust.learn": "了解如何",
+  "zeroTrust.dismiss": "關閉"
+}

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ApiVersions } from '$lib/portal';
+  import { translate } from './i18n';
 
   export let versions: ApiVersions | null = null;
 </script>
@@ -7,29 +8,29 @@
 <article class="panel card-block wide">
   <div class="section-head">
     <div>
-      <p class="eyebrow mono">API SURFACE</p>
-      <h3>Version and support matrix</h3>
+      <p class="eyebrow mono">{$translate('api.title')}</p>
+      <h3>{$translate('api.title')}</h3>
     </div>
   </div>
 
   {#if versions}
     <div class="support-grid">
       <div>
-        <span class="mono">Current</span>
+        <span class="mono">{$translate('api.current')}</span>
         <strong>{versions.current ?? '—'}</strong>
       </div>
       <div>
-        <span class="mono">Supported</span>
+        <span class="mono">{$translate('api.supported')}</span>
         <strong>{versions.supported?.length ?? 0}</strong>
       </div>
       <div>
-        <span class="mono">Deprecated</span>
+        <span class="mono">{$translate('api.deprecated')}</span>
         <strong>{versions.deprecated?.length ?? 0}</strong>
       </div>
     </div>
   {:else}
     <div class="empty-state">
-      <p>No API version information. Click <strong>Refresh</strong> to fetch.</p>
+      <p>{$translate('empty.api')}</p>
     </div>
   {/if}
 </article>

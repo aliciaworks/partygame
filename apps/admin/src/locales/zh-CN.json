@@ -1,0 +1,33 @@
+{
+  "sidebar.dashboard": "仪表盘",
+  "sidebar.operations": "操作",
+  "sidebar.settings": "设置",
+  "sidebar.users": "用户",
+  "sidebar.logs": "日志",
+
+  "label.room": "房间 ID",
+  "placeholder.room": "输入房间 ID",
+
+  "button.build": "构建",
+  "button.refresh": "刷新",
+
+  "api.title": "API 概况",
+  "api.current": "当前",
+  "api.supported": "受支持",
+  "api.deprecated": "已弃用",
+  "empty.api": "没有可用的 API 版本",
+
+  "ops.refresh_backend": "刷新后端",
+  "ops.open_health": "打开健康页",
+  "ops.open_versions": "打开版本",
+
+  "metrics.uptime": "运行时间",
+  "sla.at_risk": "SLA 风险",
+
+  "topbar.brand": "PARTYGAME / 管理",
+
+  "zeroTrust.title": "安全建议",
+  "zeroTrust.desc": "启用 Cloudflare Zero Trust 来保护此管理门户并将访问限制为受信任的账户。",
+  "zeroTrust.learn": "了解如何操作",
+  "zeroTrust.dismiss": "关闭"
+}

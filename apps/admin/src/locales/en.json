@@ -1,0 +1,33 @@
+{
+  "sidebar.dashboard": "Dashboard",
+  "sidebar.operations": "Operations",
+  "sidebar.settings": "Settings",
+  "sidebar.users": "Users",
+  "sidebar.logs": "Logs",
+
+  "label.room": "Room ID",
+  "placeholder.room": "Enter room id",
+
+  "button.build": "Build",
+  "button.refresh": "Refresh",
+
+  "api.title": "API Surface",
+  "api.current": "Current",
+  "api.supported": "Supported",
+  "api.deprecated": "Deprecated",
+  "empty.api": "No API versions available",
+
+  "ops.refresh_backend": "Refresh backend",
+  "ops.open_health": "Open health",
+  "ops.open_versions": "Open versions",
+
+  "metrics.uptime": "Uptime",
+  "sla.at_risk": "SLA at risk",
+
+  "topbar.brand": "PARTYGAME / ADMIN",
+
+  "zeroTrust.title": "Security recommendation",
+  "zeroTrust.desc": "Enable Cloudflare Zero Trust to protect this admin portal and restrict access to trusted accounts.",
+  "zeroTrust.learn": "Learn how",
+  "zeroTrust.dismiss": "Dismiss"
+}

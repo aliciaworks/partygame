@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { BackendHealth, BackendSla, ApiVersions } from '$lib/portal';
+  import { translate } from './i18n';
 
   export let health: BackendHealth | null = null;
   export let sla: BackendSla | null = null;
@@ -8,27 +9,27 @@
 
 <section class="metric-grid">
   <article class="metric panel">
-    <span class="mono">Uptime</span>
+    <span class="mono">{$translate('metrics.uptime')}</span>
     <strong>{typeof sla?.uptime_percent === 'number' ? `${sla.uptime_percent.toFixed(2)}%` : '—'}</strong>
-    <p>{sla ? (sla.meets_sla ? 'Meeting SLA' : 'SLA at risk') : 'Click Refresh to fetch'}</p>
+    <p>{sla ? (sla.meets_sla ? $translate('metrics.uptime') : 'SLA at risk') : $translate('button.refresh')}</p>
   </article>
 
   <article class="metric panel">
-    <span class="mono">Backend health</span>
+    <span class="mono">{$translate('metrics.health')}</span>
     <strong>{health?.status ?? '—'}</strong>
-    <p>{health?.timestamp ?? 'Click Refresh to fetch'}</p>
+    <p>{health?.timestamp ?? $translate('button.refresh')}</p>
   </article>
 
   <article class="metric panel">
-    <span class="mono">Error rate</span>
+    <span class="mono">{$translate('metrics.error_rate')}</span>
     <strong>{typeof sla?.error_rate_percent === 'number' ? `${sla.error_rate_percent.toFixed(2)}%` : '—'}</strong>
     <p>30-day average</p>
   </article>
 
   <article class="metric panel">
-    <span class="mono">API version</span>
+    <span class="mono">{$translate('metrics.api_version')}</span>
     <strong>{versions?.current ?? '—'}</strong>
-    <p>{versions ? `${versions.supported?.length ?? 0} supported` : 'Click Refresh to fetch'}</p>
+    <p>{versions ? `${versions.supported?.length ?? 0} {$translate('api.supported')}` : $translate('button.refresh')}</p>
   </article>
 </section>
 
