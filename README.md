@@ -17,37 +17,131 @@ An open-source, out-of-the-box Serverless Game Backend Framework built natively 
 
 This repository uses a native `npm` workspace monorepo structure:
 
-- `packages/core`: The framework server engine (GameRoom, Networking, Database Logic, Middleware).
-- `packages/auth`: Better Auth integration and token bypass endpoints.
-- `packages/shared`: Shared Zod schemas and the cross-engine code generation scripts.
-- `apps/example-game`: An example Cloudflare Worker project tying the framework components together.
+### Core Packages
+- `packages/core`: ECS framework (Entity, Component, System, World), game loop, network sync, movement validation.
+- `packages/auth`: Better Auth integration and JWT token management.
+- `packages/shared`: Zod schemas (single source of truth) and cross-engine code generation.
+
+### Applications
+- `apps/worker`: Cloudflare Workers backend - pure game server using ECS framework and WebSocket multiplayer.
+- `apps/example-game`: Web frontend built with Babylon.js - multiplayer game collection (Arena Wars MOBA, CyberArena FPS).
 - `apps/admin`: Admin control plane (SvelteKit + Cloudflare Pages).
-- `engines/`: Auto-generated client SDKs and native structural types for Unity, Godot, and Unreal Engine.
+
+### Generated Clients
+- `clients/unity/`: Auto-generated C# types for Unity.
+- `clients/godot/`: Auto-generated GDScript types for Godot.
+- `clients/unreal/`: Auto-generated C++ types for Unreal Engine.
 
 ## Getting Started
 
-1. Install the dependencies via native npm:
+### Backend Setup
 
-   ```bash
-   npm install
-   ```
+```bash
+npm install
+npm run typecheck
+```
 
-2. Generate client types for your game engines:
+Start the backend server:
 
-   ```bash
-   npm run generate:types --workspace=@partygame/shared
-   ```
+```bash
+cd apps/worker
+npx wrangler dev
+```
 
-3. Configure your database bindings in `apps/example-game/wrangler.toml`.
+The backend runs on `http://localhost:8787` with:
+- `POST /api/session/login` - Authenticate and get token
+- `/ws` - WebSocket game connection
+- `/rooms` - List active game rooms
+- `/health` - Health check endpoint
 
-4. Run the development server for the example game:
+### Frontend Setup
 
-   ```bash
-   cd apps/example-game
-   npx wrangler dev
-   ```
+In a new terminal:
 
-5. Run the admin control plane separately:
+```bash
+cd apps/example-game
+npm install
+npm run dev
+```
+
+Frontend runs on `http://localhost:5173` with:
+- Game launcher with game selection
+- Arena Wars (3v3 MOBA-style battles)
+- CyberArena (8-player FPS)
+
+### Multi-Game Architecture
+
+The example-game demonstrates how to build multiple games on the same backend:
+
+```
+apps/example-game/
+  ├── src/
+  │   ├── main.ts              # Game launcher & menu
+  │   ├── core/
+  │   │   ├── game-manager.ts  # Babylon.js scene setup
+  │   │   ├── base-game.ts     # Abstract game class
+  │   │   └── network-manager.ts # WebSocket client
+  │   └── games/
+  │       ├── moba/
+  │       │   └── moba-game.ts # Arena Wars (3v3 battles)
+  │       └── fps/
+  │           └── fps-game.ts  # CyberArena (FPS)
+```
+
+**Key Points:**
+- Each game extends `BaseGame` class
+- Games use shared `NetworkManager` for server communication
+- Babylon.js renders both 2D (MOBA) and 3D (FPS) games
+- Same backend handles any number of game types
+
+## Game Examples
+
+### Arena Wars (MOBA)
+- **Type**: 3v3 isometric team battles
+- **Players**: Up to 6
+- **Mechanics**: Top-down movement, team colors, health display
+- **Rendering**: Babylon.js isometric camera with grid arena
+
+### CyberArena (FPS)
+- **Type**: Fast-paced first-person shooter
+- **Players**: Up to 8
+- **Mechanics**: FPS controls, jumping, sprinting, collision detection
+- **Rendering**: Babylon.js 3D with neon environment, physics simulation
+
+## Adding New Games
+
+To add a new game type:
+
+1. Create `src/games/your-game/your-game.ts`
+2. Extend `BaseGame` class
+3. Implement: `initialize()`, `start()`, `stop()`, `update()`, `processGameUpdate()`
+4. Add game to menu in `main.ts`
+5. Define custom components/systems in backend if needed
+
+Example:
+
+```typescript
+import { BaseGame } from "../core/base-game";
+import { NetworkManager } from "../core/network-manager";
+import type { GameTickUpdate } from "@partygame/shared";
+
+export class MyGame extends BaseGame {
+  async initialize(): Promise<void> {
+    // Setup Babylon.js scene
+  }
+  
+  start(): void {
+    // Start game
+  }
+  
+  update(): void {
+    // Send inputs to server
+  }
+  
+  processGameUpdate(update: GameTickUpdate): void {
+    // Update game state from server
+  }
+}
    ```bash
    cd apps/admin
    npm run dev

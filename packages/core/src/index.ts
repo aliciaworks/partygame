@@ -1,3 +1,10 @@
+// ECS Framework (New)
+export * from "./ecs";
+export * from "./components";
+
+// ECS Systems
+export * from "./systems/movement";
+
 // Phase 0: Foundation
 export * from "./db";
 export * from "./error-handler";

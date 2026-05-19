@@ -1,0 +1,20 @@
+{
+  "name": "@partygame/worker",
+  "version": "0.0.1",
+  "private": true,
+  "main": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@partygame/auth": "*",
+    "@partygame/core": "*",
+    "hono": "^4.2.0",
+    "partyserver": "^0.0.40"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "wrangler": "^4.92.0"
+  }
+}
