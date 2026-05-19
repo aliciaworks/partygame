@@ -22,8 +22,8 @@
 <article class="panel card-block">
   <div class="section-head">
     <div>
-      <p class="eyebrow mono">OPERATIONS</p>
-      <h3>Quick actions</h3>
+      <p class="eyebrow mono">{$translate('sidebar.operations')}</p>
+      <h3>{$translate('ops.quick_actions')}</h3>
     </div>
   </div>
 

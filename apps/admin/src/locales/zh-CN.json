@@ -7,6 +7,11 @@
 
   "label.room": "房间 ID",
   "placeholder.room": "输入房间 ID",
+  "label.health": "健康状态",
+  "label.uptime": "运行时间",
+  "label.sla_target": "SLA 目标",
+  "label.last_incident": "最近事件",
+  "language.label": "语言",
 
   "button.build": "构建",
   "button.refresh": "刷新",
@@ -20,14 +25,39 @@
   "ops.refresh_backend": "刷新后端",
   "ops.open_health": "打开健康页",
   "ops.open_versions": "打开版本",
+  "ops.quick_actions": "快捷操作",
 
   "metrics.uptime": "运行时间",
-  "sla.at_risk": "SLA 风险",
+  "metrics.health": "健康状态",
+  "metrics.error_rate": "错误率",
+  "metrics.api_version": "API 版本",
+  "metrics.sla_risk": "SLA 风险",
+  "metrics.thirty_day_average": "30 天平均",
+
+  "runtime.title": "运行时",
+  "runtime.updated": "已更新",
+  "runtime.idle": "空闲",
+  "runtime.no_data": "没有运行时数据。点击刷新以查询后端。",
+  "runtime.ok": "正常",
+  "runtime.down": "停止",
 
   "topbar.brand": "PARTYGAME / 管理",
+  "topbar.backend": "后端：",
+  "topbar.site": "站点：",
+  "meta.title": "PartyGame 门户",
+  "meta.description": "带有可配置后端选择和实时操作视图的登录受限 PartyGame 门户。",
+  "status.dashboard_refreshed": "仪表盘已刷新于",
+  "status.voice_bootstrap_prepared": "已为房间准备 Voice bootstrap",
+  "error.refresh_dashboard": "刷新仪表盘失败。",
+  "error.voice_bootstrap": "准备 Voice bootstrap 失败。",
 
   "zeroTrust.title": "安全建议",
   "zeroTrust.desc": "启用 Cloudflare Zero Trust 来保护此管理门户并将访问限制为受信任的账户。",
   "zeroTrust.learn": "了解如何操作",
-  "zeroTrust.dismiss": "关闭"
+  "zeroTrust.dismiss": "关闭",
+
+  "voice.title": "VOICE",
+  "voice.heading": "RealtimeKit bootstrap 清单",
+  "voice.empty": "尚未加载 Voice bootstrap。",
+  "voice.empty_help": "选择一个房间并点击构建来获取清单。"
 }

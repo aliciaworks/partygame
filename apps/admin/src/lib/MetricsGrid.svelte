@@ -11,7 +11,7 @@
   <article class="metric panel">
     <span class="mono">{$translate('metrics.uptime')}</span>
     <strong>{typeof sla?.uptime_percent === 'number' ? `${sla.uptime_percent.toFixed(2)}%` : '—'}</strong>
-    <p>{sla ? (sla.meets_sla ? $translate('metrics.uptime') : 'SLA at risk') : $translate('button.refresh')}</p>
+    <p>{sla ? (sla.meets_sla ? $translate('metrics.uptime') : $translate('metrics.sla_risk')) : $translate('button.refresh')}</p>
   </article>
 
   <article class="metric panel">
@@ -23,13 +23,13 @@
   <article class="metric panel">
     <span class="mono">{$translate('metrics.error_rate')}</span>
     <strong>{typeof sla?.error_rate_percent === 'number' ? `${sla.error_rate_percent.toFixed(2)}%` : '—'}</strong>
-    <p>30-day average</p>
+    <p>{$translate('metrics.thirty_day_average')}</p>
   </article>
 
   <article class="metric panel">
     <span class="mono">{$translate('metrics.api_version')}</span>
     <strong>{versions?.current ?? '—'}</strong>
-    <p>{versions ? `${versions.supported?.length ?? 0} {$translate('api.supported')}` : $translate('button.refresh')}</p>
+    <p>{versions ? `${versions.supported?.length ?? 0} ${$translate('api.supported')}` : $translate('button.refresh')}</p>
   </article>
 </section>
 

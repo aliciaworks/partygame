@@ -1,18 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import HomeView from '$lib/HomeView.svelte';
-  import {
-    backendUrl,
-    statusMessage,
-    siteName,
-  } from '$lib/portalStore';
   import { translate } from '$lib/i18n';
-  import {
-    readBackendUrl,
-    readSiteName,
-    saveSiteName,
-  } from '$lib/portal';
-  
+  import { backendUrl, statusMessage, siteName } from '$lib/portalStore';
+  import { readBackendUrl, readSiteName, saveSiteName } from '$lib/portal';
 
   let showZeroTrustHint = true;
 
@@ -26,21 +17,17 @@
     showZeroTrustHint = false;
   }
 
-  onMount(async () => {
+  onMount(() => {
     const savedBackendUrl = readBackendUrl();
     backendUrl.set(savedBackendUrl);
-    statusMessage.set(`Backend: ${savedBackendUrl}`);
-    // populate friendly site name
+    statusMessage.set(`${$translate('topbar.backend')} ${savedBackendUrl}`);
     siteName.set(readSiteName());
   });
 </script>
 
 <svelte:head>
-  <title>PartyGame Portal</title>
-  <meta
-    name="description"
-    content="Login-gated PartyGame portal with configurable backend selection and live operations view."
-  />
+  <title>{$translate('meta.title')}</title>
+  <meta name="description" content={$translate('meta.description')} />
 </svelte:head>
 
 <div class="page-shell">
@@ -48,9 +35,16 @@
     <div class="brand">
       <div class="brand-mark"></div>
       <div>
-          <p class="eyebrow mono">{$translate('topbar.brand')}</p>
-          <input class="site-name" bind:value={$siteName} on:blur={() => { saveSiteName($siteName); statusMessage.set(`Site: ${$siteName}`); }} />
-        </div>
+        <p class="eyebrow mono">{$translate('topbar.brand')}</p>
+        <input
+          class="site-name"
+          bind:value={$siteName}
+          on:blur={() => {
+            saveSiteName($siteName);
+            statusMessage.set(`${$translate('topbar.site')} ${$siteName}`);
+          }}
+        />
+      </div>
     </div>
   </header>
 
@@ -61,7 +55,9 @@
         <span>{$translate('zeroTrust.desc')}</span>
       </div>
       <div class="zt-actions">
-        <button class="ghost" on:click={() => window.open('https://developers.cloudflare.com/cloudflare-one/', '_blank', 'noopener,noreferrer')}>{$translate('zeroTrust.learn')}</button>
+        <button class="ghost" on:click={() => window.open('https://developers.cloudflare.com/cloudflare-one/', '_blank', 'noopener,noreferrer')}>
+          {$translate('zeroTrust.learn')}
+        </button>
         <button class="ghost" on:click={dismissZeroTrustHint}>{$translate('zeroTrust.dismiss')}</button>
       </div>
     </div>
@@ -129,8 +125,8 @@
     padding: 12px 16px;
     margin-bottom: 18px;
     border-radius: 12px;
-    background: linear-gradient(90deg, rgba(6,12,24,0.85), rgba(10,18,32,0.85));
-    border: 1px solid rgba(124,240,255,0.06);
+    background: linear-gradient(90deg, rgba(6, 12, 24, 0.85), rgba(10, 18, 32, 0.85));
+    border: 1px solid rgba(124, 240, 255, 0.06);
   }
 
   .zero-trust-banner .zt-content {
@@ -160,8 +156,6 @@
     font-size: 0.72rem;
   }
 
-  /* topbar pills removed to avoid duplicating backend info */
-
   @media (max-width: 1100px) {
     .page-shell {
       padding: 16px;
@@ -173,8 +167,6 @@
       border-radius: 22px;
       padding: 18px;
     }
-
-    /* status-pills removed */
   }
 
   @media (max-width: 720px) {
@@ -186,8 +178,6 @@
       border-radius: 20px;
       padding: 16px;
     }
-
-    /* h1 removed in favor of editable site-name input */
 
     .brand {
       gap: 10px;

@@ -7,6 +7,11 @@
 
   "label.room": "房間 ID",
   "placeholder.room": "輸入房間 ID",
+  "label.health": "健康狀態",
+  "label.uptime": "運行時間",
+  "label.sla_target": "SLA 目標",
+  "label.last_incident": "最近事件",
+  "language.label": "語言",
 
   "button.build": "建置",
   "button.refresh": "重新整理",
@@ -20,14 +25,39 @@
   "ops.refresh_backend": "重新整理後端",
   "ops.open_health": "打開健康頁",
   "ops.open_versions": "打開版本",
+  "ops.quick_actions": "快捷操作",
 
   "metrics.uptime": "運行時間",
-  "sla.at_risk": "SLA 風險",
+  "metrics.health": "健康狀態",
+  "metrics.error_rate": "錯誤率",
+  "metrics.api_version": "API 版本",
+  "metrics.sla_risk": "SLA 風險",
+  "metrics.thirty_day_average": "30 天平均",
+
+  "runtime.title": "執行階段",
+  "runtime.updated": "已更新",
+  "runtime.idle": "閒置",
+  "runtime.no_data": "沒有執行階段資料。點擊重新整理以查詢後端。",
+  "runtime.ok": "正常",
+  "runtime.down": "中斷",
 
   "topbar.brand": "PARTYGAME / 管理",
+  "topbar.backend": "後端：",
+  "topbar.site": "站點：",
+  "meta.title": "PartyGame 入口",
+  "meta.description": "具備可設定後端選擇與即時操作檢視的登入受限 PartyGame 入口。",
+  "status.dashboard_refreshed": "儀表板已更新於",
+  "status.voice_bootstrap_prepared": "已為房間準備 Voice bootstrap",
+  "error.refresh_dashboard": "重新整理儀表板失敗。",
+  "error.voice_bootstrap": "準備 Voice bootstrap 失敗。",
 
   "zeroTrust.title": "安全建議",
   "zeroTrust.desc": "啟用 Cloudflare Zero Trust 來保護此管理入口並將存取限制為受信任的帳戶。",
   "zeroTrust.learn": "了解如何",
-  "zeroTrust.dismiss": "關閉"
+  "zeroTrust.dismiss": "關閉",
+
+  "voice.title": "VOICE",
+  "voice.heading": "RealtimeKit bootstrap 資訊清單",
+  "voice.empty": "尚未載入 Voice bootstrap。",
+  "voice.empty_help": "選擇房間並點擊建置來取得資訊清單。"
 }

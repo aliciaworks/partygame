@@ -40,14 +40,14 @@
       <div class="chip-row">
         {#each Object.entries(health.checks) as [name, value]}
           <span class:chip={true} class:good={value} class:bad={!value}>
-            {name}: {value ? 'ok' : 'down'}
+            {name}: {value ? $translate('runtime.ok') : $translate('runtime.down')}
           </span>
         {/each}
       </div>
     {/if}
   {:else}
     <div class="empty-state">
-      <p>No runtime data available. Click <strong>Refresh</strong> to query the backend.</p>
+      <p>{$translate('runtime.no_data')}</p>
     </div>
   {/if}
 </article>

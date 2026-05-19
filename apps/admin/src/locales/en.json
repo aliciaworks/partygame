@@ -7,6 +7,11 @@
 
   "label.room": "Room ID",
   "placeholder.room": "Enter room id",
+  "label.health": "Health",
+  "label.uptime": "Uptime",
+  "label.sla_target": "SLA target",
+  "label.last_incident": "Last incident",
+  "language.label": "Language",
 
   "button.build": "Build",
   "button.refresh": "Refresh",
@@ -20,14 +25,39 @@
   "ops.refresh_backend": "Refresh backend",
   "ops.open_health": "Open health",
   "ops.open_versions": "Open versions",
+  "ops.quick_actions": "Quick actions",
 
   "metrics.uptime": "Uptime",
-  "sla.at_risk": "SLA at risk",
+  "metrics.health": "Health",
+  "metrics.error_rate": "Error rate",
+  "metrics.api_version": "API version",
+  "metrics.sla_risk": "SLA at risk",
+  "metrics.thirty_day_average": "30-day average",
+
+  "runtime.title": "Runtime",
+  "runtime.updated": "Updated",
+  "runtime.idle": "Idle",
+  "runtime.no_data": "No runtime data available. Click Refresh to query the backend.",
+  "runtime.ok": "ok",
+  "runtime.down": "down",
 
   "topbar.brand": "PARTYGAME / ADMIN",
+  "topbar.backend": "Backend:",
+  "topbar.site": "Site:",
+  "meta.title": "PartyGame Portal",
+  "meta.description": "Login-gated PartyGame portal with configurable backend selection and live operations view.",
+  "status.dashboard_refreshed": "Dashboard refreshed at",
+  "status.voice_bootstrap_prepared": "Voice bootstrap prepared for",
+  "error.refresh_dashboard": "Failed to refresh dashboard.",
+  "error.voice_bootstrap": "Failed to prepare voice bootstrap.",
 
   "zeroTrust.title": "Security recommendation",
   "zeroTrust.desc": "Enable Cloudflare Zero Trust to protect this admin portal and restrict access to trusted accounts.",
   "zeroTrust.learn": "Learn how",
-  "zeroTrust.dismiss": "Dismiss"
+  "zeroTrust.dismiss": "Dismiss",
+
+  "voice.title": "VOICE",
+  "voice.heading": "RealtimeKit bootstrap manifest",
+  "voice.empty": "No voice bootstrap loaded.",
+  "voice.empty_help": "Choose a room and click Build to fetch the manifest."
 }

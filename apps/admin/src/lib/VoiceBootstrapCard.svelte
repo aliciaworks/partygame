@@ -8,8 +8,8 @@
 <article class="panel card-block">
   <div class="section-head">
     <div>
-      <p class="eyebrow mono">VOICE</p>
-      <h3>RealtimeKit bootstrap manifest</h3>
+      <p class="eyebrow mono">{$translate('voice.title')}</p>
+      <h3>{$translate('voice.heading')}</h3>
     </div>
   </div>
 

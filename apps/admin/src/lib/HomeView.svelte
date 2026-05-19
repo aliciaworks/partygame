@@ -1,28 +1,4 @@
 <script lang="ts">
-  import { 
-    backendUrl, 
-    busy, 
-    roomId, 
-    health, 
-    sla, 
-    versions, 
-    lastSyncedAt, 
-    statusMessage,
-    errorMessage,
-    voiceBootstrap,
-    clearError,
-    setError
-  } from './portalStore';
-  import { 
-    fetchBackendHealth, 
-    fetchBackendSla, 
-    fetchApiVersions, 
-    fetchVoiceBootstrap
-  } from './portal';
-  onMount(() => {
-    refreshDashboard();
-  });
-
   import { onMount } from 'svelte';
   import MetricsGrid from './MetricsGrid.svelte';
   import RuntimeState from './RuntimeState.svelte';
@@ -30,9 +6,30 @@
   import ApiSurfaceCard from './ApiSurfaceCard.svelte';
   import OperationsCard from './OperationsCard.svelte';
   import { locale, translate, availableLocales } from './i18n';
+  import {
+    backendUrl,
+    busy,
+    roomId,
+    health,
+    sla,
+    versions,
+    lastSyncedAt,
+    statusMessage,
+    errorMessage,
+    voiceBootstrap,
+    clearError,
+    setError,
+  } from './portalStore';
+  import {
+    fetchBackendHealth,
+    fetchBackendSla,
+    fetchApiVersions,
+    fetchVoiceBootstrap,
+  } from './portal';
+
   function setLocale(e: Event) {
-    const v = (e.target as HTMLSelectElement)?.value;
-    if (v) locale.set(v);
+    const value = (e.target as HTMLSelectElement)?.value;
+    if (value) locale.set(value);
   }
 
   async function refreshDashboard() {
@@ -60,9 +57,9 @@
         voiceBootstrap.set(await fetchVoiceBootstrap($backendUrl, $roomId));
       }
 
-      statusMessage.set(`Dashboard refreshed at ${syncTime}`);
+      statusMessage.set(`${$translate('status.dashboard_refreshed')} ${syncTime}`);
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to refresh dashboard.');
+      setError(error instanceof Error ? error.message : $translate('error.refresh_dashboard'));
     } finally {
       busy.set(false);
     }
@@ -75,9 +72,9 @@
     try {
       const bootstrap = await fetchVoiceBootstrap($backendUrl, $roomId);
       voiceBootstrap.set(bootstrap);
-      statusMessage.set(`Voice bootstrap prepared for ${$roomId}`);
+      statusMessage.set(`${$translate('status.voice_bootstrap_prepared')} ${$roomId}`);
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to prepare voice bootstrap.');
+      setError(error instanceof Error ? error.message : $translate('error.voice_bootstrap'));
     } finally {
       busy.set(false);
     }
@@ -91,6 +88,9 @@
     window.open(`${$backendUrl}api-versions`, '_blank', 'noopener,noreferrer');
   }
 
+  onMount(() => {
+    refreshDashboard();
+  });
 </script>
 
 <main class="home-layout">
@@ -107,7 +107,7 @@
       </nav>
 
       <div class="sidebar-actions">
-        <label for="lang-select" class="mono">Language</label>
+        <label for="lang-select" class="mono">{$translate('language.label')}</label>
         <select id="lang-select" value={$locale} on:change={setLocale}>
           {#each availableLocales as opt}
             <option value={opt.value} selected={opt.value === $locale}>{opt.label}</option>
@@ -115,12 +115,13 @@
         </select>
       </div>
     </aside>
+
     <div class="action-bar panel">
-        <div class="room-selector">
-          <label for="room-id" class="mono">{$translate('label.room')}</label>
-          <input id="room-id" bind:value={$roomId} type="text" placeholder={$translate('placeholder.room')} />
-        </div>
-      
+      <div class="room-selector">
+        <label for="room-id" class="mono">{$translate('label.room')}</label>
+        <input id="room-id" bind:value={$roomId} type="text" placeholder={$translate('placeholder.room')} />
+      </div>
+
       <div class="actions">
         <button class="primary" on:click={buildVoiceBootstrap} disabled={$busy}>
           {$busy ? '...' : $translate('button.build')}
@@ -213,16 +214,11 @@
     background: rgba(255, 255, 255, 0.05);
   }
 
-  /* removed unused .full selector */
-
-  /* Metrics grid styles are defined inside MetricsGrid.svelte */
-
   .content-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px;
   }
-
 
   @media (max-width: 1100px) {
     .home-layout,
