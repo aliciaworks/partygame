@@ -176,34 +176,11 @@
           }
 
           .launcher-row {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
-            gap: 14px;
-            align-items: center;
-            margin-bottom: 14px;
-          }
-
-          .launcher-input {
-            width: 100%;
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 14px 16px;
-            font-size: 1rem;
-            color: var(--text);
-            background: rgba(255, 255, 255, 0.04);
-            outline: none;
-          }
-
-          .launcher-input:focus {
-            border-color: rgba(74, 222, 128, 0.5);
-            box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.12);
-          }
-
-          .button-row {
             display: flex;
             flex-wrap: wrap;
             gap: 12px;
             align-items: center;
+            margin-bottom: 14px;
           }
 
           .primary-button,
@@ -382,7 +359,7 @@
             <div class="menu-kicker">Example game launcher</div>
             <h1 class="menu-title">Choose a demo mode</h1>
             <p class="menu-description">
-              Select one of the sample games below, enter your player name, and launch into the fixed example backend.
+              Select one of the sample games below and launch into the fixed example backend. A player name is generated automatically.
             </p>
 
             <div class="game-grid">
@@ -400,21 +377,12 @@
             </div>
 
             <div class="launcher-row">
-              <input
-                type="text"
-                id="playerNameInput"
-                class="launcher-input"
-                placeholder="Player name..."
-                maxlength="32"
-              />
               <button id="playButton" class="primary-button">Join Game</button>
-            </div>
-
-            <div class="button-row">
               <button id="backButton" class="secondary-button hidden">Back to menu</button>
             </div>
 
             <div class="backend-note">Backend locked to https://partygame-example-backend.aliciaworks.workers.dev/</div>
+            <div class="backend-note">Player name is auto-generated the first time you launch.</div>
             <div id="error"></div>
           </div>
         </div>

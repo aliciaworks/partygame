@@ -1,6 +1,6 @@
-import * as BABYLON from "@babylon/core";
-import { BaseGame } from "../core/base-game";
-import { NetworkManager } from "../core/network-manager";
+import * as BABYLON from "@babylonjs/core";
+import { BaseGame } from "../../core/base-game";
+import { NetworkManager } from "../../core/network-manager";
 import type { GameTickUpdate } from "@partygame/shared";
 
 /**

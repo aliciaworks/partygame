@@ -1,4 +1,4 @@
-import * as BABYLON from "@babylon/core";
+import * as BABYLON from "@babylonjs/core";
 
 /**
  * Manages Babylon.js scene and engine setup

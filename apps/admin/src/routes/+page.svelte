@@ -27,7 +27,7 @@
   function enterAdminPanel() {
     const normalized = saveBackendUrl(backendSelection);
     backendUrl.set(normalized);
-    statusMessage.set(`Backend selected: ${normalized}`);
+    statusMessage.set('Admin panel unlocked');
     showBackendGate = false;
   }
 </script>

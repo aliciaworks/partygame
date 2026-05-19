@@ -1,4 +1,4 @@
-import * as BABYLON from "@babylon/core";
+import * as BABYLON from "@babylonjs/core";
 import { GameManager } from "./core/game-manager";
 import { MOBAGame } from "./games/moba/moba-game";
 import { FPSGame } from "./games/fps/fps-game";
@@ -40,14 +40,6 @@ class PartyGameApp {
     const gameCards = document.querySelectorAll(".game-card");
     const playButton = document.getElementById("playButton");
     const backButton = document.getElementById("backButton");
-    const playerNameInput = document.getElementById(
-      "playerNameInput"
-    ) as HTMLInputElement;
-
-    // Load saved preferences
-    const savedName = localStorage.getItem("partygame.playerName");
-
-    if (savedName) playerNameInput.value = savedName;
 
     const initialCard = document.querySelector(
       '.game-card[data-game="moba"]',
@@ -65,21 +57,15 @@ class PartyGameApp {
 
     // Play button
     playButton?.addEventListener("click", async () => {
-      const playerName = playerNameInput.value.trim();
       const selectedCard = document.querySelector(".game-card.active");
       const gameType = selectedCard?.getAttribute("data-game") || this.selectedGameType;
-
-      if (!playerName) {
-        this.showError("Please enter a player name");
-        return;
-      }
 
       if (!gameType) {
         this.showError("Please select a game");
         return;
       }
 
-      // Save preferences
+      const playerName = this.getOrCreatePlayerName();
       localStorage.setItem("partygame.playerName", playerName);
 
       // Start game
@@ -99,6 +85,19 @@ class PartyGameApp {
     gameMenu?.classList.add("active");
   }
 
+  private getOrCreatePlayerName(): string {
+    const storageKey = "partygame.playerName";
+    const savedName = localStorage.getItem(storageKey)?.trim();
+
+    if (savedName) {
+      return savedName;
+    }
+
+    const generatedName = `Guest-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    localStorage.setItem(storageKey, generatedName);
+    return generatedName;
+  }
+
   /**
    * Start the selected game
    */
@@ -115,7 +114,7 @@ class PartyGameApp {
       await this.networkManager.connect(playerName, backendUrl);
 
       // Create and start game
-      const scene = new BABYLON.Scene(this.engine);
+      const scene = this.gameManager.createScene();
 
       if (gameType === "moba") {
         this.currentGame = new MOBAGame(scene, this.networkManager);

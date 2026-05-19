@@ -97,43 +97,44 @@ async function fetchJson<T>(backendUrl: string, path: string, init?: RequestInit
   let requestUrl: URL;
   try {
     requestUrl = new URL(path, backendUrl);
-  } catch (err) {
-    // try to salvage a URL if someone accidentally stored a labeled string
+  } catch {
     const maybe = String(backendUrl).match(/https?:\/\/[^\s"']+/)?.[0];
-    if (maybe) {
-      try {
-        requestUrl = new URL(path, maybe);
-      } catch (err2) {
-        throw new Error(`Invalid backend base URL: ${backendUrl}`);
-      }
-    } else {
+    if (!maybe) {
       throw new Error(`Invalid backend base URL: ${backendUrl}`);
     }
+
+    requestUrl = new URL(path, maybe);
   }
 
-  const response = await fetch(requestUrl.toString(), {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(requestUrl.toString(), {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...(init?.headers ?? {}),
+      },
+    });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to fetch ${requestUrl.toString()}: ${reason}`);
+  }
 
   const text = await response.text();
-  let data: T;
+  let data: T = {} as T;
 
-  try {
-    data = text ? (JSON.parse(text) as T) : ({} as T);
-  } catch (parseError) {
-    if (response.status === 404) {
-      throw new Error(`Backend endpoint not found (404): ${requestUrl.toString()}`);
+  if (text) {
+    try {
+      data = JSON.parse(text) as T;
+    } catch {
+      const snippet = text.slice(0, 200).replace(/\s+/g, ' ').trim();
+      throw new Error(`Backend returned non-JSON response (${response.status}) from ${requestUrl.toString()}: ${snippet || 'empty response'}`);
     }
-    throw new Error(`Backend returned non-JSON response for ${requestUrl.toString()}. Check the backend URL or route.`);
   }
 
   if (!response.ok) {
     const error = (data as { error?: string }).error ?? `Request failed with ${response.status}`;
-    throw new Error(error);
+    throw new Error(`${error} (${requestUrl.toString()})`);
   }
 
   return data;

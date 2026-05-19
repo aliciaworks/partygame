@@ -111,7 +111,7 @@
     try {
       const bootstrap = await fetchVoiceBootstrap($backendUrl, $roomId);
       voiceBootstrap.set(bootstrap);
-      statusMessage.set(`${$translate('status.voice_bootstrap_prepared')} ${$roomId}`);
+      statusMessage.set('Voice bootstrap prepared');
     } catch (error) {
       setError(error instanceof Error ? error.message : $translate('error.voice_bootstrap'));
     } finally {
@@ -160,9 +160,9 @@
 
   <section class="workspace">
     <div class="action-bar panel">
-      <div class="room-selector">
-        <label for="room-id" class="mono">{$translate('label.room')}</label>
-        <input id="room-id" bind:value={$roomId} type="text" placeholder={$translate('placeholder.room')} />
+      <div class="room-note">
+        <span class="mono">{$translate('voice.title')}</span>
+        <span>{$roomId}</span>
       </div>
 
       <div class="actions">
@@ -203,7 +203,7 @@
           <button class="primary" on:click={async () => {
             const normalized = saveBackendUrl(backendEdit);
             backendUrl.set(normalized);
-            statusMessage.set(`Backend: ${normalized}`);
+            statusMessage.set('Backend saved');
           }}>Save backend</button>
 
           <label class="mono" for="site-input">{$translate('topbar.site')}</label>
@@ -316,9 +316,15 @@
     margin-top: auto;
   }
 
-  .sidebar-actions select,
-  .room-selector input {
+  .sidebar-actions select {
     width: 100%;
+  }
+
+  .room-note {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    color: var(--muted);
   }
 
   .workspace {
@@ -413,3 +419,6 @@
     }
   }
 </style>
+
+
+
