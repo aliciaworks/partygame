@@ -15,32 +15,38 @@
     <span class="pill subtle">{lastSyncedAt ? `Updated ${lastSyncedAt}` : 'Idle'}</span>
   </div>
 
-  <div class="info-list">
-    <div>
-      <span class="mono">Health</span>
-      <strong>{health?.status ?? 'unknown'}</strong>
+  {#if health || sla}
+    <div class="info-list">
+      <div>
+        <span class="mono">Health</span>
+        <strong>{health?.status ?? '—'}</strong>
+      </div>
+      <div>
+        <span class="mono">Uptime</span>
+        <strong>{health?.uptime_ms ? `${Math.round(health.uptime_ms / 1000)}s` : '—'}</strong>
+      </div>
+      <div>
+        <span class="mono">SLA target</span>
+        <strong>{typeof sla?.sla_target_uptime === 'number' ? `${sla!.sla_target_uptime}%` : '—'}</strong>
+      </div>
+      <div>
+        <span class="mono">Last incident</span>
+        <strong>{sla?.last_incident ?? '—'}</strong>
+      </div>
     </div>
-    <div>
-      <span class="mono">Uptime</span>
-      <strong>{health?.uptime_ms ? `${Math.round(health.uptime_ms / 1000)}s` : 'n/a'}</strong>
-    </div>
-    <div>
-      <span class="mono">SLA target</span>
-      <strong>{sla?.sla_target_uptime ? `${sla.sla_target_uptime}%` : 'n/a'}</strong>
-    </div>
-    <div>
-      <span class="mono">Last incident</span>
-      <strong>{sla?.last_incident ?? 'none'}</strong>
-    </div>
-  </div>
 
-  {#if health?.checks}
-    <div class="chip-row">
-      {#each Object.entries(health.checks) as [name, value]}
-        <span class:chip={true} class:good={value} class:bad={!value}>
-          {name}: {value ? 'ok' : 'down'}
-        </span>
-      {/each}
+    {#if health?.checks}
+      <div class="chip-row">
+        {#each Object.entries(health.checks) as [name, value]}
+          <span class:chip={true} class:good={value} class:bad={!value}>
+            {name}: {value ? 'ok' : 'down'}
+          </span>
+        {/each}
+      </div>
+    {/if}
+  {:else}
+    <div class="empty-state">
+      <p>No runtime data available. Click <strong>Refresh</strong> to query the backend.</p>
     </div>
   {/if}
 </article>
@@ -116,6 +122,15 @@
     flex-wrap: wrap;
     gap: 10px;
     margin-top: 16px;
+  }
+
+  .empty-state {
+    min-height: 120px;
+    display: grid;
+    align-content: center;
+    gap: 8px;
+    padding: 12px;
+    color: var(--muted);
   }
 
   .chip {

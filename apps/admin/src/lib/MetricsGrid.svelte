@@ -9,26 +9,26 @@
 <section class="metric-grid">
   <article class="metric panel">
     <span class="mono">Uptime</span>
-    <strong>{sla?.uptime_percent ? `${sla.uptime_percent.toFixed(2)}%` : 'n/a'}</strong>
-    <p>{sla?.meets_sla ? 'Meeting SLA' : 'SLA pending'}</p>
+    <strong>{typeof sla?.uptime_percent === 'number' ? `${sla.uptime_percent.toFixed(2)}%` : '—'}</strong>
+    <p>{sla ? (sla.meets_sla ? 'Meeting SLA' : 'SLA at risk') : 'Click Refresh to fetch'}</p>
   </article>
 
   <article class="metric panel">
     <span class="mono">Backend health</span>
-    <strong>{health?.status ?? 'unknown'}</strong>
-    <p>{health?.timestamp ?? 'Not refreshed yet'}</p>
+    <strong>{health?.status ?? '—'}</strong>
+    <p>{health?.timestamp ?? 'Click Refresh to fetch'}</p>
   </article>
 
   <article class="metric panel">
     <span class="mono">Error rate</span>
-    <strong>{sla?.error_rate_percent ? `${sla.error_rate_percent.toFixed(2)}%` : 'n/a'}</strong>
+    <strong>{typeof sla?.error_rate_percent === 'number' ? `${sla.error_rate_percent.toFixed(2)}%` : '—'}</strong>
     <p>30-day average</p>
   </article>
 
   <article class="metric panel">
     <span class="mono">API version</span>
-    <strong>{versions?.current ?? 'n/a'}</strong>
-    <p>{versions?.supported?.length ?? 0} supported</p>
+    <strong>{versions?.current ?? '—'}</strong>
+    <p>{versions ? `${versions.supported?.length ?? 0} supported` : 'Click Refresh to fetch'}</p>
   </article>
 </section>
 

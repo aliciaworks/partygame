@@ -19,6 +19,11 @@
     fetchApiVersions, 
     fetchVoiceBootstrap
   } from './portal';
+  onMount(() => {
+    refreshDashboard();
+  });
+
+  import { onMount } from 'svelte';
   import MetricsGrid from './MetricsGrid.svelte';
   import RuntimeState from './RuntimeState.svelte';
   import VoiceBootstrapCard from './VoiceBootstrapCard.svelte';
@@ -84,68 +89,41 @@
 </script>
 
 <main class="home-layout">
-  <aside class="sidebar panel">
-    <div>
-      <p class="eyebrow mono">BACKEND</p>
-      <h2>Control Center</h2>
-      <p class="lede">
-        {$backendUrl}
-      </p>
-    </div>
-
-    <div class="sidebar-stack">
-      <div class="sidebar-card">
-        <span class="mono">Backend state</span>
-        <strong>{$health?.status ?? 'unknown'}</strong>
-        <p>Health and SLA are pulled from the backend at runtime.</p>
-      </div>
-
-      <div class="sidebar-actions">
-        <button class="ghost full" on:click={openBackendHealth}>Open health</button>
-        <button class="ghost full" on:click={openApiVersions}>Open API versions</button>
-      </div>
-    </div>
-  </aside>
-
   <section class="workspace">
-    <header class="panel workspace-header">
-      <div>
-        <p class="eyebrow mono">CONTROL CENTER</p>
-        <h2>Operational dashboard for the selected backend.</h2>
+    <div class="action-bar panel">
+      <div class="room-selector">
+        <label for="room-id" class="mono">ROOM</label>
+        <input id="room-id" bind:value={$roomId} type="text" placeholder="control-room" />
       </div>
-
-      <div class="workspace-actions">
-        <label>
-          <span class="mono">Room ID</span>
-          <input bind:value={$roomId} type="text" placeholder="control-room" />
-        </label>
+      
+      <div class="actions">
         <button class="primary" on:click={buildVoiceBootstrap} disabled={$busy}>
-          Build voice bootstrap
+          {$busy ? '...' : 'Build Voice Manifest'}
         </button>
         <button class="ghost" on:click={refreshDashboard} disabled={$busy}>
-          Refresh data
+          Refresh
         </button>
       </div>
-    </header>
+    </div>
 
-    <section class="metric-grid">
-      <MetricsGrid health={$health} sla={$sla} versions={$versions} />
-    </section>
+    <MetricsGrid health={$health} sla={$sla} versions={$versions} />
 
-    <section class="content-grid">
-      <RuntimeState health={$health} sla={$sla} lastSyncedAt={$lastSyncedAt} />
-      <VoiceBootstrapCard voiceBootstrap={$voiceBootstrap} />
-      <ApiSurfaceCard versions={$versions} backendUrl={$backendUrl} />
-      <OperationsCard on:refresh={refreshDashboard} />
-    </section>
-
-    <footer class="status-strip panel">
-      <div>
-        <span class="mono">Portal status</span>
-        <strong>{$statusMessage}</strong>
+    <div class="content-grid">
+      <div class="main-content">
+        <VoiceBootstrapCard voiceBootstrap={$voiceBootstrap} />
+        <RuntimeState health={$health} sla={$sla} lastSyncedAt={$lastSyncedAt} />
       </div>
+
+      <div class="side-content">
+        <ApiSurfaceCard versions={$versions} />
+        <OperationsCard on:refresh={refreshDashboard} on:open-health={openBackendHealth} on:open-api-versions={openApiVersions} />
+      </div>
+    </div>
+
+    <footer class="status-bar">
+      <span class="mono">{$statusMessage}</span>
       {#if $errorMessage}
-        <div class="error-badge">{$errorMessage}</div>
+        <span class="error-text">{$errorMessage}</span>
       {/if}
     </footer>
   </section>

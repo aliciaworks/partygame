@@ -27,15 +27,11 @@
 <div class="page-shell">
   <header class="topbar panel">
     <div class="brand">
-      <span class="brand-mark"></span>
+      <div class="brand-mark"></div>
       <div>
-        <p class="eyebrow mono">PARTYGAME / PORTAL</p>
-        <h1>Control the backend from SvelteKit.</h1>
+        <p class="eyebrow mono">PARTYGAME / ADMIN</p>
+        <h1>{$backendUrl}</h1>
       </div>
-    </div>
-
-    <div class="status-pills">
-      <span class="pill">Backend: {$backendUrl}</span>
     </div>
   </header>
 

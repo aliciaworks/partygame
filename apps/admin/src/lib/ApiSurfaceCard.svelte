@@ -2,7 +2,6 @@
   import type { ApiVersions } from '$lib/portal';
 
   export let versions: ApiVersions | null = null;
-  export let backendUrl = '';
 </script>
 
 <article class="panel card-block wide">
@@ -13,24 +12,26 @@
     </div>
   </div>
 
-  <div class="support-grid">
-    <div>
-      <span class="mono">Current</span>
-      <strong>{versions?.current ?? 'n/a'}</strong>
+  {#if versions}
+    <div class="support-grid">
+      <div>
+        <span class="mono">Current</span>
+        <strong>{versions.current ?? '—'}</strong>
+      </div>
+      <div>
+        <span class="mono">Supported</span>
+        <strong>{versions.supported?.length ?? 0}</strong>
+      </div>
+      <div>
+        <span class="mono">Deprecated</span>
+        <strong>{versions.deprecated?.length ?? 0}</strong>
+      </div>
     </div>
-    <div>
-      <span class="mono">Supported</span>
-      <strong>{versions?.supported?.length ?? 0}</strong>
+  {:else}
+    <div class="empty-state">
+      <p>No API version information. Click <strong>Refresh</strong> to fetch.</p>
     </div>
-    <div>
-      <span class="mono">Deprecated</span>
-      <strong>{versions?.deprecated?.length ?? 0}</strong>
-    </div>
-    <div>
-      <span class="mono">Backend URL</span>
-      <strong>{backendUrl}</strong>
-    </div>
-  </div>
+  {/if}
 </article>
 
 <style>
@@ -88,6 +89,14 @@
   .support-grid strong {
     display: block;
     font-size: 1.05rem;
+  }
+
+  .empty-state {
+    min-height: 120px;
+    display: grid;
+    align-content: center;
+    gap: 8px;
+    padding: 12px;
   }
 
   @media (max-width: 1100px) {
