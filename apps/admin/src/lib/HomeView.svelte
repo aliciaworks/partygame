@@ -19,12 +19,15 @@
     voiceBootstrap,
     clearError,
     setError,
+    siteName,
   } from './portalStore';
   import {
     fetchBackendHealth,
     fetchBackendSla,
     fetchApiVersions,
     fetchVoiceBootstrap,
+    saveBackendUrl,
+    saveSiteName,
   } from './portal';
 
   function setLocale(e: Event) {
@@ -35,6 +38,8 @@
   // client-only UI state for the sidebar
   let sidebarOpen = true;
   let activeCategory: string = 'dashboard';
+  let backendEdit = '';
+  let siteNameEdit = '';
 
   onMount(() => {
     try {
@@ -43,6 +48,13 @@
     } catch (e) {
       sidebarOpen = true;
     }
+    try {
+      const saved = window.localStorage.getItem('partygame.activeCategory');
+      if (saved) activeCategory = saved;
+    } catch (e) {}
+    // initialize edit fields
+    backendEdit = $backendUrl;
+    siteNameEdit = $siteName;
   });
 
   function toggleSidebar() {
@@ -54,6 +66,9 @@
 
   function selectCategory(name: string) {
     activeCategory = name;
+    try {
+      window.localStorage.setItem('partygame.activeCategory', name);
+    } catch (e) {}
   }
 
   async function refreshDashboard() {
@@ -160,19 +175,57 @@
       </div>
     </div>
 
-    <MetricsGrid health={$health} sla={$sla} versions={$versions} />
+    {#if activeCategory === 'dashboard'}
+      <MetricsGrid health={$health} sla={$sla} versions={$versions} />
 
-    <div class="content-grid">
-      <div class="main-content">
-        <VoiceBootstrapCard voiceBootstrap={$voiceBootstrap} />
-        <RuntimeState health={$health} sla={$sla} lastSyncedAt={$lastSyncedAt} />
+      <div class="content-grid">
+        <div class="main-content">
+          <VoiceBootstrapCard voiceBootstrap={$voiceBootstrap} />
+          <RuntimeState health={$health} sla={$sla} lastSyncedAt={$lastSyncedAt} />
+        </div>
+
+        <div class="side-content">
+          <ApiSurfaceCard versions={$versions} />
+          <OperationsCard on:refresh={refreshDashboard} on:open-health={openBackendHealth} on:open-api-versions={openApiVersions} />
+        </div>
       </div>
-
-      <div class="side-content">
-        <ApiSurfaceCard versions={$versions} />
+    {:else if activeCategory === 'operations'}
+      <div class="panel">
+        <h3>{$translate('ops.quick_actions')}</h3>
         <OperationsCard on:refresh={refreshDashboard} on:open-health={openBackendHealth} on:open-api-versions={openApiVersions} />
       </div>
-    </div>
+    {:else if activeCategory === 'settings'}
+      <div class="panel card-block">
+        <h3>Settings</h3>
+        <div class="stack">
+          <label class="mono" for="backend-input">{$translate('topbar.backend')}</label>
+          <input id="backend-input" bind:value={backendEdit} />
+          <button class="primary" on:click={async () => {
+            const normalized = saveBackendUrl(backendEdit);
+            backendUrl.set(normalized);
+            statusMessage.set(`Backend: ${normalized}`);
+          }}>Save backend</button>
+
+          <label class="mono" for="site-input">{$translate('topbar.site')}</label>
+          <input id="site-input" bind:value={siteNameEdit} />
+          <button class="primary" on:click={() => {
+            const s = saveSiteName(siteNameEdit);
+            siteName.set(s);
+            statusMessage.set(`${$translate('topbar.site')} ${s}`);
+          }}>Save site name</button>
+        </div>
+      </div>
+    {:else if activeCategory === 'users'}
+      <div class="panel card-block">
+        <h3>Users</h3>
+        <div class="empty-state">No users configured.</div>
+      </div>
+    {:else if activeCategory === 'logs'}
+      <div class="panel card-block">
+        <h3>Logs</h3>
+        <div class="empty-state">No logs available.</div>
+      </div>
+    {/if}
 
     <footer class="status-bar">
       <span class="mono">{$translate('topbar.backend')} {$backendUrl}</span>
