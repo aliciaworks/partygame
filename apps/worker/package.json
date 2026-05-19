@@ -10,11 +10,16 @@
   "dependencies": {
     "@partygame/auth": "*",
     "@partygame/core": "*",
-    "hono": "^4.2.0",
-    "partyserver": "^0.0.40"
+    "@sveltejs/adapter-static": "3.0.10",
+    "@sveltejs/kit": "2.60.1",
+    "drizzle-orm": "0.45.2",
+    "hono": "^4.12.21",
+    "nanoid": "5.1.11",
+    "partyserver": "^0.5.6",
+    "vite": "8.0.13"
   },
   "devDependencies": {
-    "typescript": "^5.4.5",
-    "wrangler": "^4.92.0"
+    "typescript": "^6.0.3",
+    "wrangler": "^4.93.0"
   }
 }

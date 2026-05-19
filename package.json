@@ -17,12 +17,12 @@
     "generate:types": "npm run generate:types --workspace=@partygame/shared"
   },
   "devDependencies": {
-    "@eslint/js": "^9.28.0",
-    "@types/node": "^22.15.0",
-    "eslint": "^9.28.0",
-    "prettier": "^3.5.3",
-    "vitest": "^3.0.0",
-    "typescript-eslint": "^8.32.0",
-    "typescript": "^5.4.5"
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.9.0",
+    "eslint": "^10.4.0",
+    "prettier": "^3.8.3",
+    "vitest": "^4.1.6",
+    "typescript-eslint": "^8.59.4",
+    "typescript": "^6.0.3"
   }
 }

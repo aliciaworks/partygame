@@ -12,17 +12,19 @@
     "deploy": "npm run build && wrangler pages deploy build"
   },
   "dependencies": {
-    "@fontsource/ibm-plex-mono": "^5.2.5",
-    "@fontsource/space-grotesk": "^5.2.5"
+    "@fontsource/ibm-plex-mono": "^5.2.7",
+    "@fontsource/space-grotesk": "^5.2.10",
+    "drizzle-orm": "0.45.2",
+    "nanoid": "5.1.11"
   },
   "devDependencies": {
-    "@sveltejs/adapter-static": "^3.0.0",
-    "@sveltejs/kit": "^2.16.0",
-    "@sveltejs/vite-plugin-svelte": "^5.0.3",
-    "svelte": "^5.28.2",
-    "svelte-check": "^4.1.4",
-    "typescript": "^5.4.5",
-    "vite": "^6.3.5",
-    "wrangler": "^4.92.0"
+    "@sveltejs/adapter-static": "^3.0.10",
+    "@sveltejs/kit": "^2.60.1",
+    "@sveltejs/vite-plugin-svelte": "^7.1.2",
+    "svelte": "^5.55.8",
+    "svelte-check": "^4.4.8",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.13",
+    "wrangler": "^4.93.0"
   }
 }
