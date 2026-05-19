@@ -32,6 +32,30 @@
     if (value) locale.set(value);
   }
 
+  // client-only UI state for the sidebar
+  let sidebarOpen = true;
+  let activeCategory: string = 'dashboard';
+
+  onMount(() => {
+    try {
+      const v = window.localStorage.getItem('partygame.sidebarOpen');
+      sidebarOpen = v === null ? true : v === '1';
+    } catch (e) {
+      sidebarOpen = true;
+    }
+  });
+
+  function toggleSidebar() {
+    sidebarOpen = !sidebarOpen;
+    try {
+      window.localStorage.setItem('partygame.sidebarOpen', sidebarOpen ? '1' : '0');
+    } catch (e) {}
+  }
+
+  function selectCategory(name: string) {
+    activeCategory = name;
+  }
+
   async function refreshDashboard() {
     busy.set(true);
     clearError();
@@ -95,14 +119,17 @@
 
 <main class="home-layout">
   <section class="workspace">
-    <aside class="sidebar">
+    <aside class="sidebar" class:collapsed={!sidebarOpen} aria-hidden={!sidebarOpen}>
+      <div class="sidebar-top">
+        <button class="collapse-btn" on:click={toggleSidebar} aria-label="Toggle sidebar">{sidebarOpen ? '‹' : '›'}</button>
+      </div>
       <nav class="sidebar-stack">
         <ul class="category-list">
-          <li class="category-item">{$translate('sidebar.dashboard')}</li>
-          <li class="category-item">{$translate('sidebar.operations')}</li>
-          <li class="category-item">{$translate('sidebar.settings')}</li>
-          <li class="category-item">{$translate('sidebar.users')}</li>
-          <li class="category-item">{$translate('sidebar.logs')}</li>
+          <li><button class:active={activeCategory==='dashboard'} class="category-item" on:click={() => selectCategory('dashboard')}>{$translate('sidebar.dashboard')}</button></li>
+          <li><button class:active={activeCategory==='operations'} class="category-item" on:click={() => selectCategory('operations')}>{$translate('sidebar.operations')}</button></li>
+          <li><button class:active={activeCategory==='settings'} class="category-item" on:click={() => selectCategory('settings')}>{$translate('sidebar.settings')}</button></li>
+          <li><button class:active={activeCategory==='users'} class="category-item" on:click={() => selectCategory('users')}>{$translate('sidebar.users')}</button></li>
+          <li><button class:active={activeCategory==='logs'} class="category-item" on:click={() => selectCategory('logs')}>{$translate('sidebar.logs')}</button></li>
         </ul>
       </nav>
 
@@ -168,8 +195,23 @@
   }
 
   input {
-    width: 100%;
+    gap: 12px;
     border-radius: 16px;
+
+  .sidebar.collapsed {
+    width: 72px;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .sidebar .collapse-btn {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-size: 18px;
+    cursor: pointer;
+  }
+
     border: 1px solid rgba(255, 255, 255, 0.08);
     padding: 14px 16px;
     color: var(--text);
@@ -183,10 +225,21 @@
   }
 
   button {
-    border: 0;
-    border-radius: 16px;
-    padding: 13px 16px;
-    color: var(--text);
+  .category-item {
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: transparent;
+    border: none;
+    text-align: left;
+    width: 100%;
+    cursor: pointer;
+  }
+
+  .category-item.active,
+  .category-item:focus,
+  .category-item:hover {
+    background: rgba(0,0,0,0.04);
+  }
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.08);
     cursor: pointer;
