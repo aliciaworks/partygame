@@ -35,220 +35,416 @@
     }
 
     .hud {
-      background: rgba(10, 14, 39, 0.8);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 8px;
-      padding: 16px;
-      backdrop-filter: blur(10px);
-    }
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>PartyGame - Web Game</title>
+        <style>
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
 
-    .hud-row {
-      display: flex;
-      gap: 20px;
-      margin-bottom: 8px;
-    }
+          :root {
+            --bg: #07111f;
+            --bg-elevated: rgba(9, 18, 35, 0.86);
+            --text: #e8eefc;
+            --muted: #9fb0d0;
+            --border: rgba(255, 255, 255, 0.09);
+            --accent: #4ade80;
+            --accent-warm: #fbbf24;
+            --danger: #ef4444;
+          }
 
-    .hud-item {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-    }
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background:
+              radial-gradient(circle at top left, rgba(74, 222, 128, 0.12), transparent 28%),
+              radial-gradient(circle at bottom right, rgba(251, 191, 36, 0.08), transparent 22%),
+              var(--bg);
+            color: var(--text);
+            overflow: hidden;
+          }
 
-    .health-bar {
-      width: 150px;
-      height: 8px;
-      background: #333;
-      border-radius: 4px;
-      overflow: hidden;
-    }
+          canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(135deg, #08111f 0%, #111a2e 100%);
+          }
 
-    .health-fill {
-      height: 100%;
-      background: linear-gradient(90deg, #4ade80, #22c55e);
-      transition: width 0.1s ease-out;
-    }
+          #gameMenu {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            z-index: 20;
+            background: linear-gradient(135deg, rgba(6, 10, 22, 0.9), rgba(10, 16, 30, 0.88));
+            backdrop-filter: blur(16px);
+          }
 
-    #connection-status {
-      position: absolute;
-      bottom: 20px;
-      right: 20px;
-      padding: 8px 16px;
-      border-radius: 4px;
-      font-size: 12px;
-      font-weight: 500;
-    }
+          #gameMenu:not(.active) {
+            display: none;
+          }
 
-    .connected {
-      background: rgba(74, 222, 128, 0.2);
-      color: #4ade80;
-      border: 1px solid #4ade80;
-    }
+          .menu-card {
+            width: min(1080px, 100%);
+            border-radius: 28px;
+            padding: 30px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            box-shadow: 0 26px 70px rgba(0, 0, 0, 0.38);
+          }
 
-    .connecting {
-      background: rgba(251, 191, 36, 0.2);
-      color: #fbbf24;
-      border: 1px solid #fbbf24;
-    }
+          .menu-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            background: rgba(74, 222, 128, 0.12);
+            color: var(--accent);
+            font-size: 0.78rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            margin-bottom: 18px;
+          }
 
-    .disconnected {
-      background: rgba(239, 68, 68, 0.2);
-      color: #ef4444;
-      border: 1px solid #ef4444;
-    }
+          .menu-title {
+            font-size: clamp(2rem, 5vw, 4rem);
+            line-height: 0.95;
+            margin-bottom: 16px;
+            max-width: 13ch;
+          }
 
-    .loading {
-      text-align: center;
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-    }
+          .menu-description {
+            max-width: 60ch;
+            color: var(--muted);
+            line-height: 1.7;
+            margin-bottom: 28px;
+            font-size: 1.03rem;
+          }
 
-    .loading-spinner {
-      width: 40px;
-      height: 40px;
-      border: 4px solid rgba(255, 255, 255, 0.2);
-      border-top-color: #4ade80;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
+          .game-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+            margin-bottom: 22px;
+          }
 
-    @keyframes spin {
-      to {
-        transform: rotate(360deg);
-      }
-    }
+          .game-card {
+            padding: 20px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            cursor: pointer;
+            transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+          }
 
-    .init-screen {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 100;
-    }
+          .game-card:hover,
+          .game-card.active {
+            transform: translateY(-3px);
+            border-color: rgba(74, 222, 128, 0.45);
+            box-shadow: 0 16px 34px rgba(0, 0, 0, 0.26);
+          }
 
-    .init-screen.hidden {
-      display: none;
-    }
+          .game-tag {
+            display: inline-flex;
+            margin-bottom: 12px;
+            padding: 5px 10px;
+            border-radius: 999px;
+            background: rgba(74, 222, 128, 0.12);
+            color: var(--accent);
+            font-size: 0.74rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+          }
 
-    .init-content {
-      text-align: center;
-    }
+          .game-card h3 {
+            font-size: 1.25rem;
+            margin-bottom: 8px;
+          }
 
-    .init-title {
-      font-size: 2.5em;
-      font-weight: 700;
-      margin-bottom: 20px;
-      background: linear-gradient(135deg, #4ade80, #fbbf24);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
+          .game-card p {
+            color: var(--muted);
+            line-height: 1.55;
+          }
 
-    .init-description {
-      font-size: 1.1em;
-      color: #93a4c3;
-      margin-bottom: 40px;
-      max-width: 400px;
-    }
+          .launcher-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 14px;
+            align-items: center;
+            margin-bottom: 14px;
+          }
 
-    .init-input {
-      background: rgba(16, 26, 47, 0.92);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 8px;
-      padding: 12px 16px;
-      color: #e0e0e0;
-      margin-bottom: 12px;
-      width: 300px;
-      font-size: 1em;
-    }
+          .launcher-input {
+            width: 100%;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 14px 16px;
+            font-size: 1rem;
+            color: var(--text);
+            background: rgba(255, 255, 255, 0.04);
+            outline: none;
+          }
 
-    .init-button {
-      background: linear-gradient(135deg, #4ade80, #22c55e);
-      border: none;
-      border-radius: 8px;
-      padding: 12px 32px;
-      color: #0a0e27;
-      font-weight: 600;
-      cursor: pointer;
-      font-size: 1em;
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
+          .launcher-input:focus {
+            border-color: rgba(74, 222, 128, 0.5);
+            box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.12);
+          }
 
-    .init-button:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(74, 222, 128, 0.3);
-    }
+          .button-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+          }
 
-    .init-button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-  </style>
-</head>
-<body>
-  <div id="init-screen" class="init-screen">
-    <div class="init-content">
-      <div class="init-title">🎮 PartyGame</div>
-      <div class="init-description">Enter your player name to join the game</div>
-      
-      <input 
-        type="text" 
-        id="player-name-input" 
-        class="init-input" 
-        placeholder="Player name..."
-        maxlength="32"
-      />
-      
-      <input 
-        type="text" 
-        id="backend-url-input" 
-        class="init-input" 
-        placeholder="Backend URL (http://localhost:8787)"
-      />
-      
-      <button id="join-button" class="init-button">Join Game</button>
-      
-      <div id="init-error" style="color: #ef4444; margin-top: 16px; display: none;"></div>
-    </div>
-  </div>
+          .primary-button,
+          .secondary-button {
+            border: none;
+            border-radius: 14px;
+            padding: 13px 18px;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 0.98rem;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+          }
 
-  <canvas id="canvas"></canvas>
+          .primary-button {
+            background: linear-gradient(135deg, var(--accent), #22c55e);
+            color: #07111f;
+            box-shadow: 0 12px 26px rgba(74, 222, 128, 0.22);
+          }
 
-  <div id="ui">
-    <div class="hud">
-      <div class="hud-row">
-        <div class="hud-item">
-          <span>Health:</span>
-          <div class="health-bar">
-            <div class="health-fill" id="health-fill" style="width: 100%"></div>
+          .secondary-button {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text);
+            border: 1px solid var(--border);
+          }
+
+          .primary-button:hover,
+          .secondary-button:hover {
+            transform: translateY(-1px);
+          }
+
+          .backend-note {
+            margin-top: 14px;
+            color: var(--muted);
+            font-size: 0.92rem;
+          }
+
+          #error {
+            display: none;
+            margin-top: 16px;
+            color: var(--danger);
+            min-height: 1.25rem;
+          }
+
+          #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            z-index: 10;
+            pointer-events: none;
+          }
+
+          .hud {
+            background: rgba(9, 18, 35, 0.82);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 18px;
+            padding: 16px 18px;
+            backdrop-filter: blur(12px);
+          }
+
+          .hud-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 18px;
+            margin-bottom: 8px;
+          }
+
+          .hud-row:last-child {
+            margin-bottom: 0;
+          }
+
+          .hud-item {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+          }
+
+          .health-bar {
+            width: 160px;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 999px;
+            overflow: hidden;
+          }
+
+          .health-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4ade80, #22c55e);
+            transition: width 0.1s ease-out;
+          }
+
+          #statusBar {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: rgba(9, 18, 35, 0.84);
+            font-size: 12px;
+            font-weight: 600;
+            z-index: 10;
+          }
+
+          #statusBar.connected {
+            color: #4ade80;
+            border-color: rgba(74, 222, 128, 0.45);
+          }
+
+          #statusBar.disconnected {
+            color: #ef4444;
+            border-color: rgba(239, 68, 68, 0.45);
+          }
+
+          .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            margin-right: 8px;
+            border-radius: 999px;
+            background: #fbbf24;
+            vertical-align: middle;
+          }
+
+          .status-indicator.connected {
+            background: #4ade80;
+          }
+
+          .status-indicator.disconnected {
+            background: #ef4444;
+          }
+
+          .hidden {
+            display: none !important;
+          }
+
+          @media (max-width: 900px) {
+            .game-grid {
+              grid-template-columns: 1fr;
+            }
+
+            .launcher-row {
+              grid-template-columns: 1fr;
+            }
+
+            .menu-card {
+              padding: 22px;
+            }
+          }
+
+          @media (max-width: 640px) {
+            #gameMenu {
+              padding: 14px;
+            }
+
+            .menu-card {
+              padding: 18px;
+              border-radius: 22px;
+            }
+
+            .hud {
+              padding: 14px;
+              border-radius: 16px;
+            }
+
+            #statusBar {
+              right: 14px;
+              bottom: 14px;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div id="gameMenu" class="active">
+          <div class="menu-card">
+            <div class="menu-kicker">Example game launcher</div>
+            <h1 class="menu-title">Choose a demo mode</h1>
+            <p class="menu-description">
+              Select one of the sample games below, enter your player name, and launch into the fixed example backend.
+            </p>
+
+            <div class="game-grid">
+              <div class="game-card active" data-game="moba">
+                <div class="game-tag">MOBA</div>
+                <h3>Arena Wars</h3>
+                <p>Isometric team battles with movement, lane pressure, and shared objectives.</p>
+              </div>
+
+              <div class="game-card" data-game="fps">
+                <div class="game-tag">FPS</div>
+                <h3>CyberArena</h3>
+                <p>First-person combat with sprinting, jumping, and a neon-lit arena.</p>
+              </div>
+            </div>
+
+            <div class="launcher-row">
+              <input
+                type="text"
+                id="playerNameInput"
+                class="launcher-input"
+                placeholder="Player name..."
+                maxlength="32"
+              />
+              <button id="playButton" class="primary-button">Join Game</button>
+            </div>
+
+            <div class="button-row">
+              <button id="backButton" class="secondary-button hidden">Back to menu</button>
+            </div>
+
+            <div class="backend-note">Backend locked to https://partygame-example-backend.aliciaworks.workers.dev/</div>
+            <div id="error"></div>
           </div>
-          <span id="health-text">100/100</span>
         </div>
-      </div>
-      <div class="hud-row">
-        <div class="hud-item">
-          <span>Position:</span>
-          <span id="position-text">0, 0</span>
-        </div>
-      </div>
-      <div class="hud-row">
-        <div class="hud-item">
-          <span>Players Online:</span>
-          <span id="players-text">0</span>
-        </div>
-      </div>
-    </div>
-  </div>
 
-  <div id="connection-status" class="connecting">Loading...</div>
+        <canvas id="renderCanvas"></canvas>
 
-  <script type="module" src="/src/main.ts"></script>
-</body>
-</html>
+        <div id="ui">
+          <div class="hud">
+            <div class="hud-row">
+              <div class="hud-item">
+                <span>Health:</span>
+                <div class="health-bar">
+                  <div class="health-fill" id="health-fill" style="width: 100%"></div>
+                </div>
+                <span id="health-text">100/100</span>
+              </div>
+              <div class="hud-item">
+                <span>Position:</span>
+                <span id="position-text">0, 0</span>
+              </div>
+              <div class="hud-item">
+                <span>Players Online:</span>
+                <span id="players-text">0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="statusBar" class="disconnected"><span class="status-indicator disconnected"></span><span id="statusText">Disconnected</span></div>
+
+        <script type="module" src="/src/main.ts"></script>
+      </body>
+      </html>

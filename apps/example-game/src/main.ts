@@ -4,6 +4,8 @@ import { MOBAGame } from "./games/moba/moba-game";
 import { FPSGame } from "./games/fps/fps-game";
 import { NetworkManager } from "./core/network-manager";
 
+const DEFAULT_BACKEND_URL = "https://partygame-example-backend.aliciaworks.workers.dev/";
+
 /**
  * Main application entry point
  */
@@ -13,6 +15,7 @@ class PartyGameApp {
   private gameManager: GameManager;
   private networkManager: NetworkManager;
   private currentGame: MOBAGame | FPSGame | null = null;
+  private selectedGameType: string = "moba";
 
   constructor() {
     this.canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
@@ -40,39 +43,34 @@ class PartyGameApp {
     const playerNameInput = document.getElementById(
       "playerNameInput"
     ) as HTMLInputElement;
-    const backendUrlInput = document.getElementById(
-      "backendUrlInput"
-    ) as HTMLInputElement;
 
     // Load saved preferences
     const savedName = localStorage.getItem("partygame.playerName");
-    const savedUrl = localStorage.getItem("partygame.backendUrl");
 
     if (savedName) playerNameInput.value = savedName;
-    if (savedUrl) backendUrlInput.value = savedUrl;
+
+    const initialCard = document.querySelector(
+      '.game-card[data-game="moba"]',
+    );
+    initialCard?.classList.add("active");
 
     // Game card click handlers
     gameCards.forEach((card) => {
       card.addEventListener("click", () => {
         gameCards.forEach((c) => c.classList.remove("active"));
         card.classList.add("active");
+        this.selectedGameType = card.getAttribute("data-game") || "moba";
       });
     });
 
     // Play button
     playButton?.addEventListener("click", async () => {
       const playerName = playerNameInput.value.trim();
-      const backendUrl = backendUrlInput.value.trim();
       const selectedCard = document.querySelector(".game-card.active");
-      const gameType = selectedCard?.getAttribute("data-game");
+      const gameType = selectedCard?.getAttribute("data-game") || this.selectedGameType;
 
       if (!playerName) {
         this.showError("Please enter a player name");
-        return;
-      }
-
-      if (!backendUrl) {
-        this.showError("Please enter a backend URL");
         return;
       }
 
@@ -83,12 +81,11 @@ class PartyGameApp {
 
       // Save preferences
       localStorage.setItem("partygame.playerName", playerName);
-      localStorage.setItem("partygame.backendUrl", backendUrl);
 
       // Start game
       gameMenu?.classList.remove("active");
       backButton?.classList.remove("hidden");
-      await this.startGame(playerName, backendUrl, gameType);
+      await this.startGame(playerName, DEFAULT_BACKEND_URL, gameType);
     });
 
     // Back button

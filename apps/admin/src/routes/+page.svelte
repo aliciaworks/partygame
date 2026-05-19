@@ -3,13 +3,20 @@
   import HomeView from '$lib/HomeView.svelte';
   import { translate } from '$lib/i18n';
   import { backendUrl, statusMessage, siteName } from '$lib/portalStore';
-  import { readBackendUrl, readSiteName, saveSiteName } from '$lib/portal';
+  import { DEFAULT_BACKEND_URL, readBackendUrl, readSiteName, saveBackendUrl, saveSiteName } from '$lib/portal';
 
   let showZeroTrustHint = true;
+  let showBackendGate = true;
+  let backendSelection = DEFAULT_BACKEND_URL;
 
   onMount(() => {
     const dismissed = localStorage.getItem('partygame.zeroTrustHintDismissed');
     showZeroTrustHint = dismissed !== '1';
+
+    const savedBackend = readBackendUrl();
+    backendSelection = savedBackend;
+    backendUrl.set(savedBackend);
+    siteName.set(readSiteName());
   });
 
   function dismissZeroTrustHint() {
@@ -17,11 +24,12 @@
     showZeroTrustHint = false;
   }
 
-  onMount(() => {
-    const savedBackendUrl = readBackendUrl();
-    backendUrl.set(savedBackendUrl);
-    siteName.set(readSiteName());
-  });
+  function enterAdminPanel() {
+    const normalized = saveBackendUrl(backendSelection);
+    backendUrl.set(normalized);
+    statusMessage.set(`Backend selected: ${normalized}`);
+    showBackendGate = false;
+  }
 </script>
 
 <svelte:head>
@@ -55,7 +63,27 @@
     </div>
   {/if}
 
-  <HomeView />
+  {#if showBackendGate}
+    <section class="backend-gate panel">
+      <div class="gate-copy">
+        <p class="eyebrow mono">{$translate('topbar.backend')}</p>
+        <h2>Choose a backend</h2>
+        <p>The admin panel connects to the backend you choose here before loading the dashboard.</p>
+      </div>
+
+      <div class="gate-form">
+        <label class="mono" for="backend-selection">Backend URL</label>
+        <input id="backend-selection" bind:value={backendSelection} spellcheck="false" />
+        <div class="gate-actions">
+          <button class="ghost" on:click={() => (backendSelection = DEFAULT_BACKEND_URL)}>Use default</button>
+          <button class="primary" on:click={enterAdminPanel}>Enter admin panel</button>
+        </div>
+        <p class="gate-note">Default: {DEFAULT_BACKEND_URL}</p>
+      </div>
+    </section>
+  {:else}
+    <HomeView />
+  {/if}
 </div>
 
 <style>
@@ -137,6 +165,60 @@
     gap: 8px;
   }
 
+  .backend-gate {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+    gap: 20px;
+    padding: 28px;
+    border-radius: 28px;
+  }
+
+  .gate-copy h2 {
+    margin: 0 0 12px;
+    font-size: clamp(1.5rem, 2.4vw, 2.2rem);
+  }
+
+  .gate-copy p:last-child {
+    margin: 0;
+    color: var(--muted);
+    max-width: 40rem;
+    line-height: 1.6;
+  }
+
+  .gate-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .gate-form input {
+    width: 100%;
+    border-radius: 14px;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text);
+    font: inherit;
+    outline: none;
+  }
+
+  .gate-form input:focus {
+    border-color: rgba(124, 240, 255, 0.5);
+    box-shadow: 0 0 0 3px rgba(124, 240, 255, 0.12);
+  }
+
+  .gate-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .gate-note {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.92rem;
+  }
+
   p {
     margin: 0;
   }
@@ -158,6 +240,12 @@
       align-items: stretch;
       border-radius: 22px;
       padding: 18px;
+    }
+
+    .backend-gate {
+      grid-template-columns: 1fr;
+      border-radius: 22px;
+      padding: 20px;
     }
   }
 

@@ -1,4 +1,4 @@
-export const DEFAULT_BACKEND_URL = "https://partygame.aliciaworks.workers.dev";
+export const DEFAULT_BACKEND_URL = "https://partygame-example-backend.aliciaworks.workers.dev/";
 
 export const BACKEND_STORAGE_KEY = "partygame.portal.backendUrl";
 export const SITE_NAME_STORAGE_KEY = "partygame.portal.siteName";
