@@ -263,7 +263,7 @@ import { initializeLogger, createChildLogger } from "@partygame/core";
 // At app startup
 initializeLogger({
   isDev: process.env.ENV === "development",
-  serviceName: "partygame-worker",
+  serviceName: "partygame-example-backend",
 });
 
 // In handlers
