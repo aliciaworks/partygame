@@ -10,7 +10,6 @@ export class NetworkManager {
   private playerId: string = "";
   private token: string = "";
   private messageHandlers: Map<string, MessageHandler> = new Map();
-  private isConnecting = false;
 
   /**
    * Connect to backend server
@@ -18,8 +17,6 @@ export class NetworkManager {
   async connect(playerName: string, backendUrl: string): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
-        this.isConnecting = true;
-
         // Normalize backend URL
         let wsUrl = backendUrl;
         if (!wsUrl.startsWith("http")) {
@@ -35,7 +32,9 @@ export class NetworkManager {
         console.log(`Connecting to ${wsUrl}`);
 
         // First, authenticate to get a token
-        const authUrl = backendUrl.replace("ws://", "http://").replace("wss://", "https://");
+        const authUrl = backendUrl
+          .replace("ws://", "http://")
+          .replace("wss://", "https://");
         const loginUrl = authUrl.endsWith("/")
           ? authUrl + "api/session/login"
           : authUrl + "/api/session/login";
@@ -56,7 +55,6 @@ export class NetworkManager {
 
             this.ws.onopen = () => {
               console.log("WebSocket connected");
-              this.isConnecting = false;
               resolve();
             };
 
@@ -71,7 +69,6 @@ export class NetworkManager {
 
             this.ws.onerror = (error) => {
               console.error("WebSocket error:", error);
-              this.isConnecting = false;
               reject(error);
             };
 
@@ -81,11 +78,9 @@ export class NetworkManager {
             };
           })
           .catch((error) => {
-            this.isConnecting = false;
             reject(error);
           });
       } catch (error) {
-        this.isConnecting = false;
         reject(error);
       }
     });

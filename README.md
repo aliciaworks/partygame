@@ -4,33 +4,31 @@ An open-source, out-of-the-box Serverless Game Backend Framework built natively 
 
 ## Features
 
-- **Authoritative GameRoom (`@partygame/core`)**: Built on `partyserver` (Cloudflare Durable Objects). Features a fixed tick-rate loop, server-authoritative anti-cheat movement validation, and an automatic Ping-Pong Keep-Alive mechanism to prevent stale connections.
-- **ACID-Compliant Transactions (`@partygame/core/db`)**: Built with Drizzle ORM and Cloudflare D1. Features strict transactional logic for game inventory loops. Includes built-in **Idempotency Key** validation to prevent double-spending on network retries, and **Soft Deletes** for safe inventory management.
-- **Game Identity (`@partygame/auth`)**: Powered by `better-auth`. Seamlessly bypasses cookie dependency, providing explicit stateless Session Token extraction for native game engines. Includes a dedicated Refresh Token bridge for persistent login states without relying on web cookies.
+- **Authoritative GameRoom (`apps/worker/src/game`)**: Built directly into the Cloudflare Worker Durable Object runtime. Features a fixed tick-rate loop, server-authoritative movement validation, and per-room state isolation.
+- **Worker-Owned Backend Runtime (`apps/worker`)**: The Worker owns room routing, WebSocket upgrades, public player sessions, and admin-only operations without a separate backend framework package.
+- **Public Player Sessions**: Example clients can request lightweight session tokens through `/api/session/login`; admin and operations routes require `ADMIN_TOKEN`.
 - **Cross-Engine Type Generation (`@partygame/shared`)**: Single source of truth. Define your networking models and database schemas in TypeScript (Zod), and automatically generate `C#` for Unity, `GDScript` for Godot, and `C++ Structs` for Unreal Engine simultaneously.
-- **Security Middleware (`@partygame/core/middleware`)**: Built-in API Rate Limiting for Hono routes. **NEW**: Player-aware and room-aware rate limiting to prevent per-player/per-room flooding.
-- **Structured Logging & Error Tracking**: Pino-based structured logging with Sentry integration support for production error tracking and incident response.
-- **Comprehensive API Documentation**: Auto-generated OpenAPI 3.1 spec for all endpoints. Health checks, metrics, and SLA tracking for operational visibility.
-- **Input Validation**: Zod-based request body and query parameter validation with security headers (CSP, HSTS, X-Frame-Options).
+- **Operational Surface**: Health, SLA, room status, and admin room management endpoints are exposed from the Worker.
 
 ## Project Structure
 
 This repository uses a native `npm` workspace monorepo structure:
 
-### Core Packages
-- `packages/core`: ECS framework (Entity, Component, System, World), game loop, network sync, movement validation.
-- `packages/auth`: Better Auth integration and JWT token management.
+### Shared Packages
+
 - `packages/shared`: Zod schemas (single source of truth) and cross-engine code generation.
 
 ### Applications
-- `apps/worker`: Cloudflare Workers backend - pure game server using ECS framework and WebSocket multiplayer.
+
+- `apps/worker`: Cloudflare Workers backend with Durable Object room routing, local ECS runtime, public player sessions, and protected admin routes.
 - `apps/example-game`: Web frontend built with Babylon.js - multiplayer game collection (Arena Wars MOBA, CyberArena FPS).
 - `apps/admin`: Admin control plane (SvelteKit + Cloudflare Pages).
 
-### Generated Clients
-- `clients/unity/`: Auto-generated C# types for Unity.
-- `clients/godot/`: Auto-generated GDScript types for Godot.
-- `clients/unreal/`: Auto-generated C++ types for Unreal Engine.
+### Generated Engine Packages
+
+- `engines/unity/`: Auto-generated C# types for Unity.
+- `engines/godot/`: Auto-generated GDScript types for Godot.
+- `engines/unreal/`: Auto-generated C++ types for Unreal Engine.
 
 ## Getting Started
 
@@ -49,6 +47,7 @@ npx wrangler dev
 ```
 
 The backend runs on `http://localhost:8787` with:
+
 - `POST /api/session/login` - Authenticate and get token
 - `/ws` - WebSocket game connection
 - `/rooms` - List active game rooms
@@ -65,6 +64,7 @@ npm run dev
 ```
 
 Frontend runs on `http://localhost:5173` with:
+
 - Game launcher with game selection
 - Arena Wars (3v3 MOBA-style battles)
 - CyberArena (8-player FPS)
@@ -89,6 +89,7 @@ apps/example-game/
 ```
 
 **Key Points:**
+
 - Each game extends `BaseGame` class
 - Games use shared `NetworkManager` for server communication
 - Babylon.js renders both 2D (MOBA) and 3D (FPS) games
@@ -97,12 +98,14 @@ apps/example-game/
 ## Game Examples
 
 ### Arena Wars (MOBA)
+
 - **Type**: 3v3 isometric team battles
 - **Players**: Up to 6
 - **Mechanics**: Top-down movement, team colors, health display
 - **Rendering**: Babylon.js isometric camera with grid arena
 
 ### CyberArena (FPS)
+
 - **Type**: Fast-paced first-person shooter
 - **Players**: Up to 8
 - **Mechanics**: FPS controls, jumping, sprinting, collision detection
@@ -116,11 +119,11 @@ To add a new game type:
 2. Extend `BaseGame` class
 3. Implement: `initialize()`, `start()`, `stop()`, `update()`, `processGameUpdate()`
 4. Add game to menu in `main.ts`
-5. Define custom components/systems in backend if needed
+5. Define custom components/systems in `apps/worker/src/game` if needed
 
 Example:
 
-```typescript
+````typescript
 import { BaseGame } from "../core/base-game";
 import { NetworkManager } from "../core/network-manager";
 import type { GameTickUpdate } from "@partygame/shared";
@@ -129,15 +132,15 @@ export class MyGame extends BaseGame {
   async initialize(): Promise<void> {
     // Setup Babylon.js scene
   }
-  
+
   start(): void {
     // Start game
   }
-  
+
   update(): void {
     // Send inputs to server
   }
-  
+
   processGameUpdate(update: GameTickUpdate): void {
     // Update game state from server
   }
@@ -145,16 +148,16 @@ export class MyGame extends BaseGame {
    ```bash
    cd apps/admin
    npm run dev
-   ```
+````
 
 ## Deployment
 
 ### Worker backend
 
-The worker entrypoint is the example game in [apps/example-game](apps/example-game). Deploy it with Wrangler from that directory:
+The worker entrypoint is [apps/worker](apps/worker). Deploy it with Wrangler from that directory:
 
 ```bash
-cd apps/example-game
+cd apps/worker
 npm run deploy
 ```
 
@@ -181,11 +184,9 @@ If you have not created the Pages project yet, you can do that in the Cloudflare
 
 The worker backend expects the following runtime bindings or secrets depending on which endpoints you use:
 
-- `DB` for D1
 - `GAME_ROOM` for the Durable Object binding
-- `GOOGLE_CLIENT_ID` for native Google login
-- `APPLE_CLIENT_ID` for native Apple login
-- `AUTH_SESSION_SECRET` for the stateless session token signing key
+- `ADMIN_TOKEN` for `/admin/*` routes
+- `CONTROLS_BUCKET`, `REALTIMEKIT_APP_ID`, and `REALTIMEKIT_API_TOKEN` only if using the optional admin/voice control helpers
 
 ## Quality Gates
 
@@ -203,115 +204,25 @@ npm run format
 
 The management interface now lives in [apps/admin](apps/admin). It is a separate SvelteKit workspace that is built for Pages-style deployment rather than the Worker runtime, so the control plane stays isolated from the game backend.
 
-## Native Auth
-
-The native login route now verifies real Google or Apple ID tokens. Set the corresponding client ID bindings in your Worker environment before using the `/api/auth/login/native` endpoint:
-
-- `GOOGLE_CLIENT_ID`
-- `APPLE_CLIENT_ID`
-
-The refresh endpoint is still intentionally conservative and returns `501` until a session lookup flow is wired in.
-
 ## Notes On Abuse Resistance
 
-`@partygame/core` now includes stricter message parsing, movement validation, and purchase request validation. The current rate limiter is still in-memory and should be replaced with a distributed store for production deployments that span multiple isolates or regions.
+The Worker keeps player sessions lightweight for public game access and protects admin operations with `ADMIN_TOKEN`. Add distributed rate limiting before exposing sensitive economy, inventory, or account mutation endpoints in production.
 
-## Phase 0 Engineering Improvements (v0.0.1)
-
-### Observability
-
-- **Structured Logging**: Pino-based logging with context propagation (request ID, room ID, player ID)
-- **Error Tracking**: Sentry integration ready (set `SENTRY_DSN` env var in production)
-- **Metrics Endpoint**: Prometheus `/metrics` endpoint for monitoring (uptime, active rooms, requests)
-- **Health Checks**: Liveness (`/health`) and readiness (`/ready`) probes for load balancers
-- **SLA Tracking**: `/sla` endpoint to monitor uptime vs. SLA targets
-
-### Security
-
-- **Enhanced Rate Limiting**: IP-based, player-based, and room-based rate limit buckets
-- **Input Validation**: Zod schemas for all HTTP payloads with detailed error messages
-- **Security Headers**: CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy
-- **Request Size Limits**: Maximum body size enforcement to prevent DoS
-- **Rate Limit Response Headers**: `X-RateLimit-*` headers for client-side backoff
-
-### Testing
-
-- **Integration Tests**: Room lifecycle testing (join, move, disconnect, state sync)
-- **Test Fixtures**: Reusable TestGameRoom class for future multiplayer tests
-- **Chaos Testing Preparation**: Foundation for disconnect/network partition scenarios
-
-### API Documentation
-
-- **OpenAPI 3.1 Spec**: Machine-readable API definition in `@partygame/core/openapi.ts`
-- **Endpoint Coverage**: Auth, Room, Inventory, Health, Metrics all documented
-- **Schema Documentation**: Request/response schemas with validation rules
-- **Error Code Catalog**: Standardized error responses (400, 401, 429, 503, etc.)
-
-### Operations
-
-- **Disaster Recovery Plan**: See [BACKUP_STRATEGY.md](BACKUP_STRATEGY.md) for backup procedures, recovery playbooks, and monthly DR drills
-- **Database Snapshots**: Snapshot logic for Durable Object state recovery
-- **Log Retention Strategy**: Audit logging for compliance (GDPR, SOC 2)
-
-## Using Phase 0 Features
-
-### Initialize Logging
-
-```typescript
-import { initializeLogger, createChildLogger } from "@partygame/core";
-
-// At app startup
-initializeLogger({
-  isDev: process.env.ENV === "development",
-  serviceName: "partygame-example-backend",
-});
-
-// In handlers
-const logger = createChildLogger({ roomId, playerId, requestId });
-logger.info({ event: "player_joined", playerId });
-```
-
-### Add Rate Limiting to Routes
-
-```typescript
-import { playerRateLimiter, roomRateLimiter } from "@partygame/core";
-
-// Protect player endpoints
-app.post("/api/purchase", playerRateLimiter, handlePurchase);
-
-// Protect room endpoints
-app.ws("/rooms/:id", roomRateLimiter, handleRoomSocket);
-```
-
-### Validate Inputs
-
-```typescript
-import { validateJsonBody, PurchaseRequestSchema } from "@partygame/core";
-
-app.post(
-  "/api/purchase",
-  validateJsonBody(PurchaseRequestSchema),
-  async (c) => {
-    const body = c.get("validatedBody");
-    // body is now type-safe: { itemId, quantity, playerId, idempotencyKey }
-  }
-);
-```
-
-### Health & Metrics
+## Runtime Endpoints
 
 ```bash
 # Check service health
 curl http://localhost:8787/health
-# {"status":"healthy","timestamp":"2026-05-18T...","uptime_ms":12345}
+# {"status":"ok","timestamp":...,"activeRooms":0,"totalPlayers":0}
 
-# Prometheus metrics
-curl http://localhost:8787/metrics
-# partygame_uptime_ms 12345
-# partygame_active_rooms 5
-# partygame_active_players 42
+# List active rooms
+curl http://localhost:8787/rooms
+# {"rooms":[],"total":0}
 
 # SLA status
 curl http://localhost:8787/sla
 # {"uptime_percent":99.95,"meets_sla":true,...}
+
+# Admin room list
+curl -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8787/admin/rooms
 ```

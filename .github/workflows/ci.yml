@@ -64,28 +64,28 @@ jobs:
 
             if [[ "${source_file}" == *.cs ]]; then
               cat > "${asset_dir}/asset.meta" <<EOF
-fileFormatVersion: 2
-guid: ${guid}
-MonoImporter:
-  externalObjects: {}
-  serializedVersion: 2
-  defaultReferences: []
-  executionOrder: 0
-  icon: {instanceID: 0}
-  userData:
-  assetBundleName:
-  assetBundleVariant:
-EOF
+          fileFormatVersion: 2
+          guid: ${guid}
+          MonoImporter:
+            externalObjects: {}
+            serializedVersion: 2
+            defaultReferences: []
+            executionOrder: 0
+            icon: {instanceID: 0}
+            userData:
+            assetBundleName:
+            assetBundleVariant:
+          EOF
             else
               cat > "${asset_dir}/asset.meta" <<EOF
-fileFormatVersion: 2
-guid: ${guid}
-DefaultImporter:
-  externalObjects: {}
-  userData:
-  assetBundleName:
-  assetBundleVariant:
-EOF
+          fileFormatVersion: 2
+          guid: ${guid}
+          DefaultImporter:
+            externalObjects: {}
+            userData:
+            assetBundleName:
+            assetBundleVariant:
+          EOF
             fi
           }
 

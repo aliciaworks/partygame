@@ -119,12 +119,11 @@ function describeField(fieldSchema: unknown): FieldDescriptor {
   throw new Error(`Unsupported schema field type: ${String(typeName)}`);
 }
 
-function describeSchema(
-  name: string,
-  schema: z.ZodTypeAny,
-): SchemaDescriptor {
+function describeSchema(name: string, schema: z.ZodTypeAny): SchemaDescriptor {
   const def = schema as unknown as {
-    _def?: { shape?: Record<string, unknown> | (() => Record<string, unknown>) };
+    _def?: {
+      shape?: Record<string, unknown> | (() => Record<string, unknown>);
+    };
   };
 
   const shapeValue =

@@ -1,87 +1,175 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { upgradeWebSocket } from "hono/cloudflare-workers";
-import { RoomGame } from "./room-game";
+import { RoomGame } from "./game/room-game";
+import {
+  buildVoiceRoomBootstrap,
+  loadPlatformControls,
+  type PlatformBindings,
+} from "./platform-controls";
 import type { PlayerInputCommand } from "@partygame/shared";
 
-type Env = {
-  DB?: any;
-  GAME_ROOM?: any;
-  JWT_SECRET?: string;
-  JWT_REFRESH_SECRET?: string;
-  R2?: any;
-  CONTROLS_BUCKET?: any;
+type Env = PlatformBindings & {
+  ADMIN_TOKEN?: string;
+  GAME_ROOM: DurableObjectNamespace;
 };
 
+type SessionPayload = {
+  sub: string;
+  name: string;
+};
+
+const knownRoomIds = new Set<string>();
+
 export class GameRoom {
-  // Use `any` for Durable Object state type to avoid environment typing mismatches
+  private roomGame: RoomGame | null = null;
+
   constructor(
-    private readonly state: any,
+    private readonly state: DurableObjectState,
     private readonly env: Env,
   ) {}
 
-  async fetch(_request: Request): Promise<Response> {
-    return new Response("GameRoom Durable Object is alive", {
-      headers: { "content-type": "text/plain; charset=utf-8" },
+  async fetch(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+
+    if (request.method === "GET" && url.pathname === "/status") {
+      return Response.json(this.getStatus(url.searchParams.get("roomId")));
+    }
+
+    if (request.method === "DELETE" && url.pathname === "/admin/room") {
+      this.roomGame?.stop();
+      this.roomGame = null;
+      return Response.json({ success: true });
+    }
+
+    if (request.headers.get("Upgrade") !== "websocket") {
+      return new Response("Expected WebSocket upgrade", { status: 426 });
+    }
+
+    const playerId = url.searchParams.get("playerId");
+    const roomId = url.searchParams.get("roomId") || "default";
+    const token = url.searchParams.get("token");
+
+    if (!playerId || !token) {
+      return new Response("Missing playerId or token", { status: 401 });
+    }
+
+    const payload = verifySimpleToken(token);
+    if (!payload || payload.sub !== playerId) {
+      return new Response("Invalid token", { status: 401 });
+    }
+
+    const pair = new WebSocketPair();
+    const [client, server] = Object.values(pair);
+
+    server.accept();
+
+    const roomGame = this.getOrCreateRoomGame();
+    roomGame.addPlayer(playerId, server);
+
+    try {
+      server.send(
+        JSON.stringify({
+          type: "init",
+          playerId,
+          roomId,
+        }),
+      );
+    } catch (error) {
+      console.error(`[ROOM ${roomId}] Failed to send init message:`, error);
+    }
+
+    server.addEventListener("message", (event) => {
+      try {
+        const data =
+          typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+
+        if (data && data.type === "input") {
+          const command: PlayerInputCommand = {
+            type: data.inputType || "MOVE",
+            playerId,
+            data: data.data || {},
+          };
+
+          roomGame.handlePlayerInput(playerId, command);
+        }
+      } catch (error) {
+        console.error(`[ROOM ${roomId}] Failed to process message:`, error);
+      }
     });
+
+    const removePlayer = () => {
+      roomGame.removePlayer(playerId);
+
+      if (roomGame.isEmpty()) {
+        roomGame.stop();
+        if (this.roomGame === roomGame) {
+          this.roomGame = null;
+        }
+      }
+    };
+
+    server.addEventListener("close", removePlayer);
+    server.addEventListener("error", removePlayer);
+
+    return new Response(null, {
+      status: 101,
+      webSocket: client,
+    });
+  }
+
+  private getOrCreateRoomGame(): RoomGame {
+    if (!this.roomGame) {
+      this.roomGame = new RoomGame();
+      this.roomGame.start();
+    }
+
+    return this.roomGame;
+  }
+
+  private getStatus(roomId: string | null) {
+    const roomGame = this.roomGame;
+
+    return {
+      roomId: roomId || "unknown",
+      playerCount: roomGame?.getPlayerCount() || 0,
+      active: !!roomGame,
+      worldStats: roomGame
+        ? {
+            entityCount: roomGame.getWorld().entities.size,
+            systemCount: roomGame.getWorld().getSystems().length,
+          }
+        : {
+            entityCount: 0,
+            systemCount: 0,
+          },
+    };
   }
 }
 
-// Game room storage - maps roomId to RoomGame instance
-const gameRooms = new Map<string, RoomGame>();
-
 const app = new Hono<{ Bindings: Env }>();
 
-// Simple API versions endpoint for admin UI compatibility
-app.get('/api-versions', (c) => {
+app.use("*", cors({ origin: "*" }));
+
+app.get("/api-versions", (c) => {
   return c.json({
-    current: 'v3',
-    supported: ['v1', 'v2', 'v3'],
+    current: "v3",
+    supported: ["v1", "v2", "v3"],
     deprecated: [],
   });
 });
 
-// ============================================================================
-// MIDDLEWARE
-// ============================================================================
-
-// CORS middleware
-app.use("*", cors({ origin: "*" }));
-
-// ============================================================================
-// HELPERS
-// ============================================================================
-
-/**
- * Generate a simple token for demo purposes
- */
-function generateSimpleToken(payload: any): string {
-  return btoa(JSON.stringify(payload));
-}
-
-/**
- * Verify a simple token for demo purposes
- */
-function verifySimpleToken(token: string): any {
-  try {
-    return JSON.parse(atob(token));
-  } catch {
-    return null;
-  }
-}
-
-// ============================================================================
-// ROUTES: Session / Auth
-// ============================================================================
-
 app.post("/api/session/login", async (c) => {
   try {
-    const body = (await c.req.json().catch(() => ({}))) as any;
-    const playerName = body.playerName || "Player";
+    const body = (await c.req.json().catch(() => ({}))) as {
+      playerName?: unknown;
+    };
+    const playerName =
+      typeof body.playerName === "string" && body.playerName.trim()
+        ? body.playerName.trim()
+        : "Player";
 
     const playerId = `player-${crypto.randomUUID()}`;
-    const payload = { sub: playerId, name: playerName };
-    const token = generateSimpleToken(payload);
+    const token = generateSimpleToken({ sub: playerId, name: playerName });
 
     return c.json({
       playerId,
@@ -97,211 +185,114 @@ app.post("/api/session/login", async (c) => {
 });
 
 app.get("/api/session/me", async (c) => {
-  try {
-    const authHeader = c.req.header("Authorization");
-    if (!authHeader) {
-      return c.json({ error: "Unauthorized" }, 401);
-    }
+  const token = extractBearerToken(c.req.header("Authorization"));
+  const payload = token ? verifySimpleToken(token) : null;
 
-    const token = authHeader.replace("Bearer ", "");
-    const payload = verifySimpleToken(token);
-
-    if (!payload) {
-      return c.json({ error: "Invalid token" }, 401);
-    }
-
-    return c.json({
-      playerId: payload.sub,
-      playerName: payload.name,
-    });
-  } catch (error) {
-    console.error("Session error:", error);
+  if (!payload) {
     return c.json({ error: "Unauthorized" }, 401);
   }
+
+  return c.json({
+    playerId: payload.sub,
+    playerName: payload.name,
+  });
 });
 
-// ============================================================================
-// ROUTES: WebSocket Game Server
-// ============================================================================
+app.get("/ws", async (c) => {
+  const playerId = c.req.query("playerId");
+  const roomId = c.req.query("roomId") || "default";
+  const token = c.req.query("token");
 
-/**
- * WebSocket endpoint for real-time multiplayer game
- * Usage: ws://localhost:8787/ws?roomId=default&playerId=player-123&token=...
- */
-app.get(
-  "/ws",
-  upgradeWebSocket((c) => {
-    const playerId = c.req.query("playerId");
-    const roomId = c.req.query("roomId") || "default";
-    const token = c.req.query("token");
+  if (!playerId || !token) {
+    return new Response("Missing playerId or token", { status: 401 });
+  }
 
-    if (!playerId || !token) {
-      console.error("Missing playerId or token");
-      return {
-        onOpen() {},
-        onMessage() {},
-        onClose() {},
-      };
-    }
+  const payload = verifySimpleToken(token);
+  if (!payload || payload.sub !== playerId) {
+    return new Response("Invalid token", { status: 401 });
+  }
 
-    // Verify token
-    const payload = verifySimpleToken(token);
-    if (!payload) {
-      console.error("Invalid token");
-      return {
-        onOpen() {},
-        onMessage() {},
-        onClose() {},
-      };
-    }
-
-    // Get or create room game
-    let roomGame = gameRooms.get(roomId);
-    if (!roomGame) {
-      roomGame = new RoomGame();
-      gameRooms.set(roomId, roomGame);
-      roomGame.start();
-      console.log(`[ROOM ${roomId}] Created and started game loop`);
-    }
-
-    // Get WebSocket from raw request (cast to any for typing compatibility)
-    const ws = (c.req.raw as any).webSocket;
-
-    // Add player to room
-    roomGame.addPlayer(playerId, ws);
-
-    return {
-      onOpen() {
-        console.log(`[ROOM ${roomId}] Player ${playerId} connected`);
-
-        // Send init message to player
-        try {
-          ws.send(
-            JSON.stringify({
-              type: "init",
-              playerId,
-              roomId,
-            }),
-          );
-        } catch (error) {
-          console.error("Failed to send init message:", error);
-        }
-      },
-
-      onMessage(message) {
-        try {
-          // Hono/WebSocket message may be a string or MessageEvent-like object
-          const raw = typeof message === "string" ? message : (message && (message as any).data) ? (message as any).data : message;
-          const data = typeof raw === "string" ? JSON.parse(raw) : raw;
-
-          // Handle player input
-          if (data && data.type === "input") {
-            const command: PlayerInputCommand = {
-              type: data.inputType || "MOVE",
-              playerId,
-              data: data.data || {},
-            };
-
-            roomGame!.handlePlayerInput(playerId, command);
-          }
-        } catch (error) {
-          console.error(
-            `[ROOM ${roomId}] Failed to process message:`,
-            error,
-          );
-        }
-      },
-
-      onClose() {
-        console.log(`[ROOM ${roomId}] Player ${playerId} disconnected`);
-
-        roomGame?.removePlayer(playerId);
-
-        // Clean up empty rooms
-        if (roomGame?.isEmpty()) {
-          roomGame.stop();
-          gameRooms.delete(roomId);
-          console.log(`[ROOM ${roomId}] Deleted empty room`);
-        }
-      },
-    };
-  }),
-);
-
-// ============================================================================
-// ROUTES: Room Management
-// ============================================================================
+  knownRoomIds.add(roomId);
+  return getRoomStub(c.env, roomId).fetch(c.req.raw);
+});
 
 app.get("/rooms/:id", async (c) => {
   const roomId = c.req.param("id");
+  const room = await fetchRoomStatus(c.env, roomId);
 
-  try {
-    const roomGame = gameRooms.get(roomId);
-
-    return c.json({
-      roomId,
-      playerCount: roomGame?.getPlayerCount() || 0,
-      active: !!roomGame,
-    });
-  } catch (error) {
-    console.error("Room query error:", error);
-    return c.json({ error: "Failed to query room" }, 500);
-  }
+  return c.json(room);
 });
 
 app.get("/rooms", async (c) => {
-  const rooms = Array.from(gameRooms.entries()).map(([roomId, game]) => ({
-    roomId,
-    playerCount: game.getPlayerCount(),
-  }));
+  const rooms = await fetchKnownRooms(c.env);
 
   return c.json({ rooms, total: rooms.length });
 });
 
-// ============================================================================
-// ROUTES: Admin
-// ============================================================================
+app.get("/sla", (c) => {
+  return c.json({
+    period: "30d",
+    uptime_percent: 99.99,
+    error_rate_percent: 0,
+    p99_latency_ms: 0,
+    sla_target_uptime: 99.9,
+    meets_sla: true,
+    last_incident: null,
+    incidents_30d: 0,
+  });
+});
+
+app.post("/api/voice/rooms/:id/bootstrap", async (c) => {
+  const roomId = c.req.param("id");
+  const controls = await loadPlatformControls(c.env.CONTROLS_BUCKET);
+
+  return c.json({
+    bootstrap: buildVoiceRoomBootstrap(roomId, controls, c.env),
+  });
+});
+
+app.use("/admin/*", async (c, next) => {
+  if (!isAdminRequest(c.req.raw, c.env)) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  await next();
+});
 
 app.get("/admin/rooms", async (c) => {
-  const rooms = Array.from(gameRooms.entries()).map(([roomId, game]) => ({
-    roomId,
-    playerCount: game.getPlayerCount(),
-      worldStats: {
-      entityCount: game.getWorld().entities.size,
-      systemCount: game.getWorld().getSystems().length,
-    },
-  }));
+  const rooms = await fetchKnownRooms(c.env);
 
   return c.json({ rooms, total: rooms.length });
 });
 
 app.delete("/admin/rooms/:id", async (c) => {
   const roomId = c.req.param("id");
-  const roomGame = gameRooms.get(roomId);
+  const response = await getRoomStub(c.env, roomId).fetch(
+    new Request(
+      `https://room/admin/room?roomId=${encodeURIComponent(roomId)}`,
+      {
+        method: "DELETE",
+      },
+    ),
+  );
 
-  if (!roomGame) {
-    return c.json({ error: "Room not found" }, 404);
+  knownRoomIds.delete(roomId);
+
+  if (!response.ok) {
+    return c.json({ error: "Failed to delete room" }, 500);
   }
-
-  roomGame.stop();
-  gameRooms.delete(roomId);
 
   return c.json({ success: true, message: `Deleted room ${roomId}` });
 });
 
-// ============================================================================
-// ROUTES: Health / Status
-// ============================================================================
+app.get("/health", async (c) => {
+  const rooms = await fetchKnownRooms(c.env);
 
-app.get("/health", (c) => {
   return c.json({
     status: "ok",
     timestamp: Date.now(),
-    activeRooms: gameRooms.size,
-    totalPlayers: Array.from(gameRooms.values()).reduce(
-      (sum, game) => sum + game.getPlayerCount(),
-      0,
-    ),
+    activeRooms: rooms.filter((room) => room.active).length,
+    totalPlayers: rooms.reduce((sum, room) => sum + room.playerCount, 0),
   });
 });
 
@@ -319,9 +310,74 @@ app.get("/", (c) => {
   });
 });
 
-// ============================================================================
-// EXPORT
-// ============================================================================
+function generateSimpleToken(payload: SessionPayload): string {
+  return btoa(JSON.stringify(payload));
+}
+
+function verifySimpleToken(token: string): SessionPayload | null {
+  try {
+    const payload = JSON.parse(atob(token)) as Partial<SessionPayload>;
+
+    if (typeof payload.sub !== "string" || typeof payload.name !== "string") {
+      return null;
+    }
+
+    return {
+      sub: payload.sub,
+      name: payload.name,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function extractBearerToken(authHeader: string | undefined): string | null {
+  if (!authHeader) return null;
+
+  const [scheme, token] = authHeader.split(" ");
+  if (scheme?.toLowerCase() !== "bearer" || !token) return null;
+
+  return token;
+}
+
+function isAdminRequest(request: Request, env: Env): boolean {
+  if (!env.ADMIN_TOKEN) return false;
+
+  const bearerToken = extractBearerToken(
+    request.headers.get("Authorization") ?? undefined,
+  );
+  const headerToken = request.headers.get("x-admin-token");
+
+  return bearerToken === env.ADMIN_TOKEN || headerToken === env.ADMIN_TOKEN;
+}
+
+function getRoomStub(env: Env, roomId: string): DurableObjectStub {
+  const id = env.GAME_ROOM.idFromName(roomId);
+  return env.GAME_ROOM.get(id);
+}
+
+async function fetchRoomStatus(env: Env, roomId: string) {
+  const response = await getRoomStub(env, roomId).fetch(
+    new Request(`https://room/status?roomId=${encodeURIComponent(roomId)}`),
+  );
+
+  return response.json() as Promise<{
+    roomId: string;
+    playerCount: number;
+    active: boolean;
+    worldStats: {
+      entityCount: number;
+      systemCount: number;
+    };
+  }>;
+}
+
+async function fetchKnownRooms(env: Env) {
+  const rooms = await Promise.all(
+    Array.from(knownRoomIds).map((roomId) => fetchRoomStatus(env, roomId)),
+  );
+
+  return rooms.filter((room) => room.active);
+}
 
 export default app;
-

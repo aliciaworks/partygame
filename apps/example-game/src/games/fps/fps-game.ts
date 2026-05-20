@@ -121,13 +121,21 @@ export class FPSGame extends BaseGame {
     sunLight.intensity = 0.6;
 
     // Point lights for atmosphere
-    const blueLight = new BABYLON.PointLight("blueLight", new BABYLON.Vector3(50, 20, 50), this.scene);
+    const blueLight = new BABYLON.PointLight(
+      "blueLight",
+      new BABYLON.Vector3(50, 20, 50),
+      this.scene,
+    );
     blueLight.intensity = 0.4;
     blueLight.range = 150;
     // newer Babylon typings prefer setting diffuse color via 'diffuse' alias may be unavailable; set via 'diffuse' if present
     (blueLight as any).diffuse = new BABYLON.Color3(0, 0.5, 1);
 
-    const redLight = new BABYLON.PointLight("redLight", new BABYLON.Vector3(-50, 20, -50), this.scene);
+    const redLight = new BABYLON.PointLight(
+      "redLight",
+      new BABYLON.Vector3(-50, 20, -50),
+      this.scene,
+    );
     redLight.intensity = 0.3;
     redLight.range = 150;
     (redLight as any).diffuse = new BABYLON.Color3(1, 0, 0.5);
@@ -155,7 +163,11 @@ export class FPSGame extends BaseGame {
     );
 
     // Walls/obstacles
-    const wall1 = BABYLON.MeshBuilder.CreateBox("wall1", { width: 100, height: 20, depth: 2 }, this.scene);
+    const wall1 = BABYLON.MeshBuilder.CreateBox(
+      "wall1",
+      { width: 100, height: 20, depth: 2 },
+      this.scene,
+    );
     wall1.position = new BABYLON.Vector3(0, 10, -80);
     const wallMat = new BABYLON.StandardMaterial("wallMat", this.scene);
     wallMat.diffuseColor = new BABYLON.Color3(0.3, 0.2, 0.3);
@@ -168,7 +180,11 @@ export class FPSGame extends BaseGame {
     );
 
     // Central tower
-    const tower = BABYLON.MeshBuilder.CreateCylinder("tower", { height: 30, diameter: 15 }, this.scene);
+    const tower = BABYLON.MeshBuilder.CreateCylinder(
+      "tower",
+      { height: 30, diameter: 15 },
+      this.scene,
+    );
     tower.position = new BABYLON.Vector3(0, 15, 0);
     const towerMat = new BABYLON.StandardMaterial("towerMat", this.scene);
     towerMat.diffuseColor = new BABYLON.Color3(0.5, 0.3, 0.8);
@@ -183,8 +199,15 @@ export class FPSGame extends BaseGame {
   }
 
   private setupCamera(): void {
-    this.camera = new BABYLON.UniversalCamera("camera", new BABYLON.Vector3(0, 2, 0), this.scene);
-    this.camera.attachControl(this.scene.getEngine().getRenderingCanvas(), true);
+    this.camera = new BABYLON.UniversalCamera(
+      "camera",
+      new BABYLON.Vector3(0, 2, 0),
+      this.scene,
+    );
+    this.camera.attachControl(
+      this.scene.getEngine().getRenderingCanvas(),
+      true,
+    );
 
     // FPS controls
     this.camera.inertia = 0.7;
@@ -209,7 +232,10 @@ export class FPSGame extends BaseGame {
   }
 
   private setupPhysics(): void {
-    this.scene.enablePhysics(new BABYLON.Vector3(0, -9.81, 0), new BABYLON.CannonJSPlugin());
+    this.scene.enablePhysics(
+      new BABYLON.Vector3(0, -9.81, 0),
+      new BABYLON.CannonJSPlugin(),
+    );
   }
 
   private setupInput(): void {
@@ -290,7 +316,10 @@ export class FPSGame extends BaseGame {
     capsule.position.y = 1;
 
     // Create material
-    const material = new BABYLON.StandardMaterial(`mat-${entityId}`, this.scene);
+    const material = new BABYLON.StandardMaterial(
+      `mat-${entityId}`,
+      this.scene,
+    );
     material.diffuseColor = new BABYLON.Color3(1, 0.3, 0.3);
     material.specularColor = new BABYLON.Color3(1, 0, 0);
     capsule.material = material;

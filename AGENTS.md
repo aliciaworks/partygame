@@ -13,24 +13,28 @@ This document is designed for AI agents and developers to quickly understand the
 ## Core Philosophy
 
 ### 1. **Server-Authoritative** (Anti-Cheat)
+
 - Game state and logic validation happen exclusively on the server
 - Clients send **inputs only** (position, action, ability, etc.), never state
 - Server validates moves within physics constraints, ability cooldowns, etc.
 - Prevents client-side cheating and provides fair gameplay
 
 ### 2. **Engine-Agnostic**
+
 - Server logic is written once in TypeScript
 - Client types are auto-generated for all supported engines
 - Same game can run in Unity, Godot, Unreal, and Web without modification
 - Clients differ only in rendering and input handling
 
 ### 3. **Serverless-First**
+
 - Built on Cloudflare Workers (global edge compute) and Durable Objects (stateful multiplayer)
 - No traditional game server management
 - Auto-scaling, zero cold starts (with smart preflight)
 - Pay only for what you use
 
 ### 4. **Type-Safe Cross-Engine Sync**
+
 - Single source of truth: Zod schemas define both network messages and database models
 - Auto-generate C#, GDScript, C++ structures for client engines
 - All clients and servers speak the same language
@@ -70,12 +74,14 @@ Game Loop (Fixed 20 Hz tick)
 ### Client-Side Game Architecture
 
 **Babylon.js Rendering Framework:**
+
 - Unified 2D and 3D rendering across all games
 - Physics engine integration (Cannon.js)
 - GUI system for HUDs and menus
 - Scene management and camera controls
 
 **Game Classes (extend BaseGame):**
+
 ```typescript
 BaseGame
 ├── MOBAGame       // 3v3 isometric arena battles
@@ -84,6 +90,7 @@ BaseGame
 ```
 
 Each game:
+
 - Initializes unique scene and UI
 - Handles input for specific game mechanics
 - Processes server game state updates
@@ -92,12 +99,14 @@ Each game:
 ### Current Implementation vs. Planned State
 
 **Current** (`apps/example-game/`):
+
 - MOBA game: Isometric 2D arena with player movement and health display
 - FPS game: 3D first-person with collision and neon environment
 - Game launcher with menu and game selection
 - WebSocket networking with auto-reconnect
 
 **Planned Extensions**:
+
 - Roguelike dungeon crawler (2D procedural generation)
 - Turn-based strategy game (grid-based combat)
 - Battle royale (large map, survival mechanics)
@@ -110,34 +119,6 @@ Each game:
 ```
 partygame/
 ├── packages/
-│   ├── core/
-│   │   ├── src/
-│   │   │   ├── ecs/
-│   │   │   │   ├── entity.ts          # Entity manager
-│   │   │   │   ├── component.ts       # Component registry
-│   │   │   │   ├── system.ts          # System base class
-│   │   │   │   └── world.ts           # Game world
-│   │   │   ├── systems/               # Game-specific systems
-│   │   │   │   └── movement.ts        # Anti-cheat movement validation
-│   │   │   ├── components/            # Reusable component definitions
-│   │   │   │   ├── transform.ts
-│   │   │   │   ├── health.ts
-│   │   │   │   ├── velocity.ts
-│   │   │   │   └── input.ts
-│   │   │   ├── room-game.ts           # ECS game room handler
-│   │   │   ├── game-loop.ts           # Tick management & system scheduling
-│   │   │   ├── db.ts                  # D1 persistence
-│   │   │   ├── auth.ts                # Session tokens
-│   │   │   ├── middleware.ts          # Rate limiting, validation
-│   │   │   ├── room.ts                # Durable Object Room class (legacy)
-│   │   │   └── index.ts               # Framework exports
-│   │   └── test/                      # Core tests
-│   │
-│   ├── auth/
-│   │   └── src/
-│   │       ├── auth.ts                # Authentication setup
-│   │       └── index.ts
-│   │
 │   └── shared/
 │       ├── src/
 │       │   ├── schemas.ts             # Zod schemas (single source of truth)
@@ -149,9 +130,13 @@ partygame/
 ├── apps/
 │   ├── worker/
 │   │   ├── src/
-│   │   │   ├── index.ts               # Hono worker entrypoint with ECS integration
-│   │   │   ├── room-game.ts           # RoomGame with ECS world
-│   │   │   ├── game-loop.ts           # 20 Hz game loop scheduler
+│   │   │   ├── index.ts               # Hono worker entrypoint and Durable Object routing
+│   │   │   ├── game/
+│   │   │   │   ├── ecs/               # Entity, component, system, world
+│   │   │   │   ├── components/        # Transform, health, velocity, input
+│   │   │   │   ├── systems/           # Movement and future game systems
+│   │   │   │   ├── room-game.ts       # RoomGame with ECS world
+│   │   │   │   └── game-loop.ts       # 20 Hz game loop scheduler
 │   │   │   └── platform-controls.ts   # Feature flags
 │   │   ├── wrangler.toml              # Cloudflare config
 │   │   └── package.json
@@ -181,11 +166,10 @@ partygame/
 │       ├── svelte.config.js
 │       └── vite.config.ts
 │
-├── clients/
+├── engines/
 │   ├── unity/                         # Auto-generated C# types
 │   ├── godot/                         # Auto-generated GDScript types
-│   ├── unreal/                        # Auto-generated C++ structs
-│   └── web/                           # Auto-generated TypeScript types
+│   └── unreal/                        # Auto-generated C++ structs
 │
 ├── AGENTS.md                          # This file
 └── README.md
@@ -217,13 +201,13 @@ export const TransformSchema = z.object({
 ### 2. **Component Structure**
 
 ```typescript
-// packages/core/src/components/health.ts
+// apps/worker/src/game/components/index.ts
 export class HealthComponent {
-  readonly type = 'health';
+  readonly type = "health";
   hp: number = 100;
   maxHp: number = 100;
   isDead: boolean = false;
-  
+
   takeDamage(amount: number) {
     this.hp = Math.max(0, this.hp - amount);
     this.isDead = this.hp === 0;
@@ -234,13 +218,13 @@ export class HealthComponent {
 ### 3. **System Structure**
 
 ```typescript
-// packages/core/src/systems/combat.ts
+// apps/worker/src/game/systems/combat.ts
 export class CombatSystem extends System {
   update(world: World, deltaMs: number) {
     for (const entity of world.entities.values()) {
-      const health = entity.getComponent('health');
-      const damage = entity.getComponent('damage');
-      
+      const health = entity.getComponent("health");
+      const damage = entity.getComponent("damage");
+
       if (health && damage) {
         health.takeDamage(damage.pending);
         damage.pending = 0; // Reset after application
@@ -294,6 +278,7 @@ Every message is versioned for backward compatibility:
 ## Game Types Supported (Examples)
 
 ### Arena Wars (MOBA) - ✅ IMPLEMENTED
+
 - **Type**: 3v3 isometric team battles
 - **Entities**: Players (6 max)
 - **Systems**: Movement (isometric), TeamColorSystem
@@ -301,6 +286,7 @@ Every message is versioned for backward compatibility:
 - **Status**: Fully functional with multiplayer support
 
 ### CyberArena (FPS) - ✅ IMPLEMENTED
+
 - **Type**: 8-player first-person shooter
 - **Entities**: Players, obstacles, neon environment
 - **Systems**: Movement (FPS), collision detection, jumping
@@ -308,24 +294,28 @@ Every message is versioned for backward compatibility:
 - **Status**: Fully functional with multiplayer support
 
 ### Roguelike Dungeon Crawler - PLANNED
+
 - **Type**: Single-player or co-op 2D dungeon crawler
 - **Entities**: Player, enemies, items, dungeon tiles
 - **Systems**: Movement, AISystem, LootSystem, DungeonGenerator
 - **Example**: Diablo-like or classic roguelike
 
 ### Turn-Based Strategy - PLANNED
+
 - **Type**: Grid-based tactical combat
 - **Entities**: Units, structures, terrain tiles
 - **Systems**: TurnSystem, ActionSystem, PathfindingSystem
 - **Example**: Fire Emblem or Tactics Ogre style
 
 ### Battle Royale - PLANNED
+
 - **Type**: Large-scale survival (up to 100 players)
 - **Entities**: Players, loot, vehicles, zone
 - **Systems**: ZoneSystem, LootDistributionSystem, VehicleSystem
 - **Example**: Fortnite or Apex Legends style
 
 ### Racing Game - PLANNED
+
 - **Type**: Vehicle-based racing
 - **Entities**: Vehicles, track, checkpoints
 - **Systems**: VehiclePhysicsSystem, RaceProgressSystem
@@ -336,6 +326,7 @@ Every message is versioned for backward compatibility:
 ## Development Workflow
 
 ### Phase 1: Backend Setup
+
 ```bash
 # Install dependencies
 npm install
@@ -347,6 +338,7 @@ npx wrangler dev
 ```
 
 ### Phase 2: Frontend Setup
+
 ```bash
 cd apps/example-game
 npm install
@@ -358,6 +350,7 @@ npm run dev
 
 1. Create game file: `src/games/your-game/your-game.ts`
 2. Extend `BaseGame` class:
+
 ```typescript
 import { BaseGame } from "../core/base-game";
 import { NetworkManager } from "../core/network-manager";
@@ -367,16 +360,16 @@ export class YourGame extends BaseGame {
   async initialize(): Promise<void> {
     // Setup Babylon.js scene
   }
-  
+
   start(): void {
     // Start game loop
   }
-  
+
   update(): void {
     // Send player input
     this.networkManager.sendInput(moveX, moveY, isSprinting, isJumping);
   }
-  
+
   processGameUpdate(update: GameTickUpdate): void {
     // Handle server state updates
   }
@@ -388,9 +381,9 @@ export class YourGame extends BaseGame {
 
 ### Phase 4: Backend Game Logic (if needed)
 
-1. Define custom components in `packages/core/src/components/`
-2. Create systems in `packages/core/src/systems/`
-3. Register in `apps/worker/src/room-game.ts`
+1. Define custom components in `apps/worker/src/game/components/`
+2. Create systems in `apps/worker/src/game/systems/`
+3. Register in `apps/worker/src/game/room-game.ts`
 4. Update Zod schemas in `packages/shared/src/schemas.ts`
 5. Test with: `npm run test`
 
@@ -423,40 +416,44 @@ wrangler deploy
 ## Debugging
 
 ### Backend Logs
+
 ```bash
 cd apps/worker
 npx wrangler tail
 ```
 
 ### Frontend DevTools
+
 - Open Chrome DevTools (F12)
 - Console shows network messages and game state
 - Network tab shows WebSocket traffic to `/ws`
 
 ### Admin Dashboard
+
 ```bash
 cd pages/admin
 npm run dev
 ```
+
 View active rooms at `http://localhost:5174`
 
 ---
 
 ## Key Files to Understand
 
-| File | Purpose |
-|------|---------|
-| `packages/core/src/ecs/world.ts` | ECS world manager (all entities, systems, components) |
-| `packages/core/src/ecs/entity.ts` | Entity definition and component storage |
-| `packages/core/src/components/` | Reusable game components (Transform, Health, etc.) |
-| `packages/core/src/systems/movement.ts` | Server-authoritative movement validation |
-| `apps/worker/src/room-game.ts` | ECS-based game room handler |
-| `apps/worker/src/game-loop.ts` | Fixed 20 Hz tick scheduler |
-| `apps/worker/src/index.ts` | WebSocket server and HTTP endpoints |
-| `apps/example-game/src/main.ts` | Game launcher and menu |
-| `apps/example-game/src/games/moba/moba-game.ts` | Arena Wars implementation |
-| `apps/example-game/src/games/fps/fps-game.ts` | CyberArena implementation |
-| `packages/shared/src/schemas.ts` | Single source of truth for types |
+| File                                            | Purpose                                               |
+| ----------------------------------------------- | ----------------------------------------------------- |
+| `apps/worker/src/game/ecs/world.ts`             | ECS world manager (all entities, systems, components) |
+| `apps/worker/src/game/ecs/entity.ts`            | Entity definition and component storage               |
+| `apps/worker/src/game/components/`              | Reusable game components (Transform, Health, etc.)    |
+| `apps/worker/src/game/systems/movement.ts`      | Server-authoritative movement validation              |
+| `apps/worker/src/room-game.ts`                  | ECS-based game room handler                           |
+| `apps/worker/src/game-loop.ts`                  | Fixed 20 Hz tick scheduler                            |
+| `apps/worker/src/index.ts`                      | WebSocket server and HTTP endpoints                   |
+| `apps/example-game/src/main.ts`                 | Game launcher and menu                                |
+| `apps/example-game/src/games/moba/moba-game.ts` | Arena Wars implementation                             |
+| `apps/example-game/src/games/fps/fps-game.ts`   | CyberArena implementation                             |
+| `packages/shared/src/schemas.ts`                | Single source of truth for types                      |
 
 ---
 
@@ -466,9 +463,9 @@ Future: Support for runtime system/component swapping:
 
 ```typescript
 // Update game rules without restarting servers
-const newSystemCode = await fetch(cdnUrl).then(r => r.text());
+const newSystemCode = await fetch(cdnUrl).then((r) => r.text());
 const newSystem = eval(newSystemCode);
-world.replaceSystem('combat', newSystem);
+world.replaceSystem("combat", newSystem);
 ```
 
 This enables game designers to tweak balance, add events, or patch bugs without any downtime.
@@ -507,7 +504,7 @@ This enables game designers to tweak balance, add events, or patch bugs without 
 ## Next Steps for Contributors
 
 1. **Review**: Read `README.md` and this file
-2. **Understand ECS**: Study `packages/core/src/ecs/` folder
+2. **Understand ECS**: Study `apps/worker/src/game/ecs/` folder
 3. **Check Schema**: Review `packages/shared/src/schemas.ts`
 4. **Run Example**: `cd apps/example-game && npm run dev`
 5. **Play Games**: Open two browser windows and play Arena Wars or CyberArena

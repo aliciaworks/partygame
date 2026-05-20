@@ -18,10 +18,10 @@ export interface PlatformBindings {
 }
 
 export interface VoiceRoomBootstrap {
-  provider: 'realtimekit';
+  provider: "realtimekit";
   roomId: string;
   enabled: boolean;
-  joinMode: 'client-managed';
+  joinMode: "client-managed";
   appId: string | null;
   joinHint: string;
 }
@@ -32,7 +32,7 @@ export interface GameUpdateAssetInput {
   contentType?: string;
 }
 
-const CONTROL_KEY = 'admin/platform-controls.json';
+const CONTROL_KEY = "admin/platform-controls.json";
 const DEFAULT_CONTROLS: PlatformControls = {
   voiceChatEnabled: true,
   chatEnabled: true,
@@ -46,20 +46,30 @@ const DEFAULT_CONTROLS: PlatformControls = {
 
 let memoryControls: PlatformControls = { ...DEFAULT_CONTROLS };
 
-function normalizeControls(partial: Partial<PlatformControls> | null | undefined): PlatformControls {
+function normalizeControls(
+  partial: Partial<PlatformControls> | null | undefined,
+): PlatformControls {
   return {
-    voiceChatEnabled: partial?.voiceChatEnabled ?? DEFAULT_CONTROLS.voiceChatEnabled,
+    voiceChatEnabled:
+      partial?.voiceChatEnabled ?? DEFAULT_CONTROLS.voiceChatEnabled,
     chatEnabled: partial?.chatEnabled ?? DEFAULT_CONTROLS.chatEnabled,
-    leaderboardEnabled: partial?.leaderboardEnabled ?? DEFAULT_CONTROLS.leaderboardEnabled,
-    achievementsEnabled: partial?.achievementsEnabled ?? DEFAULT_CONTROLS.achievementsEnabled,
+    leaderboardEnabled:
+      partial?.leaderboardEnabled ?? DEFAULT_CONTROLS.leaderboardEnabled,
+    achievementsEnabled:
+      partial?.achievementsEnabled ?? DEFAULT_CONTROLS.achievementsEnabled,
     replayEnabled: partial?.replayEnabled ?? DEFAULT_CONTROLS.replayEnabled,
-    analyticsEnabled: partial?.analyticsEnabled ?? DEFAULT_CONTROLS.analyticsEnabled,
-    spectatorEnabled: partial?.spectatorEnabled ?? DEFAULT_CONTROLS.spectatorEnabled,
-    gameUpdatesEnabled: partial?.gameUpdatesEnabled ?? DEFAULT_CONTROLS.gameUpdatesEnabled,
+    analyticsEnabled:
+      partial?.analyticsEnabled ?? DEFAULT_CONTROLS.analyticsEnabled,
+    spectatorEnabled:
+      partial?.spectatorEnabled ?? DEFAULT_CONTROLS.spectatorEnabled,
+    gameUpdatesEnabled:
+      partial?.gameUpdatesEnabled ?? DEFAULT_CONTROLS.gameUpdatesEnabled,
   };
 }
 
-export async function loadPlatformControls(bucket?: R2Bucket): Promise<PlatformControls> {
+export async function loadPlatformControls(
+  bucket?: R2Bucket,
+): Promise<PlatformControls> {
   if (!bucket) {
     return memoryControls;
   }
@@ -81,14 +91,14 @@ export async function loadPlatformControls(bucket?: R2Bucket): Promise<PlatformC
 
 export async function savePlatformControls(
   bucket: R2Bucket | undefined,
-  updates: Partial<PlatformControls>
+  updates: Partial<PlatformControls>,
 ): Promise<PlatformControls> {
   memoryControls = normalizeControls({ ...memoryControls, ...updates });
 
   if (bucket) {
     await bucket.put(CONTROL_KEY, JSON.stringify(memoryControls, null, 2), {
       httpMetadata: {
-        contentType: 'application/json; charset=utf-8',
+        contentType: "application/json; charset=utf-8",
       },
     });
   }
@@ -99,41 +109,46 @@ export async function savePlatformControls(
 export async function updateSingleControl(
   bucket: R2Bucket | undefined,
   controlName: keyof PlatformControls,
-  enabled: boolean
+  enabled: boolean,
 ): Promise<PlatformControls> {
-  return savePlatformControls(bucket, { [controlName]: enabled } as Partial<PlatformControls>);
+  return savePlatformControls(bucket, {
+    [controlName]: enabled,
+  } as Partial<PlatformControls>);
 }
 
-export function isRouteAllowed(routePath: string, controls: PlatformControls): boolean {
-  if (routePath.startsWith('/api/chat')) {
+export function isRouteAllowed(
+  routePath: string,
+  controls: PlatformControls,
+): boolean {
+  if (routePath.startsWith("/api/chat")) {
     return controls.chatEnabled;
   }
 
-  if (routePath.startsWith('/api/leaderboard')) {
+  if (routePath.startsWith("/api/leaderboard")) {
     return controls.leaderboardEnabled;
   }
 
-  if (routePath.startsWith('/api/achievements')) {
+  if (routePath.startsWith("/api/achievements")) {
     return controls.achievementsEnabled;
   }
 
-  if (routePath.startsWith('/api/replays')) {
+  if (routePath.startsWith("/api/replays")) {
     return controls.replayEnabled;
   }
 
-  if (routePath.startsWith('/api/analytics')) {
+  if (routePath.startsWith("/api/analytics")) {
     return controls.analyticsEnabled;
   }
 
-  if (routePath.startsWith('/api/spectate')) {
+  if (routePath.startsWith("/api/spectate")) {
     return controls.spectatorEnabled;
   }
 
-  if (routePath.startsWith('/api/voice')) {
+  if (routePath.startsWith("/api/voice")) {
     return controls.voiceChatEnabled;
   }
 
-  if (routePath.startsWith('/api/updates')) {
+  if (routePath.startsWith("/api/updates")) {
     return controls.gameUpdatesEnabled;
   }
 
@@ -143,26 +158,26 @@ export function isRouteAllowed(routePath: string, controls: PlatformControls): b
 export function buildVoiceRoomBootstrap(
   roomId: string,
   controls: PlatformControls,
-  env: PlatformBindings
+  env: PlatformBindings,
 ): VoiceRoomBootstrap {
   return {
-    provider: 'realtimekit',
+    provider: "realtimekit",
     roomId,
     enabled: controls.voiceChatEnabled,
-    joinMode: 'client-managed',
+    joinMode: "client-managed",
     appId: env.REALTIMEKIT_APP_ID ?? null,
     joinHint: env.REALTIMEKIT_APP_ID
-      ? 'Create the room in RealtimeKit, then hand the room metadata to the client SDK.'
-      : 'RealtimeKit is not configured for this environment.',
+      ? "Create the room in RealtimeKit, then hand the room metadata to the client SDK."
+      : "RealtimeKit is not configured for this environment.",
   };
 }
 
 export async function storeGameUpdateAsset(
   bucket: R2Bucket | undefined,
-  input: GameUpdateAssetInput
+  input: GameUpdateAssetInput,
 ): Promise<{ key: string; size: number; contentType: string }> {
   const key = `game-updates/${Date.now()}-${input.name}`;
-  const contentType = input.contentType ?? 'application/json; charset=utf-8';
+  const contentType = input.contentType ?? "application/json; charset=utf-8";
   const body = new TextEncoder().encode(input.content);
 
   if (bucket) {
@@ -183,14 +198,14 @@ export async function storeGameUpdateAsset(
 export function renderAdminPanelHtml(controls: PlatformControls): string {
   const rows = Object.entries(controls)
     .map(([name, enabled]) => {
-      const safeName = name.replace(/Enabled$/, '');
+      const safeName = name.replace(/Enabled$/, "");
       return `
         <tr>
           <td>${safeName}</td>
-          <td>${enabled ? 'enabled' : 'disabled'}</td>
+          <td>${enabled ? "enabled" : "disabled"}</td>
         </tr>`;
     })
-    .join('');
+    .join("");
 
   return `<!doctype html>
 <html lang="en">

@@ -1,12 +1,14 @@
-import { writable, derived } from 'svelte/store';
+import { writable, derived } from "svelte/store";
 
-const STORAGE_KEY = 'partygame.locale';
+const STORAGE_KEY = "partygame.locale";
 
 function isBrowser() {
-  return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+  return (
+    typeof window !== "undefined" && typeof window.localStorage !== "undefined"
+  );
 }
 
-export const locale = writable<string>('en');
+export const locale = writable<string>("en");
 
 const messages = writable<Record<string, string>>({});
 
@@ -15,14 +17,14 @@ async function loadLocale(l: string) {
     const mod = await import(`../locales/${l}.json`);
     messages.set(mod.default ?? mod);
   } catch (e) {
-    console.warn('Failed to load locale', l, e);
+    console.warn("Failed to load locale", l, e);
     messages.set({});
   }
 }
 
 // initialize only in browser to avoid SSR errors
 if (isBrowser()) {
-  const initial = window.localStorage.getItem(STORAGE_KEY) || 'en';
+  const initial = window.localStorage.getItem(STORAGE_KEY) || "en";
   locale.set(initial);
   loadLocale(initial);
 
@@ -41,8 +43,8 @@ export const translate = derived(messages, ($messages) => {
 });
 
 export const availableLocales = [
-  { value: 'en', label: 'English' },
-  { value: 'ja', label: '日本語' },
-  { value: 'zh-CN', label: '中文（简体）' },
-  { value: 'zh-TW', label: '中文（繁體）' }
+  { value: "en", label: "English" },
+  { value: "ja", label: "日本語" },
+  { value: "zh-CN", label: "中文（简体）" },
+  { value: "zh-TW", label: "中文（繁體）" },
 ];

@@ -45,23 +45,20 @@ export const InputComponentSchema = z.object({
 /**
  * Entity state update from server
  */
-export const EntityStateUpdateSchema = z.object({
-  entityId: z.string(),
-  components: z.array(
-    z.object({
-      type: z.string(),
-      data: z.record(z.string(), z.unknown()),
-    })
-  ),
+export const EntityComponentsSchema = z.object({
+  transform: TransformComponentSchema.optional(),
+  health: HealthComponentSchema.optional(),
+  velocity: VelocityComponentSchema.optional(),
 });
 
 /**
  * Game tick update - contains all entity changes
  */
 export const GameTickUpdateSchema = z.object({
+  v: z.number(),
   tick: z.number(),
   timestamp: z.number(),
-  entities: z.array(EntityStateUpdateSchema),
+  entities: z.record(z.string(), EntityComponentsSchema),
 });
 
 /**
@@ -82,6 +79,6 @@ export type HealthComponent = z.infer<typeof HealthComponentSchema>;
 export type VelocityComponent = z.infer<typeof VelocityComponentSchema>;
 export type InputComponent = z.infer<typeof InputComponentSchema>;
 
-export type EntityStateUpdate = z.infer<typeof EntityStateUpdateSchema>;
+export type EntityComponents = z.infer<typeof EntityComponentsSchema>;
 export type GameTickUpdate = z.infer<typeof GameTickUpdateSchema>;
 export type PlayerInputCommand = z.infer<typeof PlayerInputCommandSchema>;

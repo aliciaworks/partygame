@@ -1,4 +1,4 @@
-import { World } from "@partygame/core";
+import type { World } from "./ecs";
 
 export const TICK_RATE_MS = 50; // 20 Hz (1000ms / 20)
 export const TICKS_PER_SECOND = 1000 / TICK_RATE_MS;
@@ -49,9 +49,9 @@ export class GameLoop {
     };
 
     // Schedule first tick
-    this.tickTimer = (setTimeout(() => {
+    this.tickTimer = setTimeout(() => {
       loop();
-    }, TICK_RATE_MS) as any);
+    }, TICK_RATE_MS) as any;
   }
 
   /**

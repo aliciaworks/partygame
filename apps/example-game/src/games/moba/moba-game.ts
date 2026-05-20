@@ -114,7 +114,11 @@ export class MOBAGame extends BaseGame {
     ground.material = this.groundMaterial;
 
     // Add grid texture
-    const gridTexture = new BABYLON.DynamicTexture("gridTexture", 512, this.scene);
+    const gridTexture = new BABYLON.DynamicTexture(
+      "gridTexture",
+      512,
+      this.scene,
+    );
     const ctx = gridTexture.getContext();
     ctx.fillStyle = "rgb(50, 70, 90)";
     ctx.fillRect(0, 0, 512, 512);
@@ -134,7 +138,8 @@ export class MOBAGame extends BaseGame {
     }
 
     gridTexture.update();
-    (this.groundMaterial as BABYLON.StandardMaterial).emissiveTexture = gridTexture;
+    (this.groundMaterial as BABYLON.StandardMaterial).emissiveTexture =
+      gridTexture;
   }
 
   private setupCamera(): void {
@@ -167,11 +172,16 @@ export class MOBAGame extends BaseGame {
     this.scene.onKeyboardObservable.add((kbInfo) => {
       const key = kbInfo.event.key.toLowerCase();
 
-      if (key === "w") inputMap.w = kbInfo.type === BABYLON.KeyboardEventTypes.KEYDOWN;
-      if (key === "a") inputMap.a = kbInfo.type === BABYLON.KeyboardEventTypes.KEYDOWN;
-      if (key === "s") inputMap.s = kbInfo.type === BABYLON.KeyboardEventTypes.KEYDOWN;
-      if (key === "d") inputMap.d = kbInfo.type === BABYLON.KeyboardEventTypes.KEYDOWN;
-      if (key === "shift") inputMap.shift = kbInfo.type === BABYLON.KeyboardEventTypes.KEYDOWN;
+      if (key === "w")
+        inputMap.w = kbInfo.type === BABYLON.KeyboardEventTypes.KEYDOWN;
+      if (key === "a")
+        inputMap.a = kbInfo.type === BABYLON.KeyboardEventTypes.KEYDOWN;
+      if (key === "s")
+        inputMap.s = kbInfo.type === BABYLON.KeyboardEventTypes.KEYDOWN;
+      if (key === "d")
+        inputMap.d = kbInfo.type === BABYLON.KeyboardEventTypes.KEYDOWN;
+      if (key === "shift")
+        inputMap.shift = kbInfo.type === BABYLON.KeyboardEventTypes.KEYDOWN;
 
       // Calculate movement
       let moveX = 0;
@@ -205,7 +215,10 @@ export class MOBAGame extends BaseGame {
     sphere.position.y = 1;
 
     // Create material
-    const material = new BABYLON.StandardMaterial(`mat-${entityId}`, this.scene);
+    const material = new BABYLON.StandardMaterial(
+      `mat-${entityId}`,
+      this.scene,
+    );
     material.diffuseColor = this.getTeamColor(entityId);
     material.specularColor = new BABYLON.Color3(1, 1, 1);
     sphere.material = material;

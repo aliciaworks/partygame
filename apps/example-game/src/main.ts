@@ -4,7 +4,8 @@ import { MOBAGame } from "./games/moba/moba-game";
 import { FPSGame } from "./games/fps/fps-game";
 import { NetworkManager } from "./core/network-manager";
 
-const DEFAULT_BACKEND_URL = "https://partygame-example-backend.aliciaworks.workers.dev/";
+const DEFAULT_BACKEND_URL =
+  "https://partygame-example-backend.aliciaworks.workers.dev/";
 
 /**
  * Main application entry point
@@ -40,9 +41,7 @@ class PartyGameApp {
     const gameCards = document.querySelectorAll(".game-card");
     const playButton = document.getElementById("playButton");
 
-    const initialCard = document.querySelector(
-      '.game-card[data-game="moba"]',
-    );
+    const initialCard = document.querySelector('.game-card[data-game="moba"]');
     initialCard?.classList.add("active");
 
     // Game card click handlers
@@ -57,7 +56,8 @@ class PartyGameApp {
     // Play button
     playButton?.addEventListener("click", async () => {
       const selectedCard = document.querySelector(".game-card.active");
-      const gameType = selectedCard?.getAttribute("data-game") || this.selectedGameType;
+      const gameType =
+        selectedCard?.getAttribute("data-game") || this.selectedGameType;
 
       if (!gameType) {
         this.showError("Please select a game");
@@ -71,7 +71,6 @@ class PartyGameApp {
       gameMenu?.classList.remove("active");
       await this.startGame(playerName, DEFAULT_BACKEND_URL, gameType);
     });
-
 
     // Show menu initially
     gameMenu?.classList.add("active");

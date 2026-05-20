@@ -1,16 +1,13 @@
-import { Component } from '../ecs/component';
+import { Component } from "../ecs/component";
 
-/**
- * TransformComponent represents position, rotation, and scale in the game world.
- */
 export class TransformComponent extends Component {
-  readonly type = 'transform';
+  readonly type = "transform";
 
-  x: number = 0;
-  y: number = 0;
-  rotation: number = 0; // radians
-  scaleX: number = 1;
-  scaleY: number = 1;
+  x = 0;
+  y = 0;
+  rotation = 0;
+  scaleX = 1;
+  scaleY = 1;
 
   constructor(x = 0, y = 0, rotation = 0) {
     super();
@@ -29,7 +26,7 @@ export class TransformComponent extends Component {
     };
   }
 
-  fromJSON(data: Record<string, unknown>) {
+  fromJSON(data: Record<string, unknown>): void {
     this.x = (data.x as number) ?? 0;
     this.y = (data.y as number) ?? 0;
     this.rotation = (data.rotation as number) ?? 0;
@@ -38,15 +35,12 @@ export class TransformComponent extends Component {
   }
 }
 
-/**
- * HealthComponent tracks entity HP and death state.
- */
 export class HealthComponent extends Component {
-  readonly type = 'health';
+  readonly type = "health";
 
-  hp: number = 100;
-  maxHp: number = 100;
-  isDead: boolean = false;
+  hp = 100;
+  maxHp = 100;
+  isDead = false;
 
   constructor(maxHp = 100) {
     super();
@@ -56,9 +50,7 @@ export class HealthComponent extends Component {
 
   takeDamage(amount: number): void {
     this.hp = Math.max(0, this.hp - amount);
-    if (this.hp === 0) {
-      this.isDead = true;
-    }
+    this.isDead = this.hp === 0;
   }
 
   heal(amount: number): void {
@@ -74,21 +66,18 @@ export class HealthComponent extends Component {
     };
   }
 
-  fromJSON(data: Record<string, unknown>) {
+  fromJSON(data: Record<string, unknown>): void {
     this.hp = (data.hp as number) ?? 100;
     this.maxHp = (data.maxHp as number) ?? 100;
     this.isDead = (data.isDead as boolean) ?? false;
   }
 }
 
-/**
- * VelocityComponent tracks movement velocity.
- */
 export class VelocityComponent extends Component {
-  readonly type = 'velocity';
+  readonly type = "velocity";
 
-  vx: number = 0;
-  vy: number = 0;
+  vx = 0;
+  vy = 0;
 
   constructor(vx = 0, vy = 0) {
     super();
@@ -100,27 +89,19 @@ export class VelocityComponent extends Component {
     return { vx: this.vx, vy: this.vy };
   }
 
-  fromJSON(data: Record<string, unknown>) {
+  fromJSON(data: Record<string, unknown>): void {
     this.vx = (data.vx as number) ?? 0;
     this.vy = (data.vy as number) ?? 0;
   }
 }
 
-/**
- * InputComponent stores player input commands.
- * Each frame, fresh input is added. Systems consume it.
- */
 export class InputComponent extends Component {
-  readonly type = 'input';
+  readonly type = "input";
 
-  moveX: number = 0;
-  moveY: number = 0;
-  isJumping: boolean = false;
-  isSprinting: boolean = false;
-
-  constructor() {
-    super();
-  }
+  moveX = 0;
+  moveY = 0;
+  isJumping = false;
+  isSprinting = false;
 
   reset(): void {
     this.moveX = 0;
@@ -138,7 +119,7 @@ export class InputComponent extends Component {
     };
   }
 
-  fromJSON(data: Record<string, unknown>) {
+  fromJSON(data: Record<string, unknown>): void {
     this.moveX = (data.moveX as number) ?? 0;
     this.moveY = (data.moveY as number) ?? 0;
     this.isJumping = (data.isJumping as boolean) ?? false;

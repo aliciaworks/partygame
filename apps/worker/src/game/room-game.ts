@@ -5,9 +5,8 @@ import {
   VelocityComponent,
   InputComponent,
   MovementSystem,
-  FilteredSystem,
-} from "@partygame/core";
-import { GameLoop, TICK_RATE_MS } from "./game-loop";
+} from "./index";
+import { GameLoop } from "./game-loop";
 import type { GameTickUpdate, PlayerInputCommand } from "@partygame/shared";
 
 /**
@@ -18,7 +17,6 @@ export class RoomGame {
   private gameLoop: GameLoop;
   private playerIds = new Set<string>();
   private playerWebSockets = new Map<string, WebSocket>();
-  private changedEntities = new Set<string>();
 
   constructor() {
     this.world = new World();
@@ -115,7 +113,7 @@ export class RoomGame {
    * Start the game loop
    */
   start(): void {
-    this.gameLoop.start((tick, deltaMs) => {
+    this.gameLoop.start((tick) => {
       // Get changed entities from the world
       const changed = this.world.getChangedEntities();
 
@@ -149,13 +147,13 @@ export class RoomGame {
     tick: number,
     changedEntities: Set<string>,
   ): GameTickUpdate {
-    const entities: Record<string, any> = {};
+    const entities: GameTickUpdate["entities"] = {};
 
     for (const entityId of changedEntities) {
       const entity = this.world.getEntity(entityId);
       if (!entity) continue;
 
-      const components: Record<string, any> = {};
+      const components: GameTickUpdate["entities"][string] = {};
 
       // Get transform component
       const transform = entity.getComponent(TransformComponent);
@@ -205,9 +203,13 @@ export class RoomGame {
   private broadcast(update: GameTickUpdate): void {
     const message = JSON.stringify(update);
 
-    for (const [playerId, ws] of this.playerWebSockets) {
+    for (const [playerId, ws] of this.playerWebSockets.entries()) {
       if (ws.readyState === WebSocket.OPEN) {
-        ws.send(message);
+        try {
+          ws.send(message);
+        } catch (error) {
+          console.error(`Failed to send update to ${playerId}:`, error);
+        }
       }
     }
   }

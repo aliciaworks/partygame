@@ -1,4 +1,5 @@
-export const DEFAULT_BACKEND_URL = "https://partygame-example-backend.aliciaworks.workers.dev/";
+export const DEFAULT_BACKEND_URL =
+  "https://partygame-example-backend.aliciaworks.workers.dev/";
 
 export const BACKEND_STORAGE_KEY = "partygame.portal.backendUrl";
 export const SITE_NAME_STORAGE_KEY = "partygame.portal.siteName";
@@ -48,10 +49,10 @@ export type ApiVersions = {
 
 export type VoiceBootstrap = {
   bootstrap: {
-    provider: 'realtimekit';
+    provider: "realtimekit";
     roomId: string;
     enabled: boolean;
-    joinMode: 'client-managed';
+    joinMode: "client-managed";
     appId: string | null;
     joinHint: string;
   };
@@ -65,7 +66,8 @@ export function normalizeBackendUrl(value: string | null | undefined): string {
 
   try {
     const parsed = new URL(trimmed);
-    const path = parsed.pathname === "/" ? "/" : `${parsed.pathname.replace(/\/+$/, "")}/`;
+    const path =
+      parsed.pathname === "/" ? "/" : `${parsed.pathname.replace(/\/+$/, "")}/`;
     return `${parsed.origin}${path}`;
   } catch {
     return DEFAULT_BACKEND_URL;
@@ -93,7 +95,11 @@ export function saveBackendUrl(backendUrl: string): string {
   return normalized;
 }
 
-async function fetchJson<T>(backendUrl: string, path: string, init?: RequestInit): Promise<T> {
+async function fetchJson<T>(
+  backendUrl: string,
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
   let requestUrl: URL;
   try {
     requestUrl = new URL(path, backendUrl);
@@ -131,19 +137,34 @@ async function fetchJson<T>(backendUrl: string, path: string, init?: RequestInit
 
         const fallbackText = await fallbackResp.text();
         if (!fallbackResp.ok) {
-          const snippet = fallbackText.slice(0, 200).replace(/\s+/g, ' ').trim();
-          throw new Error(`Fallback backend returned ${fallbackResp.status}: ${snippet || 'empty'}`);
+          const snippet = fallbackText
+            .slice(0, 200)
+            .replace(/\s+/g, " ")
+            .trim();
+          throw new Error(
+            `Fallback backend returned ${fallbackResp.status}: ${snippet || "empty"}`,
+          );
         }
 
         try {
           return JSON.parse(fallbackText) as T;
         } catch {
-          const snippet = fallbackText.slice(0, 200).replace(/\s+/g, ' ').trim();
-          throw new Error(`Fallback backend returned non-JSON response: ${snippet || 'empty'}`);
+          const snippet = fallbackText
+            .slice(0, 200)
+            .replace(/\s+/g, " ")
+            .trim();
+          throw new Error(
+            `Fallback backend returned non-JSON response: ${snippet || "empty"}`,
+          );
         }
       } catch (fallbackError) {
-        const fbReason = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
-        throw new Error(`Failed to fetch ${requestUrl.toString()}: ${reason}; fallback also failed: ${fbReason}`);
+        const fbReason =
+          fallbackError instanceof Error
+            ? fallbackError.message
+            : String(fallbackError);
+        throw new Error(
+          `Failed to fetch ${requestUrl.toString()}: ${reason}; fallback also failed: ${fbReason}`,
+        );
       }
     }
 
@@ -157,20 +178,26 @@ async function fetchJson<T>(backendUrl: string, path: string, init?: RequestInit
     try {
       data = JSON.parse(text) as T;
     } catch {
-      const snippet = text.slice(0, 200).replace(/\s+/g, ' ').trim();
-      throw new Error(`Backend returned non-JSON response (${response.status}) from ${requestUrl.toString()}: ${snippet || 'empty response'}`);
+      const snippet = text.slice(0, 200).replace(/\s+/g, " ").trim();
+      throw new Error(
+        `Backend returned non-JSON response (${response.status}) from ${requestUrl.toString()}: ${snippet || "empty response"}`,
+      );
     }
   }
 
   if (!response.ok) {
-    const error = (data as { error?: string }).error ?? `Request failed with ${response.status}`;
+    const error =
+      (data as { error?: string }).error ??
+      `Request failed with ${response.status}`;
     throw new Error(`${error} (${requestUrl.toString()})`);
   }
 
   return data;
 }
 
-export async function fetchBackendHealth(backendUrl: string): Promise<BackendHealth> {
+export async function fetchBackendHealth(
+  backendUrl: string,
+): Promise<BackendHealth> {
   return fetchJson<BackendHealth>(backendUrl, "/health", { method: "GET" });
 }
 
@@ -178,15 +205,21 @@ export async function fetchBackendSla(backendUrl: string): Promise<BackendSla> {
   return fetchJson<BackendSla>(backendUrl, "/sla", { method: "GET" });
 }
 
-export async function fetchApiVersions(backendUrl: string): Promise<ApiVersions> {
+export async function fetchApiVersions(
+  backendUrl: string,
+): Promise<ApiVersions> {
   return fetchJson<ApiVersions>(backendUrl, "/api-versions", { method: "GET" });
 }
 
 export async function fetchVoiceBootstrap(
   backendUrl: string,
-  roomId: string
+  roomId: string,
 ): Promise<VoiceBootstrap> {
-  return fetchJson<VoiceBootstrap>(backendUrl, `/api/voice/rooms/${encodeURIComponent(roomId)}/bootstrap`, {
-    method: "POST",
-  });
+  return fetchJson<VoiceBootstrap>(
+    backendUrl,
+    `/api/voice/rooms/${encodeURIComponent(roomId)}/bootstrap`,
+    {
+      method: "POST",
+    },
+  );
 }

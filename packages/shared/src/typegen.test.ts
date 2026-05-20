@@ -7,16 +7,16 @@ describe("type generation", () => {
     const artifacts = buildGeneratedArtifacts();
 
     expect(artifacts["unity/Runtime/PartyGameTypes.cs"]).toContain(
-      "public class PlayerState",
+      "public class TransformComponent",
     );
     expect(artifacts["unity/Runtime/PartyGameTypes.cs"]).toContain(
-      "public float health;",
+      "public float hp;",
     );
     expect(artifacts["godot/addons/partygame/edge_pulse_types.gd"]).toContain(
-      "var item_id: String",
+      "var is_sprinting: bool",
     );
     expect(
       artifacts["unreal/PartyGame/Source/PartyGame/Public/PartyGameTypes.h"],
-    ).toContain("FPartyGamePurchaseRequest");
+    ).toContain("FPartyGameVelocityComponent");
   });
 });

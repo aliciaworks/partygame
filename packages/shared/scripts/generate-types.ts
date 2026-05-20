@@ -13,7 +13,10 @@ export function writeGeneratedArtifacts() {
   for (const [relativePath, content] of Object.entries(artifacts)) {
     const outputPath = path.join(OUT_DIR, relativePath);
     fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-    fs.writeFileSync(outputPath, content);
+    fs.writeFileSync(
+      outputPath,
+      content.endsWith("\n") ? content : `${content}\n`,
+    );
   }
 }
 
