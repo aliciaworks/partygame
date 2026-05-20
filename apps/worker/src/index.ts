@@ -32,6 +32,15 @@ const gameRooms = new Map<string, RoomGame>();
 
 const app = new Hono<{ Bindings: Env }>();
 
+// Simple API versions endpoint for admin UI compatibility
+app.get('/api-versions', (c) => {
+  return c.json({
+    current: 'v3',
+    supported: ['v1', 'v2', 'v3'],
+    deprecated: [],
+  });
+});
+
 // ============================================================================
 // MIDDLEWARE
 // ============================================================================
