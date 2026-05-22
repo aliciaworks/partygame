@@ -11,19 +11,13 @@ export type PlatformFeatures = {
   textChat: boolean;
   gameUpdates: boolean;
   matchmaking: boolean;
-};
-
-export type GameTypePreset = {
-  id: string;
-  name: string;
-  description: string;
-  features: PlatformFeatures;
+  leaderboard: boolean;
+  friends: boolean;
+  playerProfile: boolean;
 };
 
 export type PlatformState = {
   features: PlatformFeatures;
-  gameTypes: GameTypePreset[];
-  activeGameTypeId: string | null;
 };
 
 export type GameUpdateAsset = {
@@ -62,6 +56,9 @@ export const FEATURE_META: Record<
   textChat: { labelKey: "features.textChat", descKey: "features.textChatDesc" },
   gameUpdates: { labelKey: "features.gameUpdates", descKey: "features.gameUpdatesDesc" },
   matchmaking: { labelKey: "features.matchmaking", descKey: "features.matchmakingDesc" },
+  leaderboard: { labelKey: "features.leaderboard", descKey: "features.leaderboardDesc" },
+  friends: { labelKey: "features.friends", descKey: "features.friendsDesc" },
+  playerProfile: { labelKey: "features.playerProfile", descKey: "features.playerProfileDesc" },
 };
 
 export function normalizeBackendUrl(value: string | null | undefined): string {
@@ -193,41 +190,6 @@ export async function patchPlatformFeatures(
     method: "PATCH",
     body: JSON.stringify(updates),
   });
-}
-
-export async function applyGameType(
-  backendUrl: string,
-  gameTypeId: string,
-): Promise<PlatformState> {
-  return adminFetch<PlatformState>(
-    backendUrl,
-    "/admin/platform/apply-game-type",
-    {
-      method: "POST",
-      body: JSON.stringify({ gameTypeId }),
-    },
-  );
-}
-
-export async function saveGameType(
-  backendUrl: string,
-  preset: GameTypePreset,
-): Promise<PlatformState> {
-  return adminFetch<PlatformState>(backendUrl, "/admin/platform/game-types", {
-    method: "PUT",
-    body: JSON.stringify(preset),
-  });
-}
-
-export async function removeGameType(
-  backendUrl: string,
-  gameTypeId: string,
-): Promise<PlatformState> {
-  return adminFetch<PlatformState>(
-    backendUrl,
-    `/admin/platform/game-types/${encodeURIComponent(gameTypeId)}`,
-    { method: "DELETE" },
-  );
 }
 
 export async function listGameUpdates(

@@ -9,9 +9,9 @@ admin panel (cloudflare pages) seprate with server(worker)
 
 it should comptaible any type of game like fps/moba etc...
 
-(game type is just a named preset of enable / disable functions — admin panel only; clients read `GET /api/platform` → `{ features }` only)
+(FPS/MOBA/Custom presets exist only in the admin UI; applying a preset PATCHes feature flags. Backend and clients only see `features` via `/admin/platform` and `GET /api/platform`.)
 
-Platform features: voice chat, text chat, hot updates, matchmaking.
+Platform features: voice chat, text chat, hot updates, matchmaking, leaderboard, friends, player profile.
 
-Platform data uses a single R2 bucket (`PLATFORM_BUCKET`): `admin/platform-state.json` for live features + custom game types, and `game-updates/*` for hotfix assets.
+Platform data uses a single R2 bucket (`PLATFORM_BUCKET`): `admin/platform-state.json` for `{ features }` only, `game-updates/*` for hotfixes, `players/*` for profiles/friends, `leaderboards/*` for scores.
 

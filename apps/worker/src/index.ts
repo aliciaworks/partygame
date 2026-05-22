@@ -2,9 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { RoomGame } from "./game/room-game";
 import {
-  applyGameType,
   buildVoiceRoomBootstrap,
-  deleteGameType,
   deleteGameUpdateAsset,
   getGameUpdateAsset,
   isRouteAllowed,
@@ -12,11 +10,18 @@ import {
   loadPlatformState,
   savePlatformFeatures,
   storeGameUpdateAsset,
-  upsertGameType,
-  type GameTypePreset,
   type PlatformBindings,
   type PlatformFeatures,
 } from "./platform-controls";
+import {
+  addFriend,
+  getFriendsList,
+  getLeaderboard,
+  getPlayerProfile,
+  removeFriend,
+  savePlayerProfile,
+  submitLeaderboardScore,
+} from "./platform-services";
 import type { PlayerInputCommand } from "@partygame/shared";
 
 type Env = PlatformBindings & {
@@ -209,9 +214,7 @@ app.post("/api/session/login", async (c) => {
 });
 
 app.get("/api/session/me", async (c) => {
-  const token = extractBearerToken(c.req.header("Authorization"));
-  const payload = token ? verifySimpleToken(token) : null;
-
+  const payload = getPlayerFromRequest(c.req.raw);
   if (!payload) {
     return c.json({ error: "Unauthorized" }, 401);
   }
@@ -220,6 +223,126 @@ app.get("/api/session/me", async (c) => {
     playerId: payload.sub,
     playerName: payload.name,
   });
+});
+
+app.get("/api/player-profile/me", async (c) => {
+  const payload = getPlayerFromRequest(c.req.raw);
+  if (!payload) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const profile = await getPlayerProfile(
+    c.env.PLATFORM_BUCKET,
+    payload.sub,
+  );
+  if (profile.displayName === "Player" && payload.name) {
+    profile.displayName = payload.name;
+  }
+  return c.json({ profile });
+});
+
+app.patch("/api/player-profile/me", async (c) => {
+  const payload = getPlayerFromRequest(c.req.raw);
+  if (!payload) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const body = (await c.req.json().catch(() => ({}))) as {
+    displayName?: string;
+    avatarUrl?: string | null;
+    level?: number;
+  };
+
+  const profile = await savePlayerProfile(c.env.PLATFORM_BUCKET, payload.sub, {
+    displayName: body.displayName,
+    avatarUrl: body.avatarUrl,
+    level: body.level,
+  });
+  return c.json({ profile });
+});
+
+app.get("/api/friends", async (c) => {
+  const payload = getPlayerFromRequest(c.req.raw);
+  if (!payload) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const list = await getFriendsList(c.env.PLATFORM_BUCKET, payload.sub);
+  return c.json(list);
+});
+
+app.post("/api/friends", async (c) => {
+  const payload = getPlayerFromRequest(c.req.raw);
+  if (!payload) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const body = (await c.req.json().catch(() => ({}))) as {
+    friendId?: string;
+    action?: string;
+  };
+
+  if (!body.friendId) {
+    return c.json({ error: "friendId is required" }, 400);
+  }
+
+  try {
+    const list =
+      body.action === "remove"
+        ? await removeFriend(
+            c.env.PLATFORM_BUCKET,
+            payload.sub,
+            body.friendId,
+          )
+        : await addFriend(
+            c.env.PLATFORM_BUCKET,
+            payload.sub,
+            body.friendId,
+          );
+    return c.json(list);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Friends error";
+    return c.json({ error: message }, 400);
+  }
+});
+
+app.get("/api/leaderboard/:boardId", async (c) => {
+  const boardId = c.req.param("boardId") || "global";
+  const limit = Number(c.req.query("limit") ?? "50");
+  const board = await getLeaderboard(
+    c.env.PLATFORM_BUCKET,
+    boardId,
+    Number.isFinite(limit) ? limit : 50,
+  );
+  return c.json(board);
+});
+
+app.post("/api/leaderboard/:boardId/scores", async (c) => {
+  const payload = getPlayerFromRequest(c.req.raw);
+  if (!payload) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const boardId = c.req.param("boardId") || "global";
+  const body = (await c.req.json().catch(() => ({}))) as {
+    score?: number;
+    displayName?: string;
+  };
+
+  if (typeof body.score !== "number") {
+    return c.json({ error: "score is required" }, 400);
+  }
+
+  const board = await submitLeaderboardScore(
+    c.env.PLATFORM_BUCKET,
+    boardId,
+    {
+      playerId: payload.sub,
+      displayName: body.displayName ?? payload.name,
+      score: body.score,
+    },
+  );
+  return c.json(board);
 });
 
 app.get("/ws", async (c) => {
@@ -296,44 +419,6 @@ app.get("/admin/platform", async (c) => {
 app.patch("/admin/platform/features", async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as Partial<PlatformFeatures>;
   const state = await savePlatformFeatures(c.env.PLATFORM_BUCKET, body);
-  return c.json(state);
-});
-
-app.post("/admin/platform/apply-game-type", async (c) => {
-  const body = (await c.req.json().catch(() => ({}))) as { gameTypeId?: string };
-  if (!body.gameTypeId) {
-    return c.json({ error: "gameTypeId is required" }, 400);
-  }
-
-  try {
-    const state = await applyGameType(c.env.PLATFORM_BUCKET, body.gameTypeId);
-    return c.json(state);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Apply failed";
-    return c.json({ error: message }, 404);
-  }
-});
-
-app.put("/admin/platform/game-types", async (c) => {
-  const body = (await c.req.json().catch(() => ({}))) as Partial<GameTypePreset>;
-  if (!body.id || !body.name) {
-    return c.json({ error: "id and name are required" }, 400);
-  }
-
-  const state = await upsertGameType(c.env.PLATFORM_BUCKET, {
-    id: body.id,
-    name: body.name,
-    description: body.description ?? "",
-    features: (body.features ?? {}) as PlatformFeatures,
-  });
-  return c.json(state);
-});
-
-app.delete("/admin/platform/game-types/:id", async (c) => {
-  const state = await deleteGameType(
-    c.env.PLATFORM_BUCKET,
-    c.req.param("id"),
-  );
   return c.json(state);
 });
 
@@ -420,6 +505,9 @@ app.get("/", (c) => {
     endpoints: {
       auth: "/api/session/login",
       platform: "/api/platform",
+      playerProfile: "/api/player-profile/me",
+      friends: "/api/friends",
+      leaderboard: "/api/leaderboard/:boardId",
       ws: "/ws?roomId=...&playerId=...&token=...",
       health: "/health",
       rooms: "/rooms",
@@ -450,6 +538,16 @@ function verifySimpleToken(token: string): SessionPayload | null {
   } catch {
     return null;
   }
+}
+
+function getPlayerFromRequest(request: Request): SessionPayload | null {
+  const bearerToken = extractBearerToken(
+    request.headers.get("Authorization") ?? undefined,
+  );
+  const queryToken = new URL(request.url).searchParams.get("token");
+  const token = bearerToken ?? queryToken;
+  if (!token) return null;
+  return verifySimpleToken(token);
 }
 
 function extractBearerToken(authHeader: string | undefined): string | null {

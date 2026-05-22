@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import ToggleRow from "$lib/ToggleRow.svelte";
-  import GameTypesPanel from "$lib/GameTypesPanel.svelte";
   import { translate } from "$lib/i18n";
   import {
     FEATURE_META,
@@ -14,6 +13,13 @@
     DEFAULT_BACKEND_URL,
     type PlatformFeatures,
   } from "$lib/portal";
+  import {
+    PRESET_FEATURES,
+    PRESET_OPTIONS,
+    resolvePresetFromFeatures,
+    isBuiltinPreset,
+    type BuiltinPresetId,
+  } from "$lib/presets";
   import {
     backendUrl,
     siteName,
@@ -29,10 +35,20 @@
   let backendEdit = "";
   let siteEdit = "";
   let tokenEdit = "";
+  let presetSelect = "";
 
   $: backendEdit = $backendUrl;
   $: siteEdit = $siteName;
   $: tokenEdit = readAdminToken();
+  $: activePreset = $platformState
+    ? resolvePresetFromFeatures($platformState.features)
+    : "custom";
+  $: presetSelect = activePreset;
+
+  $: selectedPresetMeta =
+    activePreset !== "custom"
+      ? PRESET_OPTIONS.find((item) => item.id === activePreset)
+      : null;
 
   async function loadPlatform() {
     busy.set(true);
@@ -41,6 +57,28 @@
       platformState.set(await fetchPlatformState($backendUrl));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load platform");
+    } finally {
+      busy.set(false);
+    }
+  }
+
+  async function onPresetSelect(e: Event) {
+    const value = (e.currentTarget as HTMLSelectElement).value;
+    if (!isBuiltinPreset(value)) return;
+
+    busy.set(true);
+    clearError();
+    try {
+      platformState.set(
+        await patchPlatformFeatures(
+          $backendUrl,
+          PRESET_FEATURES[value as BuiltinPresetId],
+        ),
+      );
+      setStatus($translate("preset.applied"));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to apply preset");
+      presetSelect = activePreset;
     } finally {
       busy.set(false);
     }
@@ -116,6 +154,34 @@
 </section>
 
 <section class="panel block">
+  <h2>{$translate("preset.title")}</h2>
+  <p class="hint">{$translate("preset.hint")}</p>
+
+  <div class="preset-picker field">
+    <label for="preset-select">{$translate("preset.selectLabel")}</label>
+    <select
+      id="preset-select"
+      bind:value={presetSelect}
+      on:change={onPresetSelect}
+      disabled={$busy}
+    >
+      {#if activePreset === "custom"}
+        <option value="custom">{$translate("preset.custom")}</option>
+      {/if}
+      {#each PRESET_OPTIONS as opt}
+        <option value={opt.id}>{$translate(opt.labelKey)}</option>
+      {/each}
+    </select>
+  </div>
+
+  {#if selectedPresetMeta}
+    <p class="preset-desc">{$translate(selectedPresetMeta.descKey)}</p>
+  {:else if activePreset === "custom"}
+    <p class="preset-desc custom-note">{$translate("preset.customNote")}</p>
+  {/if}
+</section>
+
+<section class="panel block">
   <h2>{$translate("features.title")}</h2>
   <p class="hint">{$translate("settings.featuresHint")}</p>
   {#if $platformState}
@@ -135,8 +201,6 @@
   {/if}
 </section>
 
-<GameTypesPanel />
-
 <style>
   .block {
     padding: 20px;
@@ -153,5 +217,21 @@
     color: var(--muted);
     font-size: 0.9rem;
     line-height: 1.45;
+  }
+
+  .preset-picker select {
+    width: 100%;
+    max-width: 420px;
+  }
+
+  .preset-desc {
+    margin: 12px 0 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+
+  .custom-note {
+    color: var(--accent-warm);
   }
 </style>

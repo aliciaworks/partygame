@@ -4,23 +4,14 @@ export interface PlatformFeatures {
   textChat: boolean;
   gameUpdates: boolean;
   matchmaking: boolean;
+  leaderboard: boolean;
+  friends: boolean;
+  playerProfile: boolean;
 }
 
-/** A game type is only a named, reusable combination of feature toggles. */
-export interface GameTypePreset {
-  id: string;
-  name: string;
-  description: string;
-  features: PlatformFeatures;
-}
-
+/** Persisted and exposed by the API — feature toggles only. */
 export interface PlatformState {
-  /** Currently applied feature flags (live config). */
   features: PlatformFeatures;
-  /** Saved custom game-type presets. */
-  gameTypes: GameTypePreset[];
-  /** Id of the preset last applied, if any. */
-  activeGameTypeId: string | null;
 }
 
 export interface PlatformBindings {
@@ -55,6 +46,9 @@ export const FEATURE_KEYS = [
   "textChat",
   "gameUpdates",
   "matchmaking",
+  "leaderboard",
+  "friends",
+  "playerProfile",
 ] as const satisfies readonly (keyof PlatformFeatures)[];
 
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
@@ -64,51 +58,13 @@ export const DEFAULT_FEATURES: PlatformFeatures = {
   textChat: true,
   gameUpdates: true,
   matchmaking: true,
+  leaderboard: true,
+  friends: true,
+  playerProfile: true,
 };
-
-const DEFAULT_GAME_TYPES: GameTypePreset[] = [
-  {
-    id: "fps",
-    name: "FPS",
-    description: "Voice, chat, and matchmaking.",
-    features: {
-      voiceChat: true,
-      textChat: true,
-      gameUpdates: true,
-      matchmaking: true,
-    },
-  },
-  {
-    id: "moba",
-    name: "MOBA",
-    description: "Text chat and hot updates; no voice.",
-    features: {
-      voiceChat: false,
-      textChat: true,
-      gameUpdates: true,
-      matchmaking: true,
-    },
-  },
-  {
-    id: "minimal",
-    name: "Minimal",
-    description: "Hot updates only.",
-    features: {
-      voiceChat: false,
-      textChat: false,
-      gameUpdates: true,
-      matchmaking: false,
-    },
-  },
-];
 
 let memoryState: PlatformState = {
   features: { ...DEFAULT_FEATURES },
-  gameTypes: DEFAULT_GAME_TYPES.map((preset) => ({
-    ...preset,
-    features: { ...preset.features },
-  })),
-  activeGameTypeId: null,
 };
 
 function normalizeFeatures(
@@ -125,31 +81,13 @@ function normalizeFeatures(
   return base;
 }
 
-function normalizeGameType(raw: Partial<GameTypePreset>): GameTypePreset | null {
-  if (typeof raw.id !== "string" || !raw.id.trim()) return null;
-  if (typeof raw.name !== "string" || !raw.name.trim()) return null;
-
+function normalizeState(
+  raw: (Partial<PlatformState> & Record<string, unknown>) | null | undefined,
+): PlatformState {
+  const fromWrapper = raw?.features as Partial<PlatformFeatures> | undefined;
+  const legacy = raw && !fromWrapper ? (raw as Partial<PlatformFeatures>) : null;
   return {
-    id: raw.id.trim(),
-    name: raw.name.trim(),
-    description:
-      typeof raw.description === "string" ? raw.description.trim() : "",
-    features: normalizeFeatures(raw.features),
-  };
-}
-
-function normalizeState(raw: Partial<PlatformState> | null | undefined): PlatformState {
-  const gameTypes = Array.isArray(raw?.gameTypes)
-    ? raw.gameTypes
-        .map((item) => normalizeGameType(item as Partial<GameTypePreset>))
-        .filter((item): item is GameTypePreset => item !== null)
-    : memoryState.gameTypes;
-
-  return {
-    features: normalizeFeatures(raw?.features),
-    gameTypes: gameTypes.length > 0 ? gameTypes : memoryState.gameTypes,
-    activeGameTypeId:
-      typeof raw?.activeGameTypeId === "string" ? raw.activeGameTypeId : null,
+    features: normalizeFeatures(fromWrapper ?? legacy),
   };
 }
 
@@ -166,7 +104,8 @@ export async function loadPlatformState(
   }
 
   try {
-    const parsed = JSON.parse(await object.text()) as Partial<PlatformState>;
+    const parsed = JSON.parse(await object.text()) as Partial<PlatformState> &
+      Record<string, unknown>;
     memoryState = normalizeState(parsed);
     return memoryState;
   } catch {
@@ -178,7 +117,7 @@ async function persistPlatformState(
   bucket: R2Bucket | undefined,
   state: PlatformState,
 ): Promise<PlatformState> {
-  memoryState = normalizeState(state);
+  memoryState = normalizeState(state as Partial<PlatformState> & Record<string, unknown>);
 
   if (bucket) {
     await bucket.put(STATE_KEY, JSON.stringify(memoryState, null, 2), {
@@ -196,62 +135,7 @@ export async function savePlatformFeatures(
   updates: Partial<PlatformFeatures>,
 ): Promise<PlatformState> {
   const next: PlatformState = {
-    ...memoryState,
     features: normalizeFeatures({ ...memoryState.features, ...updates }),
-    activeGameTypeId: null,
-  };
-  return persistPlatformState(bucket, next);
-}
-
-export async function applyGameType(
-  bucket: R2Bucket | undefined,
-  gameTypeId: string,
-): Promise<PlatformState> {
-  const preset = memoryState.gameTypes.find((item) => item.id === gameTypeId);
-  if (!preset) {
-    throw new Error(`Unknown game type: ${gameTypeId}`);
-  }
-
-  const next: PlatformState = {
-    ...memoryState,
-    features: { ...preset.features },
-    activeGameTypeId: preset.id,
-  };
-  return persistPlatformState(bucket, next);
-}
-
-export async function upsertGameType(
-  bucket: R2Bucket | undefined,
-  preset: GameTypePreset,
-): Promise<PlatformState> {
-  const normalized = normalizeGameType(preset);
-  if (!normalized) {
-    throw new Error("Invalid game type preset");
-  }
-
-  const gameTypes = memoryState.gameTypes.filter(
-    (item) => item.id !== normalized.id,
-  );
-  gameTypes.push(normalized);
-
-  const next: PlatformState = {
-    ...memoryState,
-    gameTypes,
-  };
-  return persistPlatformState(bucket, next);
-}
-
-export async function deleteGameType(
-  bucket: R2Bucket | undefined,
-  gameTypeId: string,
-): Promise<PlatformState> {
-  const next: PlatformState = {
-    ...memoryState,
-    gameTypes: memoryState.gameTypes.filter((item) => item.id !== gameTypeId),
-    activeGameTypeId:
-      memoryState.activeGameTypeId === gameTypeId
-        ? null
-        : memoryState.activeGameTypeId,
   };
   return persistPlatformState(bucket, next);
 }
@@ -264,6 +148,9 @@ export function isRouteAllowed(
   if (routePath.startsWith("/api/matchmaking")) return features.matchmaking;
   if (routePath.startsWith("/api/voice")) return features.voiceChat;
   if (routePath.startsWith("/api/updates")) return features.gameUpdates;
+  if (routePath.startsWith("/api/leaderboard")) return features.leaderboard;
+  if (routePath.startsWith("/api/friends")) return features.friends;
+  if (routePath.startsWith("/api/player-profile")) return features.playerProfile;
   return true;
 }
 
@@ -370,10 +257,4 @@ export async function getGameUpdateAsset(
       uploadedAt: object.uploaded.toISOString(),
     },
   };
-}
-
-/** @deprecated Use loadPlatformState */
-export async function loadPlatformControls(bucket?: R2Bucket) {
-  const state = await loadPlatformState(bucket);
-  return state.features;
 }
