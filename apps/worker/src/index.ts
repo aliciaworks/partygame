@@ -2,9 +2,20 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { RoomGame } from "./game/room-game";
 import {
+  applyGameType,
   buildVoiceRoomBootstrap,
-  loadPlatformControls,
+  deleteGameType,
+  deleteGameUpdateAsset,
+  getGameUpdateAsset,
+  isRouteAllowed,
+  listGameUpdateAssets,
+  loadPlatformState,
+  savePlatformFeatures,
+  storeGameUpdateAsset,
+  upsertGameType,
+  type GameTypePreset,
   type PlatformBindings,
+  type PlatformFeatures,
 } from "./platform-controls";
 import type { PlayerInputCommand } from "@partygame/shared";
 
@@ -150,6 +161,17 @@ const app = new Hono<{ Bindings: Env }>();
 
 app.use("*", cors({ origin: "*" }));
 
+app.use("/api/*", async (c, next) => {
+  const state = await loadPlatformState(c.env.PLATFORM_BUCKET);
+  if (!isRouteAllowed(c.req.path, state.features)) {
+    return c.json(
+      { error: "feature_disabled", path: c.req.path },
+      503,
+    );
+  }
+  await next();
+});
+
 app.get("/api-versions", (c) => {
   return c.json({
     current: "v3",
@@ -171,12 +193,14 @@ app.post("/api/session/login", async (c) => {
     const playerId = `player-${crypto.randomUUID()}`;
     const token = generateSimpleToken({ sub: playerId, name: playerName });
 
+    const state = await loadPlatformState(c.env.PLATFORM_BUCKET);
+
     return c.json({
       playerId,
       accessToken: token,
       refreshToken: token,
       expiresIn: 3600,
-      voiceEnabled: false,
+      features: state.features,
     });
   } catch (error) {
     console.error("Login error:", error);
@@ -242,12 +266,17 @@ app.get("/sla", (c) => {
   });
 });
 
+app.get("/api/platform", async (c) => {
+  const state = await loadPlatformState(c.env.PLATFORM_BUCKET);
+  return c.json({ features: state.features });
+});
+
 app.post("/api/voice/rooms/:id/bootstrap", async (c) => {
   const roomId = c.req.param("id");
-  const controls = await loadPlatformControls(c.env.CONTROLS_BUCKET);
+  const state = await loadPlatformState(c.env.PLATFORM_BUCKET);
 
   return c.json({
-    bootstrap: buildVoiceRoomBootstrap(roomId, controls, c.env),
+    bootstrap: buildVoiceRoomBootstrap(roomId, state.features, c.env),
   });
 });
 
@@ -259,30 +288,118 @@ app.use("/admin/*", async (c, next) => {
   await next();
 });
 
-app.get("/admin/rooms", async (c) => {
-  const rooms = await fetchKnownRooms(c.env);
-
-  return c.json({ rooms, total: rooms.length });
+app.get("/admin/platform", async (c) => {
+  const state = await loadPlatformState(c.env.PLATFORM_BUCKET);
+  return c.json(state);
 });
 
-app.delete("/admin/rooms/:id", async (c) => {
-  const roomId = c.req.param("id");
-  const response = await getRoomStub(c.env, roomId).fetch(
-    new Request(
-      `https://room/admin/room?roomId=${encodeURIComponent(roomId)}`,
-      {
-        method: "DELETE",
-      },
-    ),
-  );
+app.patch("/admin/platform/features", async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as Partial<PlatformFeatures>;
+  const state = await savePlatformFeatures(c.env.PLATFORM_BUCKET, body);
+  return c.json(state);
+});
 
-  knownRoomIds.delete(roomId);
-
-  if (!response.ok) {
-    return c.json({ error: "Failed to delete room" }, 500);
+app.post("/admin/platform/apply-game-type", async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as { gameTypeId?: string };
+  if (!body.gameTypeId) {
+    return c.json({ error: "gameTypeId is required" }, 400);
   }
 
-  return c.json({ success: true, message: `Deleted room ${roomId}` });
+  try {
+    const state = await applyGameType(c.env.PLATFORM_BUCKET, body.gameTypeId);
+    return c.json(state);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Apply failed";
+    return c.json({ error: message }, 404);
+  }
+});
+
+app.put("/admin/platform/game-types", async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as Partial<GameTypePreset>;
+  if (!body.id || !body.name) {
+    return c.json({ error: "id and name are required" }, 400);
+  }
+
+  const state = await upsertGameType(c.env.PLATFORM_BUCKET, {
+    id: body.id,
+    name: body.name,
+    description: body.description ?? "",
+    features: (body.features ?? {}) as PlatformFeatures,
+  });
+  return c.json(state);
+});
+
+app.delete("/admin/platform/game-types/:id", async (c) => {
+  const state = await deleteGameType(
+    c.env.PLATFORM_BUCKET,
+    c.req.param("id"),
+  );
+  return c.json(state);
+});
+
+app.get("/admin/game-updates", async (c) => {
+  const assets = await listGameUpdateAssets(c.env.PLATFORM_BUCKET);
+  return c.json({ assets });
+});
+
+app.post("/admin/game-updates", async (c) => {
+  const contentType = c.req.header("content-type") ?? "";
+
+  if (contentType.includes("multipart/form-data")) {
+    const form = await c.req.formData();
+    const file = form.get("file");
+    if (!(file instanceof File)) {
+      return c.json({ error: "file is required" }, 400);
+    }
+
+    const buffer = await file.arrayBuffer();
+    const asset = await storeGameUpdateAsset(c.env.PLATFORM_BUCKET, {
+      name: file.name,
+      content: buffer,
+      contentType: file.type || "application/octet-stream",
+    });
+    return c.json({ asset });
+  }
+
+  const body = (await c.req.json().catch(() => ({}))) as {
+    name?: string;
+    contentBase64?: string;
+    contentType?: string;
+  };
+
+  if (!body.name || !body.contentBase64) {
+    return c.json({ error: "name and contentBase64 are required" }, 400);
+  }
+
+  const bytes = Uint8Array.from(atob(body.contentBase64), (ch) => ch.charCodeAt(0));
+  const asset = await storeGameUpdateAsset(c.env.PLATFORM_BUCKET, {
+    name: body.name,
+    content: bytes,
+    contentType: body.contentType,
+  });
+  return c.json({ asset });
+});
+
+app.get("/admin/game-updates/:key{.+}", async (c) => {
+  const key = decodeURIComponent(c.req.param("key"));
+  const result = await getGameUpdateAsset(c.env.PLATFORM_BUCKET, key);
+  if (!result) {
+    return c.json({ error: "Not found" }, 404);
+  }
+
+  return new Response(result.body, {
+    headers: {
+      "Content-Type": result.meta.contentType,
+      "Content-Disposition": `attachment; filename="${result.meta.name}"`,
+    },
+  });
+});
+
+app.delete("/admin/game-updates/:key{.+}", async (c) => {
+  const key = decodeURIComponent(c.req.param("key"));
+  await deleteGameUpdateAsset(c.env.PLATFORM_BUCKET, key);
+  const assets = await listGameUpdateAssets(c.env.PLATFORM_BUCKET);
+  return c.json({ assets });
 });
 
 app.get("/health", async (c) => {
@@ -302,10 +419,14 @@ app.get("/", (c) => {
     version: "1.0.0",
     endpoints: {
       auth: "/api/session/login",
+      platform: "/api/platform",
       ws: "/ws?roomId=...&playerId=...&token=...",
       health: "/health",
       rooms: "/rooms",
-      admin: "/admin/rooms",
+      admin: {
+        platform: "/admin/platform",
+        gameUpdates: "/admin/game-updates",
+      },
     },
   });
 });

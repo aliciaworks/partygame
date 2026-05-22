@@ -93,7 +93,7 @@ apps/example-game/
 - Each game extends `BaseGame` class
 - Games use shared `NetworkManager` for server communication
 - Babylon.js renders both 2D (MOBA) and 3D (FPS) games
-- Same backend handles any number of game types
+- Same backend handles any number of game types; each type is a custom preset of enabled platform features (voice, chat, matchmaking, hotfix, etc.) configured in the admin panel
 
 ## Game Examples
 

@@ -1,17 +1,30 @@
-export interface PlatformControls {
-  voiceChatEnabled: boolean;
-  chatEnabled: boolean;
-  leaderboardEnabled: boolean;
-  achievementsEnabled: boolean;
-  replayEnabled: boolean;
-  analyticsEnabled: boolean;
-  spectatorEnabled: boolean;
-  gameUpdatesEnabled: boolean;
+/** Feature flags — each maps to optional platform APIs. */
+export interface PlatformFeatures {
+  voiceChat: boolean;
+  textChat: boolean;
+  gameUpdates: boolean;
+  matchmaking: boolean;
+}
+
+/** A game type is only a named, reusable combination of feature toggles. */
+export interface GameTypePreset {
+  id: string;
+  name: string;
+  description: string;
+  features: PlatformFeatures;
+}
+
+export interface PlatformState {
+  /** Currently applied feature flags (live config). */
+  features: PlatformFeatures;
+  /** Saved custom game-type presets. */
+  gameTypes: GameTypePreset[];
+  /** Id of the preset last applied, if any. */
+  activeGameTypeId: string | null;
 }
 
 export interface PlatformBindings {
-  CONTROLS_BUCKET?: R2Bucket;
-  GAME_UPDATES_BUCKET?: R2Bucket;
+  PLATFORM_BUCKET?: R2Bucket;
   ADMIN_TOKEN?: string;
   REALTIMEKIT_APP_ID?: string;
   REALTIMEKIT_API_TOKEN?: string;
@@ -26,144 +39,243 @@ export interface VoiceRoomBootstrap {
   joinHint: string;
 }
 
-export interface GameUpdateAssetInput {
+export interface GameUpdateAssetMeta {
+  key: string;
   name: string;
-  content: string;
-  contentType?: string;
+  size: number;
+  contentType: string;
+  uploadedAt: string;
 }
 
-const CONTROL_KEY = "admin/platform-controls.json";
-const DEFAULT_CONTROLS: PlatformControls = {
-  voiceChatEnabled: true,
-  chatEnabled: true,
-  leaderboardEnabled: true,
-  achievementsEnabled: true,
-  replayEnabled: true,
-  analyticsEnabled: true,
-  spectatorEnabled: true,
-  gameUpdatesEnabled: true,
+const STATE_KEY = "admin/platform-state.json";
+const GAME_UPDATES_PREFIX = "game-updates/";
+
+export const FEATURE_KEYS = [
+  "voiceChat",
+  "textChat",
+  "gameUpdates",
+  "matchmaking",
+] as const satisfies readonly (keyof PlatformFeatures)[];
+
+export type FeatureKey = (typeof FEATURE_KEYS)[number];
+
+export const DEFAULT_FEATURES: PlatformFeatures = {
+  voiceChat: true,
+  textChat: true,
+  gameUpdates: true,
+  matchmaking: true,
 };
 
-let memoryControls: PlatformControls = { ...DEFAULT_CONTROLS };
+const DEFAULT_GAME_TYPES: GameTypePreset[] = [
+  {
+    id: "fps",
+    name: "FPS",
+    description: "Voice, chat, and matchmaking.",
+    features: {
+      voiceChat: true,
+      textChat: true,
+      gameUpdates: true,
+      matchmaking: true,
+    },
+  },
+  {
+    id: "moba",
+    name: "MOBA",
+    description: "Text chat and hot updates; no voice.",
+    features: {
+      voiceChat: false,
+      textChat: true,
+      gameUpdates: true,
+      matchmaking: true,
+    },
+  },
+  {
+    id: "minimal",
+    name: "Minimal",
+    description: "Hot updates only.",
+    features: {
+      voiceChat: false,
+      textChat: false,
+      gameUpdates: true,
+      matchmaking: false,
+    },
+  },
+];
 
-function normalizeControls(
-  partial: Partial<PlatformControls> | null | undefined,
-): PlatformControls {
+let memoryState: PlatformState = {
+  features: { ...DEFAULT_FEATURES },
+  gameTypes: DEFAULT_GAME_TYPES.map((preset) => ({
+    ...preset,
+    features: { ...preset.features },
+  })),
+  activeGameTypeId: null,
+};
+
+function normalizeFeatures(
+  partial: Partial<PlatformFeatures> | null | undefined,
+): PlatformFeatures {
+  const base = { ...DEFAULT_FEATURES };
+  if (!partial) return base;
+
+  for (const key of FEATURE_KEYS) {
+    if (typeof partial[key] === "boolean") {
+      base[key] = partial[key];
+    }
+  }
+  return base;
+}
+
+function normalizeGameType(raw: Partial<GameTypePreset>): GameTypePreset | null {
+  if (typeof raw.id !== "string" || !raw.id.trim()) return null;
+  if (typeof raw.name !== "string" || !raw.name.trim()) return null;
+
   return {
-    voiceChatEnabled:
-      partial?.voiceChatEnabled ?? DEFAULT_CONTROLS.voiceChatEnabled,
-    chatEnabled: partial?.chatEnabled ?? DEFAULT_CONTROLS.chatEnabled,
-    leaderboardEnabled:
-      partial?.leaderboardEnabled ?? DEFAULT_CONTROLS.leaderboardEnabled,
-    achievementsEnabled:
-      partial?.achievementsEnabled ?? DEFAULT_CONTROLS.achievementsEnabled,
-    replayEnabled: partial?.replayEnabled ?? DEFAULT_CONTROLS.replayEnabled,
-    analyticsEnabled:
-      partial?.analyticsEnabled ?? DEFAULT_CONTROLS.analyticsEnabled,
-    spectatorEnabled:
-      partial?.spectatorEnabled ?? DEFAULT_CONTROLS.spectatorEnabled,
-    gameUpdatesEnabled:
-      partial?.gameUpdatesEnabled ?? DEFAULT_CONTROLS.gameUpdatesEnabled,
+    id: raw.id.trim(),
+    name: raw.name.trim(),
+    description:
+      typeof raw.description === "string" ? raw.description.trim() : "",
+    features: normalizeFeatures(raw.features),
   };
 }
 
-export async function loadPlatformControls(
+function normalizeState(raw: Partial<PlatformState> | null | undefined): PlatformState {
+  const gameTypes = Array.isArray(raw?.gameTypes)
+    ? raw.gameTypes
+        .map((item) => normalizeGameType(item as Partial<GameTypePreset>))
+        .filter((item): item is GameTypePreset => item !== null)
+    : memoryState.gameTypes;
+
+  return {
+    features: normalizeFeatures(raw?.features),
+    gameTypes: gameTypes.length > 0 ? gameTypes : memoryState.gameTypes,
+    activeGameTypeId:
+      typeof raw?.activeGameTypeId === "string" ? raw.activeGameTypeId : null,
+  };
+}
+
+export async function loadPlatformState(
   bucket?: R2Bucket,
-): Promise<PlatformControls> {
+): Promise<PlatformState> {
   if (!bucket) {
-    return memoryControls;
+    return memoryState;
   }
 
-  const object = await bucket.get(CONTROL_KEY);
+  const object = await bucket.get(STATE_KEY);
   if (!object) {
-    return memoryControls;
+    return memoryState;
   }
 
   try {
-    const raw = await object.text();
-    const parsed = JSON.parse(raw) as Partial<PlatformControls>;
-    memoryControls = normalizeControls(parsed);
-    return memoryControls;
+    const parsed = JSON.parse(await object.text()) as Partial<PlatformState>;
+    memoryState = normalizeState(parsed);
+    return memoryState;
   } catch {
-    return memoryControls;
+    return memoryState;
   }
 }
 
-export async function savePlatformControls(
+async function persistPlatformState(
   bucket: R2Bucket | undefined,
-  updates: Partial<PlatformControls>,
-): Promise<PlatformControls> {
-  memoryControls = normalizeControls({ ...memoryControls, ...updates });
+  state: PlatformState,
+): Promise<PlatformState> {
+  memoryState = normalizeState(state);
 
   if (bucket) {
-    await bucket.put(CONTROL_KEY, JSON.stringify(memoryControls, null, 2), {
+    await bucket.put(STATE_KEY, JSON.stringify(memoryState, null, 2), {
       httpMetadata: {
         contentType: "application/json; charset=utf-8",
       },
     });
   }
 
-  return memoryControls;
+  return memoryState;
 }
 
-export async function updateSingleControl(
+export async function savePlatformFeatures(
   bucket: R2Bucket | undefined,
-  controlName: keyof PlatformControls,
-  enabled: boolean,
-): Promise<PlatformControls> {
-  return savePlatformControls(bucket, {
-    [controlName]: enabled,
-  } as Partial<PlatformControls>);
+  updates: Partial<PlatformFeatures>,
+): Promise<PlatformState> {
+  const next: PlatformState = {
+    ...memoryState,
+    features: normalizeFeatures({ ...memoryState.features, ...updates }),
+    activeGameTypeId: null,
+  };
+  return persistPlatformState(bucket, next);
+}
+
+export async function applyGameType(
+  bucket: R2Bucket | undefined,
+  gameTypeId: string,
+): Promise<PlatformState> {
+  const preset = memoryState.gameTypes.find((item) => item.id === gameTypeId);
+  if (!preset) {
+    throw new Error(`Unknown game type: ${gameTypeId}`);
+  }
+
+  const next: PlatformState = {
+    ...memoryState,
+    features: { ...preset.features },
+    activeGameTypeId: preset.id,
+  };
+  return persistPlatformState(bucket, next);
+}
+
+export async function upsertGameType(
+  bucket: R2Bucket | undefined,
+  preset: GameTypePreset,
+): Promise<PlatformState> {
+  const normalized = normalizeGameType(preset);
+  if (!normalized) {
+    throw new Error("Invalid game type preset");
+  }
+
+  const gameTypes = memoryState.gameTypes.filter(
+    (item) => item.id !== normalized.id,
+  );
+  gameTypes.push(normalized);
+
+  const next: PlatformState = {
+    ...memoryState,
+    gameTypes,
+  };
+  return persistPlatformState(bucket, next);
+}
+
+export async function deleteGameType(
+  bucket: R2Bucket | undefined,
+  gameTypeId: string,
+): Promise<PlatformState> {
+  const next: PlatformState = {
+    ...memoryState,
+    gameTypes: memoryState.gameTypes.filter((item) => item.id !== gameTypeId),
+    activeGameTypeId:
+      memoryState.activeGameTypeId === gameTypeId
+        ? null
+        : memoryState.activeGameTypeId,
+  };
+  return persistPlatformState(bucket, next);
 }
 
 export function isRouteAllowed(
   routePath: string,
-  controls: PlatformControls,
+  features: PlatformFeatures,
 ): boolean {
-  if (routePath.startsWith("/api/chat")) {
-    return controls.chatEnabled;
-  }
-
-  if (routePath.startsWith("/api/leaderboard")) {
-    return controls.leaderboardEnabled;
-  }
-
-  if (routePath.startsWith("/api/achievements")) {
-    return controls.achievementsEnabled;
-  }
-
-  if (routePath.startsWith("/api/replays")) {
-    return controls.replayEnabled;
-  }
-
-  if (routePath.startsWith("/api/analytics")) {
-    return controls.analyticsEnabled;
-  }
-
-  if (routePath.startsWith("/api/spectate")) {
-    return controls.spectatorEnabled;
-  }
-
-  if (routePath.startsWith("/api/voice")) {
-    return controls.voiceChatEnabled;
-  }
-
-  if (routePath.startsWith("/api/updates")) {
-    return controls.gameUpdatesEnabled;
-  }
-
+  if (routePath.startsWith("/api/chat")) return features.textChat;
+  if (routePath.startsWith("/api/matchmaking")) return features.matchmaking;
+  if (routePath.startsWith("/api/voice")) return features.voiceChat;
+  if (routePath.startsWith("/api/updates")) return features.gameUpdates;
   return true;
 }
 
 export function buildVoiceRoomBootstrap(
   roomId: string,
-  controls: PlatformControls,
+  features: PlatformFeatures,
   env: PlatformBindings,
 ): VoiceRoomBootstrap {
   return {
     provider: "realtimekit",
     roomId,
-    enabled: controls.voiceChatEnabled,
+    enabled: features.voiceChat,
     joinMode: "client-managed",
     appId: env.REALTIMEKIT_APP_ID ?? null,
     joinHint: env.REALTIMEKIT_APP_ID
@@ -172,99 +284,96 @@ export function buildVoiceRoomBootstrap(
   };
 }
 
+export async function listGameUpdateAssets(
+  bucket: R2Bucket | undefined,
+): Promise<GameUpdateAssetMeta[]> {
+  if (!bucket) return [];
+
+  const listed = await bucket.list({ prefix: GAME_UPDATES_PREFIX });
+  const items: GameUpdateAssetMeta[] = [];
+
+  for (const object of listed.objects) {
+    const head = await bucket.head(object.key);
+    const fileName = object.key.slice(GAME_UPDATES_PREFIX.length);
+    const dash = fileName.indexOf("-");
+    const name = dash >= 0 ? fileName.slice(dash + 1) : fileName;
+
+    items.push({
+      key: object.key,
+      name,
+      size: object.size,
+      contentType:
+        head?.httpMetadata?.contentType ?? "application/octet-stream",
+      uploadedAt: object.uploaded.toISOString(),
+    });
+  }
+
+  return items.sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
+}
+
 export async function storeGameUpdateAsset(
   bucket: R2Bucket | undefined,
-  input: GameUpdateAssetInput,
-): Promise<{ key: string; size: number; contentType: string }> {
-  const key = `game-updates/${Date.now()}-${input.name}`;
-  const contentType = input.contentType ?? "application/json; charset=utf-8";
-  const body = new TextEncoder().encode(input.content);
+  input: { name: string; content: ArrayBuffer | Uint8Array; contentType?: string },
+): Promise<GameUpdateAssetMeta> {
+  const safeName = input.name.replace(/[^\w.\-]+/g, "_") || "asset";
+  const key = `${GAME_UPDATES_PREFIX}${Date.now()}-${safeName}`;
+  const contentType = input.contentType ?? "application/octet-stream";
+  const body =
+    input.content instanceof Uint8Array
+      ? input.content
+      : new Uint8Array(input.content);
 
   if (bucket) {
     await bucket.put(key, body, {
-      httpMetadata: {
-        contentType,
-      },
+      httpMetadata: { contentType },
     });
   }
 
   return {
     key,
+    name: safeName,
     size: body.byteLength,
     contentType,
+    uploadedAt: new Date().toISOString(),
   };
 }
 
-export function renderAdminPanelHtml(controls: PlatformControls): string {
-  const rows = Object.entries(controls)
-    .map(([name, enabled]) => {
-      const safeName = name.replace(/Enabled$/, "");
-      return `
-        <tr>
-          <td>${safeName}</td>
-          <td>${enabled ? "enabled" : "disabled"}</td>
-        </tr>`;
-    })
-    .join("");
+export async function deleteGameUpdateAsset(
+  bucket: R2Bucket | undefined,
+  key: string,
+): Promise<void> {
+  if (!bucket || !key.startsWith(GAME_UPDATES_PREFIX)) return;
+  await bucket.delete(key);
+}
 
-  return `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>PartyGame Admin</title>
-    <style>
-      :root {
-        color-scheme: dark;
-        --bg: #0b1220;
-        --panel: #101a2f;
-        --text: #e5eefc;
-        --muted: #93a4c3;
-        --accent: #45d3a1;
-        --border: rgba(255, 255, 255, 0.08);
-      }
-      body {
-        margin: 0;
-        font-family: Inter, Segoe UI, sans-serif;
-        background: radial-gradient(circle at top, #15213a, var(--bg) 55%);
-        color: var(--text);
-      }
-      main {
-        max-width: 1080px;
-        margin: 0 auto;
-        padding: 40px 20px 56px;
-      }
-      .card {
-        background: rgba(16, 26, 47, 0.92);
-        border: 1px solid var(--border);
-        border-radius: 20px;
-        padding: 24px;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
-        backdrop-filter: blur(12px);
-      }
-      h1, h2 { margin: 0 0 12px; }
-      p { color: var(--muted); line-height: 1.6; }
-      table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-      td, th { padding: 12px 10px; border-bottom: 1px solid var(--border); text-align: left; }
-      .badge { color: var(--accent); }
-      code { background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 6px; }
-    </style>
-  </head>
-  <body>
-    <main>
-      <section class="card">
-        <h1>PartyGame Admin Panel</h1>
-        <p>Use this panel to switch features on or off, manage voice chat bootstrap data, and store update artifacts in R2.</p>
-        <p class="badge">RealtimeKit: enabled as a client-managed bootstrap target when configured</p>
-        <table>
-          <thead>
-            <tr><th>Control</th><th>Status</th></tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-        <p>Protect the panel with <code>X-Admin-Token</code> and persist control state in the <code>CONTROLS_BUCKET</code> binding.</p>
-      </section>
-    </main>
-  </body>
-</html>`;
+export async function getGameUpdateAsset(
+  bucket: R2Bucket | undefined,
+  key: string,
+): Promise<{ body: ReadableStream; meta: GameUpdateAssetMeta } | null> {
+  if (!bucket || !key.startsWith(GAME_UPDATES_PREFIX)) return null;
+
+  const object = await bucket.get(key);
+  if (!object) return null;
+
+  const fileName = key.slice(GAME_UPDATES_PREFIX.length);
+  const dash = fileName.indexOf("-");
+  const name = dash >= 0 ? fileName.slice(dash + 1) : fileName;
+
+  return {
+    body: object.body,
+    meta: {
+      key,
+      name,
+      size: object.size,
+      contentType:
+        object.httpMetadata?.contentType ?? "application/octet-stream",
+      uploadedAt: object.uploaded.toISOString(),
+    },
+  };
+}
+
+/** @deprecated Use loadPlatformState */
+export async function loadPlatformControls(bucket?: R2Bucket) {
+  const state = await loadPlatformState(bucket);
+  return state.features;
 }

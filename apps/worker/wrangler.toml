@@ -9,3 +9,7 @@ class_name = "GameRoom"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["GameRoom"]
+
+[[r2_buckets]]
+binding = "PLATFORM_BUCKET"
+bucket_name = "partygame-platform"

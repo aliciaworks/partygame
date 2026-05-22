@@ -2,43 +2,50 @@ export const DEFAULT_BACKEND_URL =
   "https://partygame-example-backend.aliciaworks.workers.dev/";
 
 export const BACKEND_STORAGE_KEY = "partygame.portal.backendUrl";
+export const ADMIN_TOKEN_STORAGE_KEY = "partygame.portal.adminToken";
 export const SITE_NAME_STORAGE_KEY = "partygame.portal.siteName";
-export const DEFAULT_SITE_NAME = "PartyGame Portal";
+export const DEFAULT_SITE_NAME = "PartyGame Admin";
 
-export type PortalSession = {
-  accessToken: string;
-  refreshToken: string;
-  playerId: string;
-  playerName: string;
-  voiceEnabled: boolean;
+export type PlatformFeatures = {
+  voiceChat: boolean;
+  textChat: boolean;
+  gameUpdates: boolean;
+  matchmaking: boolean;
 };
 
-export type SessionProfile = {
-  playerId: string;
-  playerName: string;
-  email: string | null;
-  voiceEnabled: boolean;
-  backendHealthy: boolean;
+export type GameTypePreset = {
+  id: string;
+  name: string;
+  description: string;
+  features: PlatformFeatures;
+};
+
+export type PlatformState = {
+  features: PlatformFeatures;
+  gameTypes: GameTypePreset[];
+  activeGameTypeId: string | null;
+};
+
+export type GameUpdateAsset = {
+  key: string;
+  name: string;
+  size: number;
+  contentType: string;
+  uploadedAt: string;
 };
 
 export type BackendHealth = {
   status: string;
-  timestamp?: string;
-  uptime_ms?: number;
-  version?: string;
-  message?: string;
-  checks?: Record<string, boolean>;
+  timestamp?: number;
+  activeRooms?: number;
+  totalPlayers?: number;
 };
 
 export type BackendSla = {
   period?: string;
   uptime_percent?: number;
   error_rate_percent?: number;
-  p99_latency_ms?: number;
-  sla_target_uptime?: number;
   meets_sla?: boolean;
-  last_incident?: string | null;
-  incidents_30d?: number;
 };
 
 export type ApiVersions = {
@@ -47,22 +54,19 @@ export type ApiVersions = {
   deprecated: string[];
 };
 
-export type VoiceBootstrap = {
-  bootstrap: {
-    provider: "realtimekit";
-    roomId: string;
-    enabled: boolean;
-    joinMode: "client-managed";
-    appId: string | null;
-    joinHint: string;
-  };
+export const FEATURE_META: Record<
+  keyof PlatformFeatures,
+  { labelKey: string; descKey: string }
+> = {
+  voiceChat: { labelKey: "features.voiceChat", descKey: "features.voiceChatDesc" },
+  textChat: { labelKey: "features.textChat", descKey: "features.textChatDesc" },
+  gameUpdates: { labelKey: "features.gameUpdates", descKey: "features.gameUpdatesDesc" },
+  matchmaking: { labelKey: "features.matchmaking", descKey: "features.matchmakingDesc" },
 };
 
 export function normalizeBackendUrl(value: string | null | undefined): string {
   const trimmed = value?.trim();
-  if (!trimmed) {
-    return DEFAULT_BACKEND_URL;
-  }
+  if (!trimmed) return DEFAULT_BACKEND_URL;
 
   try {
     const parsed = new URL(trimmed);
@@ -76,6 +80,20 @@ export function normalizeBackendUrl(value: string | null | undefined): string {
 
 export function readBackendUrl(): string {
   return normalizeBackendUrl(localStorage.getItem(BACKEND_STORAGE_KEY));
+}
+
+export function readAdminToken(): string {
+  return localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY)?.trim() ?? "";
+}
+
+export function saveAdminToken(token: string): string {
+  const trimmed = token.trim();
+  if (trimmed) {
+    localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, trimmed);
+  } else {
+    localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
+  }
+  return trimmed;
 }
 
 export function readSiteName(): string {
@@ -100,88 +118,16 @@ async function fetchJson<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
-  let requestUrl: URL;
-  try {
-    requestUrl = new URL(path, backendUrl);
-  } catch {
-    const maybe = String(backendUrl).match(/https?:\/\/[^\s"']+/)?.[0];
-    if (!maybe) {
-      throw new Error(`Invalid backend base URL: ${backendUrl}`);
-    }
-
-    requestUrl = new URL(path, maybe);
-  }
-
-  let response: Response;
-  try {
-    response = await fetch(requestUrl.toString(), {
-      ...init,
-      headers: {
-        "Content-Type": "application/json",
-        ...(init?.headers ?? {}),
-      },
-    });
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    // If the configured backend fails, try the default example backend once as a fallback.
-    if (backendUrl !== DEFAULT_BACKEND_URL) {
-      try {
-        const fallbackUrl = new URL(path, DEFAULT_BACKEND_URL).toString();
-        const fallbackResp = await fetch(fallbackUrl, {
-          ...init,
-          headers: {
-            "Content-Type": "application/json",
-            ...(init?.headers ?? {}),
-          },
-        });
-
-        const fallbackText = await fallbackResp.text();
-        if (!fallbackResp.ok) {
-          const snippet = fallbackText
-            .slice(0, 200)
-            .replace(/\s+/g, " ")
-            .trim();
-          throw new Error(
-            `Fallback backend returned ${fallbackResp.status}: ${snippet || "empty"}`,
-          );
-        }
-
-        try {
-          return JSON.parse(fallbackText) as T;
-        } catch {
-          const snippet = fallbackText
-            .slice(0, 200)
-            .replace(/\s+/g, " ")
-            .trim();
-          throw new Error(
-            `Fallback backend returned non-JSON response: ${snippet || "empty"}`,
-          );
-        }
-      } catch (fallbackError) {
-        const fbReason =
-          fallbackError instanceof Error
-            ? fallbackError.message
-            : String(fallbackError);
-        throw new Error(
-          `Failed to fetch ${requestUrl.toString()}: ${reason}; fallback also failed: ${fbReason}`,
-        );
-      }
-    }
-
-    throw new Error(`Failed to fetch ${requestUrl.toString()}: ${reason}`);
-  }
-
+  const requestUrl = new URL(path, backendUrl);
+  const response = await fetch(requestUrl.toString(), init);
   const text = await response.text();
-  let data: T = {} as T;
+  let data = {} as T;
 
   if (text) {
     try {
       data = JSON.parse(text) as T;
     } catch {
-      const snippet = text.slice(0, 200).replace(/\s+/g, " ").trim();
-      throw new Error(
-        `Backend returned non-JSON response (${response.status}) from ${requestUrl.toString()}: ${snippet || "empty response"}`,
-      );
+      throw new Error(`Non-JSON response (${response.status})`);
     }
   }
 
@@ -189,37 +135,154 @@ async function fetchJson<T>(
     const error =
       (data as { error?: string }).error ??
       `Request failed with ${response.status}`;
-    throw new Error(`${error} (${requestUrl.toString()})`);
+    throw new Error(error);
   }
 
   return data;
 }
 
+export async function adminFetch<T>(
+  backendUrl: string,
+  path: string,
+  init: RequestInit = {},
+): Promise<T> {
+  const token = readAdminToken();
+  if (!token) {
+    throw new Error("Admin token is required. Add it in Settings.");
+  }
+
+  return fetchJson<T>(backendUrl, path, {
+    ...init,
+    headers: {
+      ...(init.headers ?? {}),
+      "X-Admin-Token": token,
+      ...(init.body instanceof FormData
+        ? {}
+        : { "Content-Type": "application/json" }),
+    },
+  });
+}
+
 export async function fetchBackendHealth(
   backendUrl: string,
 ): Promise<BackendHealth> {
-  return fetchJson<BackendHealth>(backendUrl, "/health", { method: "GET" });
+  return fetchJson<BackendHealth>(backendUrl, "/health");
 }
 
 export async function fetchBackendSla(backendUrl: string): Promise<BackendSla> {
-  return fetchJson<BackendSla>(backendUrl, "/sla", { method: "GET" });
+  return fetchJson<BackendSla>(backendUrl, "/sla");
 }
 
 export async function fetchApiVersions(
   backendUrl: string,
 ): Promise<ApiVersions> {
-  return fetchJson<ApiVersions>(backendUrl, "/api-versions", { method: "GET" });
+  return fetchJson<ApiVersions>(backendUrl, "/api-versions");
 }
 
-export async function fetchVoiceBootstrap(
+export async function fetchPlatformState(
   backendUrl: string,
-  roomId: string,
-): Promise<VoiceBootstrap> {
-  return fetchJson<VoiceBootstrap>(
+): Promise<PlatformState> {
+  return adminFetch<PlatformState>(backendUrl, "/admin/platform");
+}
+
+export async function patchPlatformFeatures(
+  backendUrl: string,
+  updates: Partial<PlatformFeatures>,
+): Promise<PlatformState> {
+  return adminFetch<PlatformState>(backendUrl, "/admin/platform/features", {
+    method: "PATCH",
+    body: JSON.stringify(updates),
+  });
+}
+
+export async function applyGameType(
+  backendUrl: string,
+  gameTypeId: string,
+): Promise<PlatformState> {
+  return adminFetch<PlatformState>(
     backendUrl,
-    `/api/voice/rooms/${encodeURIComponent(roomId)}/bootstrap`,
+    "/admin/platform/apply-game-type",
     {
       method: "POST",
+      body: JSON.stringify({ gameTypeId }),
     },
   );
+}
+
+export async function saveGameType(
+  backendUrl: string,
+  preset: GameTypePreset,
+): Promise<PlatformState> {
+  return adminFetch<PlatformState>(backendUrl, "/admin/platform/game-types", {
+    method: "PUT",
+    body: JSON.stringify(preset),
+  });
+}
+
+export async function removeGameType(
+  backendUrl: string,
+  gameTypeId: string,
+): Promise<PlatformState> {
+  return adminFetch<PlatformState>(
+    backendUrl,
+    `/admin/platform/game-types/${encodeURIComponent(gameTypeId)}`,
+    { method: "DELETE" },
+  );
+}
+
+export async function listGameUpdates(
+  backendUrl: string,
+): Promise<{ assets: GameUpdateAsset[] }> {
+  return adminFetch<{ assets: GameUpdateAsset[] }>(
+    backendUrl,
+    "/admin/game-updates",
+  );
+}
+
+export async function uploadGameUpdate(
+  backendUrl: string,
+  file: File,
+): Promise<{ asset: GameUpdateAsset }> {
+  const form = new FormData();
+  form.append("file", file);
+  return adminFetch<{ asset: GameUpdateAsset }>(
+    backendUrl,
+    "/admin/game-updates",
+    { method: "POST", body: form },
+  );
+}
+
+export async function deleteGameUpdate(
+  backendUrl: string,
+  key: string,
+): Promise<{ assets: GameUpdateAsset[] }> {
+  return adminFetch<{ assets: GameUpdateAsset[] }>(
+    backendUrl,
+    `/admin/game-updates/${encodeURIComponent(key)}`,
+    { method: "DELETE" },
+  );
+}
+
+export async function downloadGameUpdate(
+  backendUrl: string,
+  key: string,
+  fileName: string,
+): Promise<void> {
+  const token = readAdminToken();
+  const url = new URL(
+    `/admin/game-updates/${encodeURIComponent(key)}`,
+    backendUrl,
+  );
+  const response = await fetch(url.toString(), {
+    headers: { "X-Admin-Token": token },
+  });
+  if (!response.ok) {
+    throw new Error(`Download failed (${response.status})`);
+  }
+  const blob = await response.blob();
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(link.href);
 }

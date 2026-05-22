@@ -31,6 +31,7 @@
     <strong>{versions?.current ?? '—'}</strong>
     <p>{versions ? `${versions.supported?.length ?? 0} ${$translate('api.supported')}` : $translate('button.refresh')}</p>
   </article>
+
 </section>
 
 <style>
@@ -43,8 +44,8 @@
   .metric {
     padding: 18px;
     border-radius: 24px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
   }
 
   .metric span {
