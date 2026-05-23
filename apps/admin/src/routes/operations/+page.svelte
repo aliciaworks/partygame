@@ -4,33 +4,41 @@
   import {
     backendUrl,
     busy,
-    gameUpdates,
-    platformState,
     clearError,
     setError,
     setStatus,
   } from "$lib/portalStore";
   import {
-    deleteGameUpdate,
-    downloadGameUpdate,
+    deleteHotfix,
+    downloadHotfix,
     fetchPlatformState,
-    listGameUpdates,
+    listHotfixes,
+    promoteHotfix,
+    rollbackHotfix,
     readAdminToken,
-    uploadGameUpdate,
+    uploadHotfix,
+    type GameUpdateAsset,
   } from "$lib/portal";
 
   let fileInput: HTMLInputElement;
+  let versionInput = "";
+  let minVersionInput = "";
+  let latestVersion = "";
+  let hotfixes: GameUpdateAsset[] = [];
 
   async function load() {
     busy.set(true);
     clearError();
     try {
-      const [updates, state] = await Promise.all([
-        listGameUpdates($backendUrl),
+      const [hotfixList, platform] = await Promise.all([
+        listHotfixes($backendUrl),
         fetchPlatformState($backendUrl).catch(() => null),
       ]);
-      gameUpdates.set(updates.assets);
-      if (state) platformState.set(state);
+      hotfixes = hotfixList.versions;
+      latestVersion = hotfixList.latest ?? "";
+      if (platform && !platform.features.gameUpdates) {
+        setStatus($translate("hotfix.disabled"));
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load");
     } finally {
@@ -52,9 +60,11 @@
     busy.set(true);
     clearError();
     try {
-      await uploadGameUpdate($backendUrl, file);
+      await uploadHotfix($backendUrl, file, versionInput.trim() || undefined, minVersionInput.trim() || undefined);
       await load();
       fileInput.value = "";
+      versionInput = "";
+      minVersionInput = "";
       setStatus($translate("hotfix.uploaded"));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");
@@ -63,13 +73,13 @@
     }
   }
 
-  async function onDelete(key: string) {
+  async function onDelete(version: string) {
     if (!confirm($translate("hotfix.confirmDelete"))) return;
     busy.set(true);
     clearError();
     try {
-      const result = await deleteGameUpdate($backendUrl, key);
-      gameUpdates.set(result.assets);
+      await deleteHotfix($backendUrl, version);
+      await load();
       setStatus($translate("hotfix.deleted"));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Delete failed");
@@ -78,11 +88,11 @@
     }
   }
 
-  async function onDownload(key: string, name: string) {
+  async function onDownload(version: string) {
     busy.set(true);
     clearError();
     try {
-      await downloadGameUpdate($backendUrl, key, name);
+      await downloadHotfix($backendUrl, version);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Download failed");
     } finally {
@@ -90,10 +100,32 @@
     }
   }
 
-  function formatSize(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  async function onPromote(version: string) {
+    busy.set(true);
+    clearError();
+    try {
+      await promoteHotfix($backendUrl, version);
+      await load();
+      setStatus($translate("hotfix.promoted"));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Promote failed");
+    } finally {
+      busy.set(false);
+    }
+  }
+
+  async function onRollback(version: string) {
+    busy.set(true);
+    clearError();
+    try {
+      await rollbackHotfix($backendUrl, version);
+      await load();
+      setStatus($translate("hotfix.rolledBack"));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Rollback failed");
+    } finally {
+      busy.set(false);
+    }
   }
 
   onMount(load);
@@ -105,54 +137,62 @@
   <p>{$translate("operations.desc")}</p>
 </div>
 
-{#if $platformState && !$platformState.features.gameUpdates}
-  <div class="panel warn">{$translate("hotfix.disabled")}</div>
-{/if}
-
 <section class="panel block">
   <h2>{$translate("hotfix.uploadTitle")}</h2>
   <p class="hint">{$translate("operations.hotfixHint")}</p>
-  <input bind:this={fileInput} type="file" />
+  <div class="grid">
+    <input bind:this={fileInput} type="file" />
+    <input bind:value={versionInput} placeholder={$translate("hotfix.versionPlaceholder")} spellcheck="false" />
+    <input bind:value={minVersionInput} placeholder={$translate("hotfix.minVersionPlaceholder")} spellcheck="false" />
+  </div>
   <button class="btn btn-primary" type="button" on:click={onUpload} disabled={$busy}>
     {$translate("hotfix.upload")}
   </button>
 </section>
 
 <section class="panel block">
-  <h2>{$translate("hotfix.listTitle")}</h2>
-  {#if $gameUpdates.length === 0}
+  <div class="head-row">
+    <h2>{$translate("hotfix.listTitle")}</h2>
+    {#if latestVersion}
+      <span class="mono latest">{$translate("hotfix.latest")}: {latestVersion}</span>
+    {/if}
+  </div>
+  {#if hotfixes.length === 0}
     <div class="empty">{$translate("hotfix.empty")}</div>
   {:else}
     <table>
       <thead>
         <tr>
-          <th>{$translate("hotfix.colName")}</th>
-          <th>{$translate("hotfix.colSize")}</th>
+          <th>{$translate("hotfix.colVersion")}</th>
+          <th>{$translate("hotfix.colMinVersion")}</th>
+          <th>{$translate("hotfix.colChecksum")}</th>
           <th>{$translate("hotfix.colDate")}</th>
           <th></th>
         </tr>
       </thead>
       <tbody>
-        {#each $gameUpdates as asset}
+        {#each hotfixes as asset}
           <tr>
-            <td class="mono">{asset.name}</td>
-            <td>{formatSize(asset.size)}</td>
+            <td class="mono">
+              {asset.version}
+              {#if asset.version === latestVersion}
+                <span class="badge">{$translate("hotfix.latest")}</span>
+              {/if}
+            </td>
+            <td>{asset.gameVersionMin}</td>
+            <td class="mono checksum">{asset.checksum}</td>
             <td>{new Date(asset.uploadedAt).toLocaleString()}</td>
             <td class="actions">
-              <button
-                class="btn"
-                type="button"
-                on:click={() => onDownload(asset.key, asset.name)}
-                disabled={$busy}
-              >
+              <button class="btn" type="button" on:click={() => onDownload(asset.version)} disabled={$busy}>
                 {$translate("hotfix.download")}
               </button>
-              <button
-                class="btn btn-danger"
-                type="button"
-                on:click={() => onDelete(asset.key)}
-                disabled={$busy}
-              >
+              <button class="btn" type="button" on:click={() => onPromote(asset.version)} disabled={$busy}>
+                {$translate("hotfix.promote")}
+              </button>
+              <button class="btn" type="button" on:click={() => onRollback(asset.version)} disabled={$busy}>
+                {$translate("hotfix.rollback")}
+              </button>
+              <button class="btn btn-danger" type="button" on:click={() => onDelete(asset.version)} disabled={$busy}>
                 {$translate("hotfix.delete")}
               </button>
             </td>
@@ -164,31 +204,44 @@
 </section>
 
 <style>
-  .warn {
-    margin-bottom: 14px;
-    padding: 14px 16px;
-    color: var(--accent-warm);
-  }
-
   .block {
-    padding: 18px 20px;
-    margin-bottom: 14px;
+    padding: 20px;
+    margin-bottom: 16px;
   }
 
   .block h2 {
     margin: 0 0 8px;
-    font-size: 1rem;
+    font-size: 1.05rem;
   }
 
   .hint {
-    margin: 0 0 12px;
+    margin: 0 0 14px;
     color: var(--muted);
     font-size: 0.9rem;
+    line-height: 1.45;
   }
 
-  .block input[type="file"] {
-    display: block;
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
     margin-bottom: 12px;
+  }
+
+  .grid input {
+    width: 100%;
+  }
+
+  .head-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .latest {
+    color: var(--accent);
+    font-size: 0.8rem;
   }
 
   table {
@@ -201,6 +254,7 @@
     padding: 10px 8px;
     border-bottom: 1px solid var(--border);
     text-align: left;
+    vertical-align: top;
   }
 
   th {
@@ -212,5 +266,24 @@
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
+  }
+
+  .badge {
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    color: var(--accent);
+    border: 1px solid var(--border);
+  }
+
+  .checksum {
+    word-break: break-all;
+  }
+
+  @media (max-width: 960px) {
+    .grid {
+      grid-template-columns: 1fr;
+    }
   }
 </style>

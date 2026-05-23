@@ -21,11 +21,73 @@ export type PlatformState = {
 };
 
 export type GameUpdateAsset = {
-  key: string;
-  name: string;
-  size: number;
-  contentType: string;
+  version: string;
+  gameVersionMin: string;
+  files: string[];
+  checksum: string;
   uploadedAt: string;
+};
+
+export type ModuleFlag = {
+  key: string;
+  label: string;
+  type: string;
+  default: boolean | number | string | string[];
+  description?: string;
+  options?: string[];
+};
+
+export type ModuleNavItem = {
+  label: string;
+  page: string;
+};
+
+export type ModuleManifest = {
+  id: string;
+  name: string;
+  description?: string;
+  icon?: string;
+  nav?: ModuleNavItem[];
+  flags?: ModuleFlag[];
+};
+
+export type ModuleSummary = ModuleManifest & {
+  enabled: boolean;
+};
+
+export type PlayerBan = {
+  playerId: string;
+  reason: string;
+  bannedBy: string;
+  bannedAt: string;
+  expiresAt?: string;
+};
+
+export type PlayerAccount = {
+  playerId: string;
+  playerName: string;
+  createdAt: string;
+  lastSeen: string;
+  banned: boolean;
+};
+
+export type PlayerDetail = {
+  account: PlayerAccount;
+  ban: PlayerBan | null;
+  progress: unknown;
+};
+
+export type AuditRecord = {
+  action: string;
+  targetPlayerId?: string;
+  adminId: string;
+  detail: string;
+  timestamp: string;
+};
+
+export type HotfixList = {
+  versions: GameUpdateAsset[];
+  latest: string | null;
 };
 
 export type BackendHealth = {
@@ -176,6 +238,172 @@ export async function fetchApiVersions(
   return fetchJson<ApiVersions>(backendUrl, "/api-versions");
 }
 
+export async function fetchModules(
+  backendUrl: string,
+): Promise<{ modules: ModuleSummary[] }> {
+  return adminFetch<{ modules: ModuleSummary[] }>(backendUrl, "/admin/modules");
+}
+
+export async function fetchModuleManifest(
+  backendUrl: string,
+  moduleId: string,
+): Promise<ModuleManifest> {
+  return adminFetch<ModuleManifest>(
+    backendUrl,
+    `/admin/modules/${encodeURIComponent(moduleId)}/manifest`,
+  );
+}
+
+export async function fetchPlayers(
+  backendUrl: string,
+  limit = 50,
+  cursor?: string,
+): Promise<{ players: PlayerAccount[]; cursor: string | null }> {
+  const query = new URLSearchParams({ limit: String(limit) });
+  if (cursor) query.set("cursor", cursor);
+  return adminFetch<{ players: PlayerAccount[]; cursor: string | null }>(
+    backendUrl,
+    `/admin/players?${query.toString()}`,
+  );
+}
+
+export async function fetchPlayerDetail(
+  backendUrl: string,
+  playerId: string,
+): Promise<PlayerDetail> {
+  return adminFetch<PlayerDetail>(
+    backendUrl,
+    `/admin/players/${encodeURIComponent(playerId)}`,
+  );
+}
+
+export async function banPlayer(
+  backendUrl: string,
+  playerId: string,
+  reason?: string,
+  expiresAt?: string,
+): Promise<{ success: true; ban: PlayerBan }> {
+  return adminFetch<{ success: true; ban: PlayerBan }>(
+    backendUrl,
+    `/admin/players/${encodeURIComponent(playerId)}/ban`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason, expiresAt }),
+    },
+  );
+}
+
+export async function kickPlayer(
+  backendUrl: string,
+  playerId: string,
+): Promise<{ success: true }> {
+  return adminFetch<{ success: true }>(
+    backendUrl,
+    `/admin/players/${encodeURIComponent(playerId)}/kick`,
+    { method: "POST" },
+  );
+}
+
+export async function unbanPlayer(
+  backendUrl: string,
+  playerId: string,
+): Promise<{ success: true }> {
+  return adminFetch<{ success: true }>(
+    backendUrl,
+    `/admin/players/${encodeURIComponent(playerId)}/ban`,
+    { method: "DELETE" },
+  );
+}
+
+export async function fetchAuditRecords(
+  backendUrl: string,
+  limit = 50,
+  cursor?: string,
+): Promise<{ records: AuditRecord[]; cursor: string | null }> {
+  const query = new URLSearchParams({ limit: String(limit) });
+  if (cursor) query.set("cursor", cursor);
+  return adminFetch<{ records: AuditRecord[]; cursor: string | null }>(
+    backendUrl,
+    `/admin/audit?${query.toString()}`,
+  );
+}
+
+export async function listHotfixes(
+  backendUrl: string,
+): Promise<HotfixList> {
+  return adminFetch<HotfixList>(backendUrl, "/hotfix/list");
+}
+
+export async function uploadHotfix(
+  backendUrl: string,
+  file: File,
+  version?: string,
+  gameVersionMin?: string,
+): Promise<{ manifest: GameUpdateAsset }> {
+  const form = new FormData();
+  form.append("file", file);
+  if (version) form.append("version", version);
+  if (gameVersionMin) form.append("gameVersionMin", gameVersionMin);
+  return adminFetch<{ manifest: GameUpdateAsset }>(backendUrl, "/hotfix/upload", {
+    method: "POST",
+    body: form,
+  });
+}
+
+export async function promoteHotfix(
+  backendUrl: string,
+  version: string,
+): Promise<{ success: true; latest: string }> {
+  return adminFetch<{ success: true; latest: string }>(
+    backendUrl,
+    `/hotfix/promote/${encodeURIComponent(version)}`,
+    { method: "POST" },
+  );
+}
+
+export async function rollbackHotfix(
+  backendUrl: string,
+  version: string,
+): Promise<{ success: true; latest: string }> {
+  return adminFetch<{ success: true; latest: string }>(
+    backendUrl,
+    `/hotfix/rollback/${encodeURIComponent(version)}`,
+    { method: "POST" },
+  );
+}
+
+export async function deleteHotfix(
+  backendUrl: string,
+  version: string,
+): Promise<{ success: true }> {
+  return adminFetch<{ success: true }>(
+    backendUrl,
+    `/hotfix/${encodeURIComponent(version)}`,
+    { method: "DELETE" },
+  );
+}
+
+export async function downloadHotfix(
+  backendUrl: string,
+  version: string,
+): Promise<void> {
+  const token = readAdminToken();
+  const url = new URL(`/hotfix/${encodeURIComponent(version)}/patch`, backendUrl);
+  const response = await fetch(url.toString(), {
+    headers: { "X-Admin-Token": token },
+  });
+  if (!response.ok) {
+    throw new Error(`Download failed (${response.status})`);
+  }
+
+  const blob = await response.blob();
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `${version}.zip`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
 export async function fetchPlatformState(
   backendUrl: string,
 ): Promise<PlatformState> {
@@ -195,34 +423,24 @@ export async function patchPlatformFeatures(
 export async function listGameUpdates(
   backendUrl: string,
 ): Promise<{ assets: GameUpdateAsset[] }> {
-  return adminFetch<{ assets: GameUpdateAsset[] }>(
-    backendUrl,
-    "/admin/game-updates",
-  );
+  const list = await listHotfixes(backendUrl);
+  return { assets: list.versions };
 }
 
 export async function uploadGameUpdate(
   backendUrl: string,
   file: File,
 ): Promise<{ asset: GameUpdateAsset }> {
-  const form = new FormData();
-  form.append("file", file);
-  return adminFetch<{ asset: GameUpdateAsset }>(
-    backendUrl,
-    "/admin/game-updates",
-    { method: "POST", body: form },
-  );
+  const result = await uploadHotfix(backendUrl, file);
+  return { asset: result.manifest };
 }
 
 export async function deleteGameUpdate(
   backendUrl: string,
   key: string,
 ): Promise<{ assets: GameUpdateAsset[] }> {
-  return adminFetch<{ assets: GameUpdateAsset[] }>(
-    backendUrl,
-    `/admin/game-updates/${encodeURIComponent(key)}`,
-    { method: "DELETE" },
-  );
+  await deleteHotfix(backendUrl, key);
+  return listGameUpdates(backendUrl);
 }
 
 export async function downloadGameUpdate(
@@ -230,21 +448,5 @@ export async function downloadGameUpdate(
   key: string,
   fileName: string,
 ): Promise<void> {
-  const token = readAdminToken();
-  const url = new URL(
-    `/admin/game-updates/${encodeURIComponent(key)}`,
-    backendUrl,
-  );
-  const response = await fetch(url.toString(), {
-    headers: { "X-Admin-Token": token },
-  });
-  if (!response.ok) {
-    throw new Error(`Download failed (${response.status})`);
-  }
-  const blob = await response.blob();
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = fileName;
-  link.click();
-  URL.revokeObjectURL(link.href);
+  await downloadHotfix(backendUrl, key);
 }

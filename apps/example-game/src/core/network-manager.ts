@@ -7,9 +7,15 @@ type MessageHandler = (data: any) => void;
  */
 export class NetworkManager {
   private ws: WebSocket | null = null;
-  private playerId: string = "";
-  private token: string = "";
+  private playerId = "";
+  private token = "";
   private messageHandlers: Map<string, MessageHandler> = new Map();
+  private mode: "online" | "offline" = "offline";
+  private offlineState = {
+    tick: 0,
+    x: 0,
+    y: 0,
+  };
 
   /**
    * Connect to backend server
@@ -24,20 +30,18 @@ export class NetworkManager {
         }
         wsUrl = wsUrl.replace("http://", "ws://").replace("https://", "wss://");
 
-        // Add /ws path if not present
         if (!wsUrl.includes("/ws")) {
           wsUrl = wsUrl.endsWith("/") ? wsUrl + "ws" : wsUrl + "/ws";
         }
 
         console.log(`Connecting to ${wsUrl}`);
 
-        // First, authenticate to get a token
         const authUrl = backendUrl
           .replace("ws://", "http://")
           .replace("wss://", "https://");
         const loginUrl = authUrl.endsWith("/")
-          ? authUrl + "api/session/login"
-          : authUrl + "/api/session/login";
+          ? authUrl + "auth/login"
+          : authUrl + "/auth/login";
 
         fetch(loginUrl, {
           method: "POST",
@@ -47,13 +51,33 @@ export class NetworkManager {
           .then((res) => res.json())
           .then((data) => {
             this.playerId = data.playerId;
-            this.token = data.accessToken;
+            this.token = data.token ?? data.accessToken ?? "";
 
-            // Now connect via WebSocket
+            if (!this.playerId || !this.token) {
+              throw new Error("Authentication failed");
+            }
+
             const fullWsUrl = `${wsUrl}?roomId=default&playerId=${this.playerId}&token=${this.token}`;
             this.ws = new WebSocket(fullWsUrl);
 
+            const timeout = window.setTimeout(() => {
+              if (!this.ws || this.ws.readyState !== WebSocket.CONNECTING) {
+                return;
+              }
+
+              this.ws.close();
+              this.ws = null;
+              this.mode = "offline";
+              this.messageHandlers.get("init")?.({
+                playerId: this.playerId,
+                roomId: "offline",
+              });
+              resolve();
+            }, 1500);
+
             this.ws.onopen = () => {
+              window.clearTimeout(timeout);
+              this.mode = "online";
               console.log("WebSocket connected");
               resolve();
             };
@@ -68,17 +92,33 @@ export class NetworkManager {
             };
 
             this.ws.onerror = (error) => {
+              window.clearTimeout(timeout);
               console.error("WebSocket error:", error);
-              reject(error);
+              this.mode = "offline";
+              this.ws = null;
+              this.messageHandlers.get("init")?.({
+                playerId: this.playerId,
+                roomId: "offline",
+              });
+              resolve();
             };
 
             this.ws.onclose = () => {
+              window.clearTimeout(timeout);
               console.log("WebSocket disconnected");
               this.ws = null;
             };
           })
           .catch((error) => {
-            reject(error);
+            console.warn("Falling back to offline mode:", error);
+            this.mode = "offline";
+            this.playerId = `offline-${crypto.randomUUID()}`;
+            this.token = "";
+            this.messageHandlers.get("init")?.({
+              playerId: this.playerId,
+              roomId: "offline",
+            });
+            resolve();
           });
       } catch (error) {
         reject(error);
@@ -94,6 +134,8 @@ export class NetworkManager {
       this.ws.close();
       this.ws = null;
     }
+
+    this.mode = "offline";
   }
 
   /**
@@ -105,7 +147,28 @@ export class NetworkManager {
     isSprinting: boolean,
     isJumping: boolean,
   ): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN || this.mode === "offline") {
+      this.offlineState.tick += 1;
+      this.offlineState.x += moveX * (isSprinting ? 2 : 1);
+      this.offlineState.y += moveY * (isSprinting ? 2 : 1);
+
+      this.messageHandlers.get("tick")?.({
+        v: 1,
+        tick: this.offlineState.tick,
+        timestamp: Date.now(),
+        entities: {
+          [this.playerId]: {
+            transform: {
+              x: this.offlineState.x,
+              y: this.offlineState.y,
+              rotation: 0,
+              scaleX: 1,
+              scaleY: 1,
+            },
+          },
+        },
+      } as GameTickUpdate);
+
       return;
     }
 
@@ -144,7 +207,6 @@ export class NetworkManager {
       console.log(`Initialized in room with player ID: ${data.playerId}`);
       this.messageHandlers.get("init")?.(data);
     } else if (data.tick !== undefined) {
-      // Game tick update
       const update: GameTickUpdate = data;
       this.messageHandlers.get("tick")?.(update);
     } else {

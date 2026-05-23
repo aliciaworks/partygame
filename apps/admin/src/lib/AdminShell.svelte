@@ -13,6 +13,8 @@
 
   const nav = [
     { href: "/", labelKey: "sidebar.overview" },
+    { href: "/modules", labelKey: "sidebar.modules" },
+    { href: "/players", labelKey: "sidebar.players" },
     { href: "/operations", labelKey: "sidebar.operations" },
     { href: "/settings", labelKey: "sidebar.settings" },
   ];
