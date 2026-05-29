@@ -1,5 +1,6 @@
 import type { Hono } from "hono";
 import type { ModuleManifest, WorkerModule } from "../loader";
+import { createSignedToken, verifySignedToken } from "../../auth-utils";
 
 type AuthSession = {
   playerId: string;
@@ -29,33 +30,21 @@ const sessionIndex = new Map<string, Set<string>>();
 const PLAYER_ACCOUNT_PREFIX = "players/";
 const PLAYER_ACCOUNT_SUFFIX = "/account.json";
 
-function createToken(playerId: string, playerName: string): string {
-  return btoa(
-    JSON.stringify({
-      playerId,
-      playerName,
-      nonce: crypto.randomUUID(),
-    }),
-  );
+function createToken(playerId: string, _playerName: string): string {
+  // Deprecated: only for session storage key
+  // Real tokens are created via createSignedToken in routes
+  return `${playerId}:legacy`;
 }
 
-function parseToken(token: string): { playerId: string; playerName: string } | null {
-  try {
-    const parsed = JSON.parse(atob(token)) as Partial<AuthResponse>;
-    if (
-      typeof parsed.playerId !== "string" ||
-      typeof parsed.playerName !== "string"
-    ) {
-      return null;
-    }
-
-    return {
-      playerId: parsed.playerId,
-      playerName: parsed.playerName,
-    };
-  } catch {
-    return null;
+async function createSignedTokenForPlayer(
+  playerId: string,
+  secretKey: string | undefined,
+): Promise<string> {
+  if (!secretKey) {
+    // Fallback: use simple token if no secret
+    return btoa(JSON.stringify({ playerId, nonce: crypto.randomUUID() }));
   }
+  return await createSignedToken(playerId, secretKey);
 }
 
 function readBearerToken(request: Request): string | null {
@@ -72,8 +61,10 @@ function readBearerToken(request: Request): string | null {
 
 function createSession(playerId: string, playerName: string): AuthResponse {
   const createdAt = new Date().toISOString();
-  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-  const token = createToken(playerId, playerName);
+  const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 minutes
+  // Token will be created asynchronously in the route handler
+  // For now, use placeholder
+  const token = `${playerId}:unsigned`;
 
   sessions.set(token, {
     playerId,
@@ -170,6 +161,10 @@ export async function listPlayerAccounts(
   const players: PlayerAccount[] = [];
 
   for (const object of listed.objects) {
+    if (!object.key.endsWith(PLAYER_ACCOUNT_SUFFIX)) {
+      continue;
+    }
+
     const loaded = await bucket.get(object.key);
     if (!loaded) continue;
 
@@ -188,7 +183,7 @@ export async function listPlayerAccounts(
     }
   }
 
-  return { players };
+  return { players, cursor: listed.truncated ? listed.cursor : undefined };
 }
 
 export function revokePlayerSessions(playerId: string): number {
@@ -203,10 +198,28 @@ export function revokePlayerSessions(playerId: string): number {
   return removed;
 }
 
-function readSession(request: Request): AuthSession | null {
+async function readSession(
+  request: Request,
+  secretKey: string | undefined,
+): Promise<AuthSession | null> {
   const token = readBearerToken(request) ?? new URL(request.url).searchParams.get("token");
   if (!token) return null;
 
+  // Try to verify signed token first
+  if (secretKey) {
+    const playerId = await verifySignedToken(token, secretKey, 300); // 5 min
+    if (playerId) {
+      // Token is valid, return synthetic session
+      return {
+        playerId,
+        playerName: "Player", // Will be fetched from account if needed
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+      };
+    }
+  }
+
+  // Fallback: check in-memory sessions (for legacy/testing)
   const session = sessions.get(token);
   if (!session) return null;
 
@@ -240,9 +253,22 @@ export const playerAuthModule: WorkerModule = {
 
       const playerId = `player-${crypto.randomUUID()}`;
       await upsertAccount(c.env.PLATFORM_BUCKET, playerId, playerName);
-      const session = createSession(playerId, playerName);
 
-      return c.json(session, 201);
+      // Create signed token
+      const signedToken = await createSignedTokenForPlayer(
+        playerId,
+        (c.env as { PLAYER_SECRET?: string }).PLAYER_SECRET,
+      );
+
+      return c.json(
+        {
+          token: signedToken,
+          playerId,
+          playerName,
+          expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+        },
+        201,
+      );
     });
 
     app.post("/auth/login", async (c) => {
@@ -262,11 +288,25 @@ export const playerAuthModule: WorkerModule = {
 
       await upsertAccount(c.env.PLATFORM_BUCKET, playerId, playerName);
 
-      return c.json(createSession(playerId, playerName));
+      // Create signed token
+      const signedToken = await createSignedTokenForPlayer(
+        playerId,
+        (c.env as { PLAYER_SECRET?: string }).PLAYER_SECRET,
+      );
+
+      return c.json({
+        token: signedToken,
+        playerId,
+        playerName,
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+      });
     });
 
-    app.get("/auth/me", (c) => {
-      const session = readSession(c.req.raw);
+    app.get("/auth/me", async (c) => {
+      const session = await readSession(
+        c.req.raw,
+        (c.env as { PLAYER_SECRET?: string }).PLAYER_SECRET,
+      );
       if (!session) {
         return c.json({ error: "Unauthorized" }, 401);
       }
@@ -278,14 +318,27 @@ export const playerAuthModule: WorkerModule = {
       });
     });
 
-    app.post("/auth/refresh", (c) => {
-      const session = readSession(c.req.raw);
+    app.post("/auth/refresh", async (c) => {
+      const session = await readSession(
+        c.req.raw,
+        (c.env as { PLAYER_SECRET?: string }).PLAYER_SECRET,
+      );
       if (!session) {
         return c.json({ error: "Unauthorized" }, 401);
       }
 
-      const next = createSession(session.playerId, session.playerName);
-      return c.json(next);
+      // Create new signed token
+      const signedToken = await createSignedTokenForPlayer(
+        session.playerId,
+        (c.env as { PLAYER_SECRET?: string }).PLAYER_SECRET,
+      );
+
+      return c.json({
+        token: signedToken,
+        playerId: session.playerId,
+        playerName: session.playerName,
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+      });
     });
 
     app.post("/auth/logout", (c) => {

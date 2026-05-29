@@ -1,6 +1,7 @@
 import type { Hono } from "hono";
 import type { ModuleManifest, WorkerModule } from "../loader";
 import { getPlayerAccount } from "../player_auth/index";
+import { isFeatureEnabled } from "../../platform-state";
 
 type ProgressRecord = {
   playerId: string;
@@ -12,10 +13,11 @@ type ProgressRecord = {
   updatedAt: string;
 };
 
-const PROGRESS_PREFIX = "progress/";
+const PLAYERS_PREFIX = "players/";
+const PLAYER_PROGRESS_SUFFIX = "/progress.json";
 
 function progressKey(playerId: string): string {
-  return `${PROGRESS_PREFIX}${playerId}.json`;
+  return `${PLAYERS_PREFIX}${playerId}${PLAYER_PROGRESS_SUFFIX}`;
 }
 
 function defaultProgress(playerId: string): ProgressRecord {
@@ -76,6 +78,22 @@ export const playerProgressManifest: ModuleManifest = {
 export const playerProgressModule: WorkerModule = {
   manifest: playerProgressManifest,
   init(app: Hono<any>) {
+    app.use("/progress", async (c, next) => {
+      if (!(await isFeatureEnabled(c.env.PLATFORM_BUCKET, "playerProfile"))) {
+        return c.json({ error: "FEATURE_DISABLED", feature: "playerProfile" }, 403);
+      }
+
+      await next();
+    });
+
+    app.use("/progress/*", async (c, next) => {
+      if (!(await isFeatureEnabled(c.env.PLATFORM_BUCKET, "playerProfile"))) {
+        return c.json({ error: "FEATURE_DISABLED", feature: "playerProfile" }, 403);
+      }
+
+      await next();
+    });
+
     app.get("/progress", async (c) => {
       const playerId = c.req.query("playerId") ?? c.req.header("x-player-id");
       if (!playerId) {
@@ -136,14 +154,25 @@ export const playerProgressModule: WorkerModule = {
     });
 
     app.get("/progress/leaderboard", async (c) => {
+      if (!(await isFeatureEnabled(c.env.PLATFORM_BUCKET, "leaderboard"))) {
+        return c.json({ error: "FEATURE_DISABLED", feature: "leaderboard" }, 403);
+      }
+
       const limit = Number(c.req.query("limit") ?? "50");
       const listed = c.env.PLATFORM_BUCKET
-        ? await c.env.PLATFORM_BUCKET.list({ prefix: PROGRESS_PREFIX })
+        ? await c.env.PLATFORM_BUCKET.list({ prefix: PLAYERS_PREFIX })
         : { objects: [] as Array<{ key: string }> };
 
+      const ids: string[] = listed.objects
+        .map((object: { key: string }) => object.key)
+        .filter((key: string) => key.endsWith(PLAYER_PROGRESS_SUFFIX))
+        .map((key: string) =>
+          key.slice(PLAYERS_PREFIX.length, -PLAYER_PROGRESS_SUFFIX.length),
+        );
+      const uniqueIds: string[] = [...new Set(ids)];
+
       const entries: Array<Pick<ProgressRecord, "playerId" | "xp" | "level" | "matchesPlayed" | "matchesWon">> = [];
-      for (const object of listed.objects.slice(0, Number.isFinite(limit) ? limit : 50)) {
-        const playerId = object.key.slice(PROGRESS_PREFIX.length).replace(/\.json$/, "");
+      for (const playerId of uniqueIds.slice(0, Number.isFinite(limit) ? limit : 50)) {
         const progress = await readProgress(c.env.PLATFORM_BUCKET, playerId);
         entries.push({
           playerId,

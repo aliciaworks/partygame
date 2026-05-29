@@ -1,5 +1,6 @@
 import type { Hono } from "hono";
 import type { ModuleManifest, WorkerModule } from "../loader";
+import { isFeatureEnabled } from "../../platform-state";
 
 type PlayerPresence = {
   playerId: string;
@@ -88,6 +89,22 @@ export const communicationManifest: ModuleManifest = {
 export const communicationModule: WorkerModule = {
   manifest: communicationManifest,
   init(app: Hono<any>) {
+    app.use("/chat/*", async (c, next) => {
+      if (!(await isFeatureEnabled(c.env.PLATFORM_BUCKET, "textChat"))) {
+        return c.json({ error: "FEATURE_DISABLED", feature: "textChat" }, 403);
+      }
+
+      await next();
+    });
+
+    app.use("/voice/*", async (c, next) => {
+      if (!(await isFeatureEnabled(c.env.PLATFORM_BUCKET, "voiceChat"))) {
+        return c.json({ error: "FEATURE_DISABLED", feature: "voiceChat" }, 403);
+      }
+
+      await next();
+    });
+
     app.post("/chat/join", async (c) => {
       const body = (await c.req.json().catch(() => ({}))) as {
         roomId?: string;

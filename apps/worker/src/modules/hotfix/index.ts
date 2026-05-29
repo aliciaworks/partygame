@@ -1,5 +1,6 @@
 import type { Hono } from "hono";
 import type { ModuleManifest, WorkerModule } from "../loader";
+import { isFeatureEnabled } from "../../platform-state";
 
 type HotfixManifest = {
   version: string;
@@ -9,8 +10,8 @@ type HotfixManifest = {
   uploadedAt: string;
 };
 
-const HOTFIX_PREFIX = "hotfix/";
-const LATEST_KEY = "hotfix/latest";
+const HOTFIX_PREFIX = "game-updates/";
+const LATEST_KEY = "game-updates/latest";
 
 function versionRoot(version: string): string {
   return `${HOTFIX_PREFIX}${version}`;
@@ -64,6 +65,14 @@ export const hotfixManifest: ModuleManifest = {
 export const hotfixModule: WorkerModule = {
   manifest: hotfixManifest,
   init(app: Hono<any>) {
+    app.use("/hotfix/*", async (c, next) => {
+      if (!(await isFeatureEnabled(c.env.PLATFORM_BUCKET, "gameUpdates"))) {
+        return c.json({ error: "FEATURE_DISABLED", feature: "gameUpdates" }, 403);
+      }
+
+      await next();
+    });
+
     app.post("/hotfix/upload", async (c) => {
       const contentType = c.req.header("content-type") ?? "";
       let version: string | undefined;

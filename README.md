@@ -186,7 +186,13 @@ The worker backend expects the following runtime bindings or secrets depending o
 
 - `GAME_ROOM` for the Durable Object binding
 - `ADMIN_TOKEN` for `/admin/*` routes
-- `CONTROLS_BUCKET`, `REALTIMEKIT_APP_ID`, and `REALTIMEKIT_API_TOKEN` only if using the optional admin/voice control helpers
+- `PLATFORM_BUCKET` for platform features, hotfix assets, player profile/progress, and leaderboard data
+
+Platform state is stored at `admin/platform-state.json` and exposed as:
+
+- `GET /api/platform` (public; returns `{ features }`)
+- `GET /admin/platform` (admin only; returns `{ features }`)
+- `PATCH /admin/platform/features` (admin only; updates feature flags)
 
 ## Quality Gates
 
