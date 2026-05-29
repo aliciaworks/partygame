@@ -170,6 +170,10 @@ export async function listPlayerAccounts(
   const players: PlayerAccount[] = [];
 
   for (const object of listed.objects) {
+    if (!object.key.endsWith(PLAYER_ACCOUNT_SUFFIX)) {
+      continue;
+    }
+
     const loaded = await bucket.get(object.key);
     if (!loaded) continue;
 
@@ -188,7 +192,7 @@ export async function listPlayerAccounts(
     }
   }
 
-  return { players };
+  return { players, cursor: listed.truncated ? listed.cursor : undefined };
 }
 
 export function revokePlayerSessions(playerId: string): number {

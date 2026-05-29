@@ -18,11 +18,11 @@ type AuditRecord = {
   timestamp: string;
 };
 
-const BAN_PREFIX = "ban/";
-const AUDIT_PREFIX = "audit/";
+const PLAYERS_PREFIX = "players/";
+const AUDIT_PREFIX = "players/_audit/";
 
 function banKey(playerId: string): string {
-  return `${BAN_PREFIX}${playerId}.json`;
+  return `${PLAYERS_PREFIX}${playerId}/ban.json`;
 }
 
 function auditKey(timestamp: string): string {
@@ -110,7 +110,7 @@ export const playerManagementModule: WorkerModule = {
 
       const ban = await readBan(c.env.PLATFORM_BUCKET, playerId);
       const progress = c.env.PLATFORM_BUCKET
-        ? await c.env.PLATFORM_BUCKET.get(`progress/${playerId}.json`)
+        ? await c.env.PLATFORM_BUCKET.get(`players/${playerId}/progress.json`)
         : null;
 
       return c.json({
@@ -207,7 +207,6 @@ export const playerManagementModule: WorkerModule = {
       if (!bucket) {
         return c.json({ records: [], cursor: null });
       }
-
       const listed = await bucket.list({ prefix: AUDIT_PREFIX, limit: Number.isFinite(limit) ? limit : 50, cursor });
       const records: AuditRecord[] = [];
 
