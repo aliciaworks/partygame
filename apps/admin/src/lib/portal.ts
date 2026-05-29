@@ -16,8 +16,18 @@ export type PlatformFeatures = {
   playerProfile: boolean;
 };
 
+export type PlatformDeprecation = {
+  path: string;
+  removedAt: string;
+  alternative?: string;
+  reason?: string;
+};
+
 export type PlatformState = {
   features: PlatformFeatures;
+  apiVersion: string;
+  minClientVersion?: string;
+  deprecations: PlatformDeprecation[];
 };
 
 export type GameUpdateAsset = {

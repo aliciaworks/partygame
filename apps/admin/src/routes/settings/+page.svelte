@@ -49,6 +49,7 @@
     activePreset !== "custom"
       ? PRESET_OPTIONS.find((item) => item.id === activePreset)
       : null;
+  $: deprecations = $platformState?.deprecations ?? [];
 
   async function loadPlatform() {
     busy.set(true);
@@ -201,6 +202,31 @@
   {/if}
 </section>
 
+<section class="panel block">
+  <h2>Platform version</h2>
+  {#if $platformState}
+    <div class="stack">
+      <p class="hint mono">API version: {$platformState.apiVersion}</p>
+      <p class="hint mono">
+        Minimum client version: {$platformState.minClientVersion ?? "none"}
+      </p>
+      <p class="hint mono">Deprecated endpoints: {deprecations.length}</p>
+      {#if deprecations.length}
+        <ul class="deprecation-list">
+          {#each deprecations as entry}
+            <li>
+              <strong>{entry.path}</strong> -> {entry.alternative ?? "n/a"}
+              <span>removed {entry.removedAt}</span>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </div>
+  {:else}
+    <div class="empty">Loading platform state...</div>
+  {/if}
+</section>
+
 <style>
   .block {
     padding: 20px;
@@ -233,5 +259,15 @@
 
   .custom-note {
     color: var(--accent-warm);
+  }
+
+  .deprecation-list {
+    margin: 0;
+    padding-left: 20px;
+    color: var(--muted);
+  }
+
+  .deprecation-list li {
+    margin-bottom: 8px;
   }
 </style>

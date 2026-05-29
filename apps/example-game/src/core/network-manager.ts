@@ -2,6 +2,23 @@ import type { GameTickUpdate, PlayerInputCommand } from "@partygame/shared";
 
 type MessageHandler = (data: any) => void;
 
+type PlatformDeprecation = {
+  path: string;
+  removedAt: string;
+  alternative?: string;
+  reason?: string;
+};
+
+type PlatformState = {
+  features: Record<string, boolean>;
+  apiVersion: string;
+  minClientVersion?: string;
+  deprecations: PlatformDeprecation[];
+};
+
+const CLIENT_VERSION = "example-game-1.0.0";
+const API_VERSION_FLOOR = "2025-01-01";
+
 /**
  * Manages WebSocket communication with backend
  */
@@ -11,11 +28,46 @@ export class NetworkManager {
   private token = "";
   private messageHandlers: Map<string, MessageHandler> = new Map();
   private mode: "online" | "offline" = "offline";
+  private platformState: PlatformState | null = null;
   private offlineState = {
     tick: 0,
     x: 0,
     y: 0,
   };
+
+  private async loadPlatformState(backendUrl: string): Promise<PlatformState | null> {
+    try {
+      const platformUrl = backendUrl.endsWith("/")
+        ? `${backendUrl}api/platform`
+        : `${backendUrl}/api/platform`;
+      const response = await fetch(platformUrl, {
+        headers: {
+          "X-Client-Version": CLIENT_VERSION,
+          "Accept-API-Version": `>=${API_VERSION_FLOOR}`,
+        },
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const state = (await response.json()) as PlatformState;
+      this.platformState = state;
+
+      if (state.deprecations.length > 0) {
+        for (const entry of state.deprecations) {
+          console.warn(
+            `Deprecated endpoint ${entry.path} scheduled for removal on ${entry.removedAt}`,
+          );
+        }
+      }
+
+      return state;
+    } catch (error) {
+      console.warn("Failed to load platform state:", error);
+      return null;
+    }
+  }
 
   /**
    * Connect to backend server
@@ -43,11 +95,18 @@ export class NetworkManager {
           ? authUrl + "auth/login"
           : authUrl + "/auth/login";
 
-        fetch(loginUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ playerName }),
-        })
+        this.loadPlatformState(authUrl)
+          .then(() =>
+            fetch(loginUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-Client-Version": CLIENT_VERSION,
+                "Accept-API-Version": `>=${API_VERSION_FLOOR}`,
+              },
+              body: JSON.stringify({ playerName }),
+            }),
+          )
           .then((res) => res.json())
           .then((data) => {
             this.playerId = data.playerId;
@@ -226,5 +285,9 @@ export class NetworkManager {
    */
   getPlayerId(): string {
     return this.playerId;
+  }
+
+  getPlatformState(): PlatformState | null {
+    return this.platformState;
   }
 }

@@ -103,6 +103,15 @@ class PartyGameApp {
 
       // Initialize network manager
       await this.networkManager.connect(playerName, backendUrl);
+      const platformState = this.networkManager.getPlatformState();
+      if (platformState) {
+        console.log(
+          `Platform API ${platformState.apiVersion}, features: ${Object.entries(platformState.features)
+            .filter(([, enabled]) => enabled)
+            .map(([key]) => key)
+            .join(", ")}`,
+        );
+      }
 
       // Create and start game
       const scene = this.gameManager.createScene();
@@ -116,7 +125,10 @@ class PartyGameApp {
       if (this.currentGame) {
         await this.currentGame.initialize();
         this.currentGame.start();
-        this.updateStatus("Connected", true);
+        this.updateStatus(
+          platformState ? `Connected (API ${platformState.apiVersion})` : "Connected",
+          true,
+        );
       }
 
       // Render loop

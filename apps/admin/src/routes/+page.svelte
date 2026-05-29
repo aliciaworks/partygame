@@ -9,6 +9,7 @@
     busy,
     health,
     sla,
+    platformState,
     versions,
     lastSyncedAt,
     clearError,
@@ -19,20 +20,23 @@
     fetchBackendHealth,
     fetchBackendSla,
     fetchApiVersions,
+    fetchPlatformState,
   } from "$lib/portal";
 
   async function refresh() {
     busy.set(true);
     clearError();
     try {
-      const [h, s, v] = await Promise.all([
+      const [h, s, v, p] = await Promise.all([
         fetchBackendHealth($backendUrl),
         fetchBackendSla($backendUrl),
         fetchApiVersions($backendUrl),
+        fetchPlatformState($backendUrl),
       ]);
       health.set(h);
       sla.set(s);
       versions.set(v);
+      platformState.set(p);
       const t = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
       lastSyncedAt.set(t);
       setStatus(`${$translate("status.refreshed")} ${t}`);
@@ -61,7 +65,12 @@
 <MetricsGrid health={$health} sla={$sla} versions={$versions} />
 
 <div class="grid-2">
-  <RuntimeState health={$health} sla={$sla} lastSyncedAt={$lastSyncedAt} />
+  <RuntimeState
+    health={$health}
+    sla={$sla}
+    platformState={$platformState}
+    lastSyncedAt={$lastSyncedAt}
+  />
   <ApiSurfaceCard versions={$versions} />
 </div>
 

@@ -1,9 +1,10 @@
 <script lang="ts">
-  import type { BackendHealth, BackendSla } from "$lib/portal";
+  import type { BackendHealth, BackendSla, PlatformState } from "$lib/portal";
   import { translate } from "./i18n";
 
   export let health: BackendHealth | null = null;
   export let sla: BackendSla | null = null;
+  export let platformState: PlatformState | null = null;
   export let lastSyncedAt = "";
 </script>
 
@@ -32,7 +33,18 @@
             : "—"}
         </strong>
       </div>
+      <div>
+        <span class="mono">API version</span>
+        <strong>{platformState?.apiVersion ?? "—"}</strong>
+      </div>
+      <div>
+        <span class="mono">Deprecated endpoints</span>
+        <strong>{platformState?.deprecations?.length ?? 0}</strong>
+      </div>
     </div>
+    {#if platformState?.minClientVersion}
+      <p class="hint">Minimum client version: {platformState.minClientVersion}</p>
+    {/if}
   {:else}
     <div class="empty-state">
       <p>{$translate("runtime.no_data")}</p>
@@ -85,6 +97,12 @@
     color: var(--muted);
     font-size: 0.82rem;
     margin-bottom: 8px;
+  }
+
+  .hint {
+    margin: 12px 0 0;
+    color: var(--muted);
+    font-size: 0.88rem;
   }
 
   .empty-state {
