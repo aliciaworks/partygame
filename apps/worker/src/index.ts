@@ -10,13 +10,17 @@ import {
   isDeprecatedPath,
   isClientVersionCompatible,
 } from "./platform-state";
+import { verifyAdminSecret } from "./auth-utils";
+import { handleForbidden, errorCodeToStatus } from "./error-handler";
 
 type AppEnv = {
   Variables: {
     platformState: PlatformState;
+    isAdmin: boolean;
   };
   Bindings: {
     PLATFORM_BUCKET?: R2Bucket;
+    ADMIN_SECRET?: string;
   };
 };
 
@@ -49,6 +53,19 @@ app.use("*", async (c, next) => {
 
   // Store platform state in context for later use
   c.set("platformState", platformState);
+
+  // Check admin secret for /admin/* routes
+  const isAdminRoute = c.req.path.startsWith("/admin");
+  let isAdmin = false;
+  if (isAdminRoute) {
+    const authHeader = c.req.header("authorization") ?? null;
+    if (!verifyAdminSecret(authHeader, c.env.ADMIN_SECRET)) {
+      const err = handleForbidden("Admin secret required");
+      return c.json(err, { status: errorCodeToStatus(err.error) } as any);
+    }
+    isAdmin = true;
+  }
+  c.set("isAdmin", isAdmin);
 
   await next();
 
