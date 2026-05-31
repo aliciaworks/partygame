@@ -2,6 +2,8 @@
 
 An open-source, out-of-the-box Serverless Game Backend Framework built natively for Cloudflare Workers, Durable Objects, and D1. It is designed to bridge the gap between web-native infrastructure and traditional game engines (Unity, Godot, and Unreal Engine).
 
+**📜 Dual Licensed:** Available under [AGPL-3.0](LICENSE) for personal/open-source use, or [Commercial License](LICENSE-COMMERCIAL.md) for commercial products. See [LICENSING.md](LICENSING.md) for details.
+
 ## Features
 
 - **Authoritative GameRoom (`apps/worker/src/game`)**: Built directly into the Cloudflare Worker Durable Object runtime. Features a fixed tick-rate loop, server-authoritative movement validation, and per-room state isolation.
