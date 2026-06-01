@@ -20,9 +20,12 @@ export type PlatformState = {
   apiVersion: string; // ISO date (YYYY-MM-DD) - deployment date
   minClientVersion?: string; // minimum required client version (SemVer)
   deprecations: Deprecation[]; // APIs scheduled for removal
+  revision: number;
+  updatedAt: string;
 };
 
 const PLATFORM_STATE_KEY = "admin/platform-state.json";
+const PLATFORM_STATE_CACHE_TTL_MS = 15_000;
 
 const DEFAULT_FEATURES: PlatformFeatures = {
   voiceChat: true,
@@ -35,6 +38,24 @@ const DEFAULT_FEATURES: PlatformFeatures = {
 };
 
 const FEATURE_KEYS = Object.keys(DEFAULT_FEATURES) as Array<keyof PlatformFeatures>;
+let platformStateCache:
+  | {
+      value: PlatformState;
+      expiresAt: number;
+    }
+  | null = null;
+
+export class PlatformStateConflictError extends Error {
+  readonly expectedRevision: number;
+  readonly actualRevision: number;
+
+  constructor(expectedRevision: number, actualRevision: number) {
+    super(`Platform state revision mismatch (expected ${expectedRevision}, actual ${actualRevision})`);
+    this.name = "PlatformStateConflictError";
+    this.expectedRevision = expectedRevision;
+    this.actualRevision = actualRevision;
+  }
+}
 
 function normalizeFeatures(input: unknown): PlatformFeatures {
   const source = (input ?? {}) as Partial<PlatformFeatures>;
@@ -52,6 +73,27 @@ function normalizeFeatures(input: unknown): PlatformFeatures {
 function getISODateString(): string {
   const now = new Date();
   return now.toISOString().split("T")[0]; // YYYY-MM-DD
+}
+
+function getDefaultState(): PlatformState {
+  return {
+    features: { ...DEFAULT_FEATURES },
+    apiVersion: getISODateString(),
+    deprecations: [],
+    revision: 0,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function writeCache(state: PlatformState): void {
+  platformStateCache = {
+    value: state,
+    expiresAt: Date.now() + PLATFORM_STATE_CACHE_TTL_MS,
+  };
+}
+
+function invalidatePlatformStateCache(): void {
+  platformStateCache = null;
 }
 
 // Validate deprecation entries
@@ -77,45 +119,52 @@ function normalizeDeprecations(input: unknown): Deprecation[] {
 export async function readPlatformState(
   bucket: R2Bucket | undefined,
 ): Promise<PlatformState> {
+  if (platformStateCache && platformStateCache.expiresAt > Date.now()) {
+    return platformStateCache.value;
+  }
+
   if (!bucket) {
-    return {
-      features: { ...DEFAULT_FEATURES },
-      apiVersion: getISODateString(),
-      deprecations: [],
-    };
+    const fallback = getDefaultState();
+    writeCache(fallback);
+    return fallback;
   }
 
   const object = await bucket.get(PLATFORM_STATE_KEY);
   if (!object) {
-    return {
-      features: { ...DEFAULT_FEATURES },
-      apiVersion: getISODateString(),
-      deprecations: [],
-    };
+    const fallback = getDefaultState();
+    writeCache(fallback);
+    return fallback;
   }
 
   try {
     const parsed = JSON.parse(await object.text()) as Partial<PlatformState>;
-    return {
+    const state: PlatformState = {
       features: normalizeFeatures(parsed.features),
       apiVersion: parsed.apiVersion ?? getISODateString(),
       minClientVersion: parsed.minClientVersion,
       deprecations: normalizeDeprecations(parsed.deprecations),
+      revision: typeof parsed.revision === "number" ? parsed.revision : 0,
+      updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : new Date().toISOString(),
     };
+    writeCache(state);
+    return state;
   } catch {
-    return {
-      features: { ...DEFAULT_FEATURES },
-      apiVersion: getISODateString(),
-      deprecations: [],
-    };
+    const fallback = getDefaultState();
+    writeCache(fallback);
+    return fallback;
   }
 }
 
 export async function patchPlatformFeatures(
   bucket: R2Bucket | undefined,
   updates: unknown,
+  expectedRevision?: number,
 ): Promise<PlatformState> {
+  invalidatePlatformStateCache();
   const current = await readPlatformState(bucket);
+  if (typeof expectedRevision === "number" && expectedRevision !== current.revision) {
+    throw new PlatformStateConflictError(expectedRevision, current.revision);
+  }
   const merged = normalizeFeatures({
     ...current.features,
     ...(updates as Partial<PlatformFeatures>),
@@ -125,6 +174,8 @@ export async function patchPlatformFeatures(
     apiVersion: getISODateString(),
     minClientVersion: current.minClientVersion,
     deprecations: current.deprecations,
+    revision: current.revision + 1,
+    updatedAt: new Date().toISOString(),
   };
 
   if (bucket) {
@@ -133,14 +184,20 @@ export async function patchPlatformFeatures(
     });
   }
 
+  writeCache(state);
   return state;
 }
 
 export async function patchPlatformState(
   bucket: R2Bucket | undefined,
   updates: Partial<PlatformState>,
+  expectedRevision?: number,
 ): Promise<PlatformState> {
+  invalidatePlatformStateCache();
   const current = await readPlatformState(bucket);
+  if (typeof expectedRevision === "number" && expectedRevision !== current.revision) {
+    throw new PlatformStateConflictError(expectedRevision, current.revision);
+  }
   const state: PlatformState = {
     features: normalizeFeatures({
       ...current.features,
@@ -149,6 +206,8 @@ export async function patchPlatformState(
     apiVersion: updates.apiVersion ?? getISODateString(),
     minClientVersion: updates.minClientVersion ?? current.minClientVersion,
     deprecations: normalizeDeprecations(updates.deprecations ?? current.deprecations),
+    revision: current.revision + 1,
+    updatedAt: new Date().toISOString(),
   };
 
   if (bucket) {
@@ -157,6 +216,7 @@ export async function patchPlatformState(
     });
   }
 
+  writeCache(state);
   return state;
 }
 

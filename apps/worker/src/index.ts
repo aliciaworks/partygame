@@ -12,6 +12,9 @@ import {
 } from "./platform-state";
 import { verifyAdminSecret } from "./auth-utils";
 import { handleForbidden, errorCodeToStatus } from "./error-handler";
+import { enforceRateLimit, rateLimitResponse } from "./rate-limit";
+import { PlatformStateConflictError } from "./platform-state";
+export { GameRoom } from "./modules/communication/room";
 
 type AppEnv = {
   Variables: {
@@ -21,6 +24,9 @@ type AppEnv = {
   Bindings: {
     PLATFORM_BUCKET?: R2Bucket;
     ADMIN_SECRET?: string;
+    ADMIN_TOKEN?: string;
+    PLAYER_SECRET?: string;
+    GAME_ROOM?: DurableObjectNamespace;
   };
 };
 
@@ -34,6 +40,16 @@ const moduleFeatureRequirements: Partial<Record<string, Array<keyof PlatformFeat
 
 // Middleware: Version negotiation and response header injection
 app.use("*", async (c, next) => {
+  const ip = c.req.header("cf-connecting-ip") ?? "unknown-ip";
+  const path = c.req.path;
+  const limitKeyPrefix = path.startsWith("/admin/") ? "admin" : "public";
+  const limit = path.startsWith("/admin/") ? 60 : 240;
+  const windowMs = path.startsWith("/admin/") ? 60_000 : 60_000;
+  const limited = enforceRateLimit(`${limitKeyPrefix}:${ip}`, limit, windowMs);
+  if (!limited.ok) {
+    return c.json(rateLimitResponse(limited.retryAfterSeconds), 429);
+  }
+
   const platformState = await readPlatformState(c.env.PLATFORM_BUCKET);
 
   // Check client version compatibility if minClientVersion is set
@@ -58,8 +74,11 @@ app.use("*", async (c, next) => {
   const isAdminRoute = c.req.path.startsWith("/admin");
   let isAdmin = false;
   if (isAdminRoute) {
-    const authHeader = c.req.header("authorization") ?? null;
-    if (!verifyAdminSecret(authHeader, c.env.ADMIN_SECRET)) {
+    const authHeader = c.req.header("authorization");
+    const tokenHeader = c.req.header("x-admin-token");
+    const providedSecret = authHeader ?? tokenHeader ?? null;
+    const configuredSecret = c.env.ADMIN_SECRET ?? c.env.ADMIN_TOKEN;
+    if (!verifyAdminSecret(providedSecret, configuredSecret)) {
       const err = handleForbidden("Admin secret required");
       return c.json(err, { status: errorCodeToStatus(err.error) } as any);
     }
@@ -144,12 +163,56 @@ app.get("/admin/platform", async (c) =>
 
 app.patch("/admin/platform/features", async (c) => {
   const body = await c.req.json().catch(() => ({}));
-  return c.json(await patchPlatformFeatures(c.env.PLATFORM_BUCKET, body));
+  const expectedRevision = Number(c.req.header("if-match") ?? (body as { revision?: unknown }).revision);
+  try {
+    return c.json(
+      await patchPlatformFeatures(
+        c.env.PLATFORM_BUCKET,
+        body,
+        Number.isFinite(expectedRevision) ? expectedRevision : undefined,
+      ),
+    );
+  } catch (error) {
+    if (error instanceof PlatformStateConflictError) {
+      return c.json(
+        {
+          error: "CONFLICT",
+          message: "Platform state has changed, reload before updating",
+          expectedRevision: error.expectedRevision,
+          actualRevision: error.actualRevision,
+        },
+        409,
+      );
+    }
+    throw error;
+  }
 });
 
 app.patch("/admin/platform", async (c) => {
   const body = await c.req.json().catch(() => ({}));
-  return c.json(await patchPlatformState(c.env.PLATFORM_BUCKET, body));
+  const expectedRevision = Number(c.req.header("if-match") ?? (body as { revision?: unknown }).revision);
+  try {
+    return c.json(
+      await patchPlatformState(
+        c.env.PLATFORM_BUCKET,
+        body,
+        Number.isFinite(expectedRevision) ? expectedRevision : undefined,
+      ),
+    );
+  } catch (error) {
+    if (error instanceof PlatformStateConflictError) {
+      return c.json(
+        {
+          error: "CONFLICT",
+          message: "Platform state has changed, reload before updating",
+          expectedRevision: error.expectedRevision,
+          actualRevision: error.actualRevision,
+        },
+        409,
+      );
+    }
+    throw error;
+  }
 });
 
 export default app;

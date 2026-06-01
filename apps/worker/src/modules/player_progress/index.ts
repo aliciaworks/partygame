@@ -15,6 +15,13 @@ type ProgressRecord = {
 
 const PLAYERS_PREFIX = "players/";
 const PLAYER_PROGRESS_SUFFIX = "/progress.json";
+const LEADERBOARD_KEY = "leaderboards/top.json";
+const LEADERBOARD_MAX_SIZE = 200;
+
+type LeaderboardEntry = Pick<
+  ProgressRecord,
+  "playerId" | "xp" | "level" | "matchesPlayed" | "matchesWon" | "updatedAt"
+>;
 
 function progressKey(playerId: string): string {
   return `${PLAYERS_PREFIX}${playerId}${PLAYER_PROGRESS_SUFFIX}`;
@@ -66,6 +73,63 @@ async function writeProgress(
   await bucket.put(progressKey(record.playerId), JSON.stringify(record, null, 2), {
     httpMetadata: { contentType: "application/json; charset=utf-8" },
   });
+}
+
+async function readLeaderboard(
+  bucket: R2Bucket | undefined,
+): Promise<LeaderboardEntry[]> {
+  if (!bucket) return [];
+  const object = await bucket.get(LEADERBOARD_KEY);
+  if (!object) return [];
+  try {
+    const parsed = JSON.parse(await object.text()) as { entries?: LeaderboardEntry[] };
+    return Array.isArray(parsed.entries) ? parsed.entries : [];
+  } catch {
+    return [];
+  }
+}
+
+async function writeLeaderboard(
+  bucket: R2Bucket | undefined,
+  entries: LeaderboardEntry[],
+): Promise<void> {
+  if (!bucket) return;
+  const sorted = [...entries]
+    .sort((left, right) => right.xp - left.xp)
+    .slice(0, LEADERBOARD_MAX_SIZE);
+  await bucket.put(
+    LEADERBOARD_KEY,
+    JSON.stringify({ entries: sorted, updatedAt: new Date().toISOString() }, null, 2),
+    { httpMetadata: { contentType: "application/json; charset=utf-8" } },
+  );
+}
+
+async function upsertLeaderboardEntry(
+  bucket: R2Bucket | undefined,
+  record: ProgressRecord,
+): Promise<void> {
+  if (!bucket) return;
+  const existing = await readLeaderboard(bucket);
+  const filtered = existing.filter((entry) => entry.playerId !== record.playerId);
+  filtered.push({
+    playerId: record.playerId,
+    xp: record.xp,
+    level: record.level,
+    matchesPlayed: record.matchesPlayed,
+    matchesWon: record.matchesWon,
+    updatedAt: record.updatedAt,
+  });
+  await writeLeaderboard(bucket, filtered);
+}
+
+async function removeLeaderboardEntry(
+  bucket: R2Bucket | undefined,
+  playerId: string,
+): Promise<void> {
+  if (!bucket) return;
+  const existing = await readLeaderboard(bucket);
+  const filtered = existing.filter((entry) => entry.playerId !== playerId);
+  await writeLeaderboard(bucket, filtered);
 }
 
 export const playerProgressManifest: ModuleManifest = {
@@ -131,6 +195,7 @@ export const playerProgressModule: WorkerModule = {
       }
 
       await writeProgress(c.env.PLATFORM_BUCKET, next);
+      await upsertLeaderboardEntry(c.env.PLATFORM_BUCKET, next);
       return c.json({ progress: next });
     });
 
@@ -149,6 +214,7 @@ export const playerProgressModule: WorkerModule = {
       if (c.env.PLATFORM_BUCKET) {
         await c.env.PLATFORM_BUCKET.delete(progressKey(playerId));
       }
+      await removeLeaderboardEntry(c.env.PLATFORM_BUCKET, playerId);
 
       return c.json({ success: true });
     });
@@ -159,32 +225,16 @@ export const playerProgressModule: WorkerModule = {
       }
 
       const limit = Number(c.req.query("limit") ?? "50");
-      const listed = c.env.PLATFORM_BUCKET
-        ? await c.env.PLATFORM_BUCKET.list({ prefix: PLAYERS_PREFIX })
-        : { objects: [] as Array<{ key: string }> };
-
-      const ids: string[] = listed.objects
-        .map((object: { key: string }) => object.key)
-        .filter((key: string) => key.endsWith(PLAYER_PROGRESS_SUFFIX))
-        .map((key: string) =>
-          key.slice(PLAYERS_PREFIX.length, -PLAYER_PROGRESS_SUFFIX.length),
-        );
-      const uniqueIds: string[] = [...new Set(ids)];
-
-      const entries: Array<Pick<ProgressRecord, "playerId" | "xp" | "level" | "matchesPlayed" | "matchesWon">> = [];
-      for (const playerId of uniqueIds.slice(0, Number.isFinite(limit) ? limit : 50)) {
-        const progress = await readProgress(c.env.PLATFORM_BUCKET, playerId);
-        entries.push({
-          playerId,
-          xp: progress.xp,
-          level: progress.level,
-          matchesPlayed: progress.matchesPlayed,
-          matchesWon: progress.matchesWon,
-        });
-      }
-
-      entries.sort((left, right) => right.xp - left.xp);
-      return c.json({ entries: entries.slice(0, Number.isFinite(limit) ? limit : 50) });
+      const entries = await readLeaderboard(c.env.PLATFORM_BUCKET);
+      return c.json({
+        entries: entries.slice(0, Number.isFinite(limit) ? limit : 50).map((entry) => ({
+          playerId: entry.playerId,
+          xp: entry.xp,
+          level: entry.level,
+          matchesPlayed: entry.matchesPlayed,
+          matchesWon: entry.matchesWon,
+        })),
+      });
     });
   },
 };
