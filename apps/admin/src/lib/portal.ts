@@ -18,6 +18,11 @@ export type PlatformFeatures = {
 
 export type PlatformState = {
   features: PlatformFeatures;
+  apiVersion?: string;
+  minClientVersion?: string;
+  deprecations?: Array<{ path: string; removedAt: string; alternative?: string; reason?: string }>;
+  revision?: number;
+  updatedAt?: string;
 };
 
 export type GameUpdateAsset = {
@@ -413,9 +418,11 @@ export async function fetchPlatformState(
 export async function patchPlatformFeatures(
   backendUrl: string,
   updates: Partial<PlatformFeatures>,
+  expectedRevision?: number,
 ): Promise<PlatformState> {
   return adminFetch<PlatformState>(backendUrl, "/admin/platform/features", {
     method: "PATCH",
+    headers: expectedRevision === undefined ? undefined : { "If-Match": String(expectedRevision) },
     body: JSON.stringify(updates),
   });
 }

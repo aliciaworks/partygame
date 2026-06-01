@@ -20,6 +20,8 @@ type AuditRecord = {
 
 const PLAYERS_PREFIX = "players/";
 const AUDIT_PREFIX = "players/_audit/";
+const AUDIT_RETENTION_DAYS = 90;
+const AUDIT_CLEANUP_BATCH_SIZE = 50;
 
 function banKey(playerId: string): string {
   return `${PLAYERS_PREFIX}${playerId}/ban.json`;
@@ -33,12 +35,14 @@ function extractAdminId(request: Request): string {
   return request.headers.get("x-admin-id") ?? request.headers.get("x-admin-token") ?? "admin";
 }
 
-function isAdminRequest(request: Request, env: { ADMIN_TOKEN?: string }): boolean {
-  if (!env.ADMIN_TOKEN) return false;
-
-  const bearer = request.headers.get("authorization");
-  const token = request.headers.get("x-admin-token");
-  return bearer === `Bearer ${env.ADMIN_TOKEN}` || token === env.ADMIN_TOKEN;
+async function cleanupOldAuditRecords(bucket: R2Bucket): Promise<void> {
+  const cutoff = Date.now() - AUDIT_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  const listed = await bucket.list({ prefix: AUDIT_PREFIX, limit: AUDIT_CLEANUP_BATCH_SIZE });
+  for (const object of listed.objects) {
+    if (object.uploaded.getTime() < cutoff) {
+      await bucket.delete(object.key);
+    }
+  }
 }
 
 async function writeAudit(
@@ -50,6 +54,7 @@ async function writeAudit(
   await bucket.put(auditKey(record.timestamp), JSON.stringify(record, null, 2), {
     httpMetadata: { contentType: "application/json; charset=utf-8" },
   });
+  await cleanupOldAuditRecords(bucket);
 }
 
 async function readBan(
@@ -79,7 +84,7 @@ export const playerManagementModule: WorkerModule = {
   manifest: playerManagementManifest,
   init(app: Hono<any>) {
     app.use("/admin/*", async (c, next) => {
-      if (!isAdminRequest(c.req.raw, c.env)) {
+      if (!c.get("isAdmin")) {
         return c.json({ error: "Unauthorized" }, 401);
       }
 

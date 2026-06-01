@@ -102,22 +102,18 @@ export function verifyAdminSecret(
   envAdminSecret: string | undefined,
 ): boolean {
   if (!envAdminSecret) {
-    // No secret configured - allow (dev mode)
-    console.warn("ADMIN_SECRET not configured, accepting all admin requests");
-    return true;
+    return false;
   }
 
   if (!authHeader) {
     return false;
   }
 
-  const [scheme, secret] = authHeader.split(" ");
-  if (scheme?.toLowerCase() !== "bearer" || !secret) {
-    return false;
-  }
+  const [scheme, token] = authHeader.split(" ");
+  const providedSecret = scheme?.toLowerCase() === "bearer" && token ? token : authHeader.trim();
 
   // Constant-time comparison to prevent timing attacks
-  return timingSafeEqual(secret, envAdminSecret);
+  return timingSafeEqual(providedSecret, envAdminSecret);
 }
 
 /**

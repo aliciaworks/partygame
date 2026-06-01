@@ -36,6 +36,17 @@ function createToken(playerId: string, _playerName: string): string {
   return `${playerId}:legacy`;
 }
 
+function isLocalDevelopmentRequest(request: Request): boolean {
+  const host = new URL(request.url).hostname;
+  return host === "localhost" || host === "127.0.0.1";
+}
+
+function requirePlayerSecret(request: Request, secretKey: string | undefined): string | null {
+  if (secretKey) return secretKey;
+  if (isLocalDevelopmentRequest(request)) return null;
+  throw new Error("PLAYER_SECRET is required in non-local environments");
+}
+
 async function createSignedTokenForPlayer(
   playerId: string,
   secretKey: string | undefined,
@@ -202,6 +213,10 @@ async function readSession(
   request: Request,
   secretKey: string | undefined,
 ): Promise<AuthSession | null> {
+  if (!secretKey && !isLocalDevelopmentRequest(request)) {
+    return null;
+  }
+
   const token = readBearerToken(request) ?? new URL(request.url).searchParams.get("token");
   if (!token) return null;
 
@@ -255,10 +270,18 @@ export const playerAuthModule: WorkerModule = {
       await upsertAccount(c.env.PLATFORM_BUCKET, playerId, playerName);
 
       // Create signed token
-      const signedToken = await createSignedTokenForPlayer(
-        playerId,
-        (c.env as { PLAYER_SECRET?: string }).PLAYER_SECRET,
-      );
+      let secret: string | null;
+      try {
+        secret = requirePlayerSecret(
+          c.req.raw,
+          (c.env as { PLAYER_SECRET?: string }).PLAYER_SECRET,
+        );
+      } catch (error) {
+        return c.json({ error: "SERVER_MISCONFIG", message: (error as Error).message }, 500);
+      }
+      const signedToken = secret
+        ? await createSignedTokenForPlayer(playerId, secret)
+        : createToken(playerId, playerName);
 
       return c.json(
         {
@@ -289,10 +312,18 @@ export const playerAuthModule: WorkerModule = {
       await upsertAccount(c.env.PLATFORM_BUCKET, playerId, playerName);
 
       // Create signed token
-      const signedToken = await createSignedTokenForPlayer(
-        playerId,
-        (c.env as { PLAYER_SECRET?: string }).PLAYER_SECRET,
-      );
+      let secret: string | null;
+      try {
+        secret = requirePlayerSecret(
+          c.req.raw,
+          (c.env as { PLAYER_SECRET?: string }).PLAYER_SECRET,
+        );
+      } catch (error) {
+        return c.json({ error: "SERVER_MISCONFIG", message: (error as Error).message }, 500);
+      }
+      const signedToken = secret
+        ? await createSignedTokenForPlayer(playerId, secret)
+        : createToken(playerId, playerName);
 
       return c.json({
         token: signedToken,
@@ -328,10 +359,18 @@ export const playerAuthModule: WorkerModule = {
       }
 
       // Create new signed token
-      const signedToken = await createSignedTokenForPlayer(
-        session.playerId,
-        (c.env as { PLAYER_SECRET?: string }).PLAYER_SECRET,
-      );
+      let secret: string | null;
+      try {
+        secret = requirePlayerSecret(
+          c.req.raw,
+          (c.env as { PLAYER_SECRET?: string }).PLAYER_SECRET,
+        );
+      } catch (error) {
+        return c.json({ error: "SERVER_MISCONFIG", message: (error as Error).message }, 500);
+      }
+      const signedToken = secret
+        ? await createSignedTokenForPlayer(session.playerId, secret)
+        : createToken(session.playerId, session.playerName);
 
       return c.json({
         token: signedToken,
