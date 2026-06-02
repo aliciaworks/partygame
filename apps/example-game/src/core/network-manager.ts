@@ -20,7 +20,7 @@ export class NetworkManager {
   /**
    * Connect to backend server
    */
-  async connect(playerName: string, backendUrl: string): Promise<void> {
+  async connect(playerName: string, backendUrl: string, gameType: string = "moba"): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
         // Normalize backend URL
@@ -57,8 +57,35 @@ export class NetworkManager {
               throw new Error("Authentication failed");
             }
 
-            const fullWsUrl = `${wsUrl}?roomId=default&playerId=${this.playerId}&token=${this.token}`;
-            this.ws = new WebSocket(fullWsUrl);
+            const matchUrl = authUrl.endsWith("/")
+              ? authUrl + "matchmaking/join"
+              : authUrl + "/matchmaking/join";
+
+            return fetch(matchUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ playerId: this.playerId, gameType }),
+            })
+              .then(() => {
+                // Poll for status
+                const statusUrl = authUrl.endsWith("/")
+                  ? authUrl + `matchmaking/status?playerId=${this.playerId}`
+                  : authUrl + `/matchmaking/status?playerId=${this.playerId}`;
+                
+                const pollMatch = (): Promise<string> => {
+                  return fetch(statusUrl)
+                    .then(r => r.json())
+                    .then(data => {
+                      if (data.status === "matched") return data.roomId;
+                      return new Promise(resolve => setTimeout(() => resolve(pollMatch()), 1000));
+                    });
+                };
+                
+                return pollMatch();
+              })
+              .then(roomId => {
+                const fullWsUrl = `${wsUrl}?roomId=${roomId}&playerId=${this.playerId}&token=${this.token}&gameType=${gameType}`;
+                this.ws = new WebSocket(fullWsUrl);
 
             const timeout = window.setTimeout(() => {
               if (!this.ws || this.ws.readyState !== WebSocket.CONNECTING) {
@@ -108,6 +135,7 @@ export class NetworkManager {
               console.log("WebSocket disconnected");
               this.ws = null;
             };
+              });
           })
           .catch((error) => {
             console.warn("Falling back to offline mode:", error);

@@ -14,7 +14,8 @@ import { verifyAdminSecret } from "./auth-utils";
 import { handleForbidden, errorCodeToStatus } from "./error-handler";
 import { enforceRateLimit, rateLimitResponse } from "./rate-limit";
 import { PlatformStateConflictError } from "./platform-state";
-export { GameRoom } from "./modules/communication/room";
+export { GameRoom } from "./game/game-room";
+export { MatchmakerRoom } from "./matchmaker/matchmaker-room";
 
 type AppEnv = {
   Variables: {
@@ -27,6 +28,7 @@ type AppEnv = {
     ADMIN_TOKEN?: string;
     PLAYER_SECRET?: string;
     GAME_ROOM?: DurableObjectNamespace;
+    MATCHMAKER_ROOM?: DurableObjectNamespace;
   };
 };
 
@@ -99,8 +101,8 @@ app.use("*", async (c, next) => {
   c.header("X-Available-Features", featureList);
 
   // Check if this endpoint is deprecated
-  const path = c.req.path;
-  const deprecation = isDeprecatedPath(path, platformState.deprecations);
+  const currentPath = c.req.path;
+  const deprecation = isDeprecatedPath(currentPath, platformState.deprecations);
   if (deprecation) {
     c.header("X-Deprecation-Date", deprecation.removedAt);
     if (deprecation.alternative) {
@@ -122,6 +124,15 @@ app.get("/", (c) =>
     modules: getModuleManifests(),
   }),
 );
+
+app.get("/ws", (c) => {
+  const roomId = c.req.query("roomId") || "default";
+  const gameRoomNamespace = c.env.GAME_ROOM;
+  if (!gameRoomNamespace) return c.json({ error: "Missing GAME_ROOM binding" }, 500);
+  const id = gameRoomNamespace.idFromName(roomId);
+  const stub = gameRoomNamespace.get(id);
+  return stub.fetch(c.req.raw);
+});
 
 app.get("/health", (c) => c.json({ status: "ok", timestamp: Date.now() }));
 

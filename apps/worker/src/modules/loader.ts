@@ -1,9 +1,10 @@
 import type { Hono } from "hono";
 import { playerAuthModule } from "./player_auth/index";
 import { playerProgressModule } from "./player_progress/index";
-import { communicationModule } from "./communication/index";
+
 import { hotfixModule } from "./hotfix/index";
 import { playerManagementModule } from "./player_management/index";
+import { matchmakingModule } from "./matchmaking/index";
 
 export type ModuleManifest = {
   id: string;
@@ -20,9 +21,10 @@ export type WorkerModule<Bindings = Record<string, unknown>> = {
 const defaultModules = [
   playerAuthModule,
   playerProgressModule,
-  communicationModule,
+
   hotfixModule,
   playerManagementModule,
+  matchmakingModule,
 ] as const;
 
 export function getModuleManifests(): ModuleManifest[] {

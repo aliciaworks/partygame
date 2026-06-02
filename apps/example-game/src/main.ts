@@ -102,7 +102,7 @@ class PartyGameApp {
       this.updateStatus("Connecting...", false);
 
       // Initialize network manager
-      await this.networkManager.connect(playerName, backendUrl);
+      await this.networkManager.connect(playerName, backendUrl, gameType);
 
       // Create and start game
       const scene = this.gameManager.createScene();

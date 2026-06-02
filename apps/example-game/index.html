@@ -4,16 +4,18 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PartyGame - Web Game</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
     <style>
       :root {
-        --bg: #07111f;
-        --bg-elevated: rgba(9, 18, 35, 0.86);
-        --text: #e8eefc;
-        --muted: #9fb0d0;
-        --border: rgba(255, 255, 255, 0.09);
-        --accent: #4ade80;
-        --accent-warm: #fbbf24;
-        --danger: #ef4444;
+        --bg-color: #050505;
+        --text-primary: #ffffff;
+        --text-secondary: #94a3b8;
+        --accent-cyan: #06b6d4;
+        --accent-magenta: #d946ef;
+        --accent-green: #10b981;
+        --accent-red: #ef4444;
+        --glass-bg: rgba(255, 255, 255, 0.03);
+        --glass-border: rgba(255, 255, 255, 0.08);
       }
 
       * {
@@ -21,38 +23,47 @@
         margin: 0;
         padding: 0;
       }
-      html,
-      body {
+      
+      html, body {
         height: 100%;
       }
+      
       body {
-        font-family:
-          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
-          Cantarell, sans-serif;
-        background:
-          radial-gradient(
-            circle at top left,
-            rgba(74, 222, 128, 0.06),
-            transparent 28%
-          ),
-          radial-gradient(
-            circle at bottom right,
-            rgba(251, 191, 36, 0.04),
-            transparent 22%
-          ),
-          var(--bg);
-        color: var(--text);
+        font-family: 'Inter', sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-primary);
         overflow: hidden;
+      }
+
+      /* Animated Background Mesh */
+      .bg-mesh {
+        position: fixed;
+        inset: -50%;
+        width: 200%;
+        height: 200%;
+        background: 
+          radial-gradient(circle at 50% 50%, rgba(6, 182, 212, 0.08) 0%, transparent 40%),
+          radial-gradient(circle at 80% 20%, rgba(217, 70, 239, 0.08) 0%, transparent 40%);
+        animation: rotate 60s linear infinite;
+        z-index: -1;
+        pointer-events: none;
+      }
+      
+      @keyframes rotate {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
       }
 
       canvas {
         display: block;
         width: 100vw;
         height: 100vh;
-        background: linear-gradient(135deg, #08111f 0%, #111a2e 100%);
+        position: absolute;
+        inset: 0;
+        z-index: 1;
       }
 
-      /* Game Menu */
+      /* Premium Glassmorphism Menu */
       #gameMenu {
         position: absolute;
         inset: 0;
@@ -61,223 +72,340 @@
         justify-content: center;
         padding: 24px;
         z-index: 20;
-        background: linear-gradient(
-          135deg,
-          rgba(6, 10, 22, 0.9),
-          rgba(10, 16, 30, 0.88)
-        );
-        backdrop-filter: blur(12px);
+        background: rgba(5, 5, 5, 0.6);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        opacity: 1;
+        transition: opacity 0.4s ease, backdrop-filter 0.4s ease;
       }
+      
       #gameMenu:not(.active) {
-        display: none;
+        opacity: 0;
+        pointer-events: none;
+        backdrop-filter: blur(0px);
+        -webkit-backdrop-filter: blur(0px);
       }
+
       .menu-card {
-        width: min(1080px, 100%);
-        border-radius: 20px;
-        padding: 28px;
-        background: var(--bg-elevated);
-        border: 1px solid var(--border);
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+        width: min(900px, 100%);
+        border-radius: 24px;
+        padding: 48px;
+        background: var(--glass-bg);
+        border: 1px solid var(--glass-border);
+        box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255,255,255,0.1);
+        position: relative;
+        overflow: hidden;
+        transform: translateY(0);
+        transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
       }
+
+      #gameMenu:not(.active) .menu-card {
+        transform: translateY(40px) scale(0.98);
+      }
+
       .menu-kicker {
-        display: inline-flex;
-        gap: 10px;
-        padding: 8px 12px;
-        border-radius: 999px;
-        background: rgba(74, 222, 128, 0.08);
-        color: var(--accent);
+        display: inline-block;
+        padding: 6px 14px;
+        border-radius: 100px;
+        background: rgba(6, 182, 212, 0.1);
+        color: var(--accent-cyan);
+        font-family: 'Outfit', sans-serif;
         font-size: 0.75rem;
+        font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.12em;
-        margin-bottom: 12px;
+        letter-spacing: 0.15em;
+        margin-bottom: 20px;
+        border: 1px solid rgba(6, 182, 212, 0.2);
+        box-shadow: 0 0 20px rgba(6, 182, 212, 0.2);
       }
+
       .menu-title {
-        font-size: clamp(1.6rem, 4.5vw, 3rem);
-        line-height: 1;
-        margin-bottom: 10px;
+        font-family: 'Outfit', sans-serif;
+        font-size: clamp(2.5rem, 6vw, 4rem);
+        font-weight: 800;
+        line-height: 1.1;
+        margin-bottom: 16px;
+        background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        letter-spacing: -0.02em;
       }
+
       .menu-description {
-        color: var(--muted);
-        margin-bottom: 18px;
-        max-width: 60ch;
+        color: var(--text-secondary);
+        font-size: 1.125rem;
+        line-height: 1.6;
+        margin-bottom: 40px;
+        max-width: 50ch;
       }
+
       .game-grid {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
-        gap: 14px;
-        margin-bottom: 18px;
+        gap: 24px;
+        margin-bottom: 40px;
       }
+
       .game-card {
-        padding: 16px;
-        border-radius: 14px;
+        padding: 24px;
+        border-radius: 16px;
         background: rgba(255, 255, 255, 0.02);
-        border: 1px solid rgba(255, 255, 255, 0.06);
+        border: 1px solid var(--glass-border);
         cursor: pointer;
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       }
-      .game-card.active {
+
+      .game-card::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at top right, rgba(255,255,255,0.05) 0%, transparent 60%);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+
+      .game-card:hover {
+        background: rgba(255, 255, 255, 0.04);
         transform: translateY(-4px);
-        border-color: rgba(74, 222, 128, 0.4);
-        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
       }
+
+      .game-card:hover::before {
+        opacity: 1;
+      }
+
+      .game-card.active {
+        background: rgba(6, 182, 212, 0.05);
+        border-color: rgba(6, 182, 212, 0.5);
+        box-shadow: 0 10px 30px rgba(6, 182, 212, 0.15), inset 0 0 20px rgba(6, 182, 212, 0.05);
+        transform: translateY(-4px);
+      }
+
       .game-tag {
         display: inline-block;
-        padding: 4px 8px;
-        border-radius: 999px;
-        background: rgba(74, 222, 128, 0.08);
-        color: var(--accent);
-        font-size: 0.72rem;
+        padding: 4px 10px;
+        border-radius: 100px;
+        background: rgba(255, 255, 255, 0.1);
+        color: #fff;
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.7rem;
+        font-weight: 700;
         text-transform: uppercase;
-        margin-bottom: 8px;
+        margin-bottom: 12px;
+        transition: background 0.3s ease;
       }
-      .launcher-row {
-        display: flex;
-        gap: 12px;
-        margin-bottom: 8px;
+
+      .game-card.active .game-tag {
+        background: var(--accent-cyan);
+        color: #000;
       }
-      .primary-button,
-      .secondary-button {
+
+      .game-card h3 {
+        font-family: 'Outfit', sans-serif;
+        font-size: 1.5rem;
+        margin-bottom: 8px;
+        font-weight: 700;
+      }
+
+      .game-card p {
+        color: var(--text-secondary);
+        font-size: 0.95rem;
+        line-height: 1.5;
+      }
+
+      .primary-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, var(--accent-cyan), #3b82f6);
+        color: #000;
         border: none;
         border-radius: 12px;
-        padding: 10px 14px;
-        font-weight: 700;
+        padding: 16px 32px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 1.125rem;
+        font-weight: 800;
         cursor: pointer;
+        transition: all 0.3s ease;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        box-shadow: 0 10px 25px rgba(6, 182, 212, 0.4);
       }
-      .primary-button {
-        background: linear-gradient(135deg, var(--accent), #22c55e);
-        color: #07111f;
+
+      .primary-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 15px 35px rgba(6, 182, 212, 0.5);
+        filter: brightness(1.1);
       }
-      .secondary-button {
-        background: rgba(255, 255, 255, 0.04);
-        color: var(--text);
-        border: 1px solid var(--border);
+
+      .primary-button:active {
+        transform: translateY(1px);
+        box-shadow: 0 5px 15px rgba(6, 182, 212, 0.3);
       }
 
       .backend-note {
-        margin-top: 10px;
-        color: var(--muted);
-        font-size: 0.92rem;
+        margin-top: 24px;
+        color: #475569;
+        font-size: 0.85rem;
       }
 
-      /* HUD */
+      #error {
+        margin-top: 16px;
+        color: var(--accent-red);
+        font-size: 0.9rem;
+        display: none;
+      }
+
+      /* In-Game HUD */
       #ui {
         position: absolute;
-        top: 20px;
-        left: 20px;
-        right: 20px;
+        top: 24px;
+        left: 24px;
+        right: 24px;
         z-index: 10;
         pointer-events: none;
-      }
-      .hud {
-        background: rgba(9, 18, 35, 0.82);
-        border: 1px solid rgba(255, 255, 255, 0.07);
-        border-radius: 14px;
-        padding: 12px 14px;
-        backdrop-filter: blur(8px);
-      }
-      .hud-row {
         display: flex;
-        gap: 18px;
-        align-items: center;
+        justify-content: space-between;
+        align-items: flex-start;
       }
+
+      .hud-panel {
+        background: rgba(5, 5, 5, 0.5);
+        border: 1px solid var(--glass-border);
+        border-radius: 16px;
+        padding: 16px 20px;
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      }
+
       .hud-item {
         display: flex;
-        gap: 8px;
+        gap: 12px;
         align-items: center;
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--text-secondary);
       }
-      .health-bar {
-        width: 160px;
-        height: 8px;
-        background: rgba(255, 255, 255, 0.06);
-        border-radius: 999px;
+
+      .hud-item span:last-child {
+        color: #fff;
+      }
+
+      .health-bar-container {
+        width: 200px;
+        height: 12px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 100px;
         overflow: hidden;
+        border: 1px solid rgba(255,255,255,0.05);
       }
+
       .health-fill {
         height: 100%;
-        background: linear-gradient(90deg, #4ade80, #22c55e);
+        background: linear-gradient(90deg, var(--accent-green), #34d399);
         width: 100%;
-        transition: width 0.12s ease;
+        transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
       }
 
       #statusBar {
         position: absolute;
-        bottom: 20px;
-        right: 20px;
-        padding: 8px 12px;
-        border-radius: 999px;
-        border: 1px solid var(--border);
-        background: rgba(9, 18, 35, 0.84);
-        font-size: 12px;
+        bottom: 24px;
+        right: 24px;
+        padding: 10px 16px;
+        border-radius: 100px;
+        border: 1px solid var(--glass-border);
+        background: rgba(5, 5, 5, 0.7);
+        backdrop-filter: blur(16px);
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.85rem;
+        font-weight: 600;
         z-index: 10;
+        display: flex;
+        align-items: center;
+        transition: all 0.3s ease;
       }
+
       #statusBar.connected {
-        color: #4ade80;
-        border-color: rgba(74, 222, 128, 0.45);
+        color: var(--accent-green);
+        border-color: rgba(16, 185, 129, 0.3);
+        box-shadow: 0 0 20px rgba(16, 185, 129, 0.1);
       }
+
       #statusBar.disconnected {
-        color: #ef4444;
-        border-color: rgba(239, 68, 68, 0.45);
+        color: var(--accent-red);
+        border-color: rgba(239, 68, 68, 0.3);
       }
+
       .status-indicator {
         display: inline-block;
         width: 8px;
         height: 8px;
-        margin-right: 8px;
-        border-radius: 999px;
-        background: #fbbf24;
-        vertical-align: middle;
-      }
-      .status-indicator.connected {
-        background: #4ade80;
-      }
-      .status-indicator.disconnected {
-        background: #ef4444;
+        margin-right: 10px;
+        border-radius: 50%;
+        background: #f59e0b;
+        box-shadow: 0 0 10px #f59e0b;
       }
 
-      @media (max-width: 900px) {
+      .status-indicator.connected {
+        background: var(--accent-green);
+        box-shadow: 0 0 10px var(--accent-green);
+      }
+
+      .status-indicator.disconnected {
+        background: var(--accent-red);
+        box-shadow: 0 0 10px var(--accent-red);
+      }
+
+      @media (max-width: 768px) {
         .game-grid {
           grid-template-columns: 1fr;
+        }
+        .menu-title {
+          font-size: 2.5rem;
         }
       }
     </style>
   </head>
   <body>
+    <div class="bg-mesh"></div>
+
     <div id="gameMenu" class="active">
       <div class="menu-card">
-        <div class="menu-kicker">Example game launcher</div>
-        <h1 class="menu-title">Choose a demo mode</h1>
+        <div class="menu-kicker">Next-Gen Serverless Engine</div>
+        <h1 class="menu-title">Select Experience</h1>
         <p class="menu-description">
-          Select one of the sample games below and launch into the fixed example
-          backend. A player name is generated automatically.
+          Choose a demo module to connect to the global Cloudflare Edge network.
+          Real-time Matchmaking and WebSockets will initialize instantly.
         </p>
 
         <div class="game-grid">
           <div class="game-card active" data-game="moba">
-            <div class="game-tag">MOBA</div>
+            <div class="game-tag">MOBA Logic</div>
             <h3>Arena Wars</h3>
-            <p style="color: var(--muted)">
-              Isometric team battles with movement, lane pressure, and shared
-              objectives.
+            <p>
+              Isometric team battles. Tests 2D state sync and authoritative pathing over WebSockets.
             </p>
           </div>
           <div class="game-card" data-game="fps">
-            <div class="game-tag">FPS</div>
+            <div class="game-tag">FPS Logic</div>
             <h3>CyberArena</h3>
-            <p style="color: var(--muted)">
-              First-person combat with sprinting, jumping, and a neon-lit arena.
+            <p>
+              First-person combat. Tests 60Hz tick rates, 3D transform sync, and latency compensation.
             </p>
           </div>
         </div>
 
-        <div class="launcher-row">
-          <button id="playButton" class="primary-button">Join Game</button>
-        </div>
+        <button id="playButton" class="primary-button">Find Match</button>
 
         <div class="backend-note">
-          Backend locked to
-          https://partygame-example-backend.aliciaworks.workers.dev/
-        </div>
-        <div class="backend-note">
-          Player name is auto-generated the first time you launch.
+          Running on Cloudflare Workers & Durable Objects.
         </div>
         <div id="error"></div>
       </div>
@@ -286,32 +414,28 @@
     <canvas id="renderCanvas"></canvas>
 
     <div id="ui">
-      <div class="hud">
-        <div class="hud-row">
-          <div class="hud-item">
-            <span>Health:</span>
-            <div class="health-bar">
-              <div
-                class="health-fill"
-                id="health-fill"
-                style="width: 100%"
-              ></div>
-            </div>
-            <span id="health-text">100/100</span>
+      <div class="hud-panel">
+        <div class="hud-item">
+          <span>HULL INTEGRITY</span>
+          <div class="health-bar-container">
+            <div class="health-fill" id="health-fill" style="width: 100%"></div>
           </div>
-          <div class="hud-item">
-            <span>Position:</span><span id="position-text">0, 0</span>
-          </div>
-          <div class="hud-item">
-            <span>Players Online:</span><span id="players-text">0</span>
-          </div>
+          <span id="health-text">100%</span>
+        </div>
+        <div class="hud-item">
+          <span>COORDINATES</span>
+          <span id="position-text">0.00, 0.00</span>
+        </div>
+        <div class="hud-item">
+          <span>NETWORK ENTITIES</span>
+          <span id="players-text">0</span>
         </div>
       </div>
     </div>
 
     <div id="statusBar" class="disconnected">
-      <span class="status-indicator disconnected"></span
-      ><span id="statusText">Disconnected</span>
+      <span class="status-indicator disconnected"></span>
+      <span id="statusText">System Offline</span>
     </div>
 
     <script type="module" src="/src/main.ts"></script>

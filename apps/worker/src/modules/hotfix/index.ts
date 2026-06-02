@@ -60,7 +60,7 @@ async function readLatest(bucket: R2Bucket | undefined): Promise<string | null> 
 
 async function shaLike(input: ArrayBuffer | Uint8Array): Promise<string> {
   const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const digest = await crypto.subtle.digest("SHA-256", bytes as any);
   return Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, "0")).join("");
 }
 
