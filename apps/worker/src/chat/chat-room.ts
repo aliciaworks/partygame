@@ -126,8 +126,26 @@ export class ChatRoom implements DurableObject {
       typeof data.playerName === "string" ? data.playerName : session.playerName;
 
     const rawText = typeof data.text === "string" ? data.text : "";
-    const sanitized = this.sanitizeText(rawText);
+    let sanitized = this.sanitizeText(rawText);
     if (sanitized.length === 0) return;
+
+    if (this.env.AI) {
+      try {
+        const aiResult = await this.env.AI.run('@cf/meta/llama-3-8b-instruct', {
+          messages: [
+            { role: 'system', content: 'You are an automated chat moderator. Your job is to classify text. If the text contains profanity, hate speech, or extreme toxicity, reply with ONLY the word "YES". Otherwise, reply with ONLY the word "NO". Do not include any other text.' },
+            { role: 'user', content: sanitized }
+          ],
+          max_tokens: 5
+        });
+        const response = (aiResult as any).response || "";
+        if (response.trim().toUpperCase().includes('YES')) {
+          sanitized = '[Message removed by moderation]';
+        }
+      } catch (err) {
+        console.error("[ChatRoom] AI moderation failed:", err);
+      }
+    }
 
     const message: ChatMessage = {
       type: "chat",

@@ -293,7 +293,6 @@ export const playerAuthModule: WorkerModule = {
       };
 
       // Verify Turnstile CAPTCHA to block bot-driven account creation
-      const ip = c.req.header("CF-Connecting-IP") ?? "";
       const turnstileOk = await verifyTurnstile(
         body.turnstileToken,
         (c.env as any).TURNSTILE_SECRET,
@@ -390,18 +389,21 @@ export const playerAuthModule: WorkerModule = {
         return c.json({ error: "MISSING_TOKEN" }, 400);
       }
 
-      // Verify Google ID token via tokeninfo endpoint
-      const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${body.idToken}`);
-      if (!response.ok) {
-        return c.json({ error: "INVALID_GOOGLE_TOKEN" }, 401);
-      }
+      try {
+        const JWKS = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'));
+        const { payload } = await jwtVerify(body.idToken, JWKS, {
+          issuer: ['https://accounts.google.com', 'accounts.google.com'],
+          // In a real app, audience should be verified against your Google Client ID
+          // audience: 'YOUR_CLIENT_ID.apps.googleusercontent.com' 
+        });
 
-      const payload = await response.json() as any;
-      const googleId = payload.sub;
-      const playerName = payload.name || "Google Player";
-      const playerId = `google-${googleId}`;
+        const googleId = payload.sub;
+        if (!googleId) throw new Error("No sub in token");
 
-      await upsertAccount(c.env.PLATFORM_BUCKET, playerId, playerName);
+        const playerName = payload.name?.toString() || payload.email?.toString().split('@')[0] || "Google Player";
+        const playerId = `google-${googleId}`;
+
+        await upsertAccount(c.env.PLATFORM_BUCKET, playerId, playerName);
 
       let secret: string | null;
       try {
@@ -413,12 +415,15 @@ export const playerAuthModule: WorkerModule = {
         ? await createSignedTokenForPlayer(playerId, secret)
         : createToken(playerId, playerName);
 
-      return c.json({
-        token: signedToken,
-        playerId,
-        playerName,
-        expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-      });
+        return c.json({
+          token: signedToken,
+          playerId,
+          playerName,
+          expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+        });
+      } catch (e) {
+        return c.json({ error: "INVALID_GOOGLE_TOKEN" }, 401);
+      }
     });
 
     app.post("/auth/apple", async (c) => {

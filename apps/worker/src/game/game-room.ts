@@ -42,6 +42,13 @@ export class GameRoom implements DurableObject {
     this.plugin.onJoin(session);
     server.send(JSON.stringify({ type: "init", playerId }));
 
+    if (this.env.ANALYTICS) {
+      this.env.ANALYTICS.writeDataPoint({
+        blobs: ["game_connected", playerId, gameType],
+        doubles: [1],
+      });
+    }
+
     // Only start the game loop when the plugin requires ticking
     if (this.interval === null && this.plugin.tickIntervalMs > 0) {
       this.startGameLoop();
@@ -83,7 +90,16 @@ export class GameRoom implements DurableObject {
   async webSocketClose(ws: WebSocket, _code: number, _reason: string): Promise<void> {
     const tags = this.state.getTags(ws);
     const playerId = tags[0];
+    const gameType = tags[1] || "moba";
+
     if (playerId) {
+      if (this.env.ANALYTICS) {
+        this.env.ANALYTICS.writeDataPoint({
+          blobs: ["game_disconnected", playerId, gameType],
+          doubles: [1],
+        });
+      }
+
       this.state.getWebSockets().forEach(() => {}); // ensure state is current
       if (this.interval !== null && this.state.getWebSockets().length === 0) {
         clearInterval(this.interval as any);

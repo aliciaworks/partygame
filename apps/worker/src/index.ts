@@ -262,9 +262,32 @@ export default {
       
       const data = message.body;
       if (data.type === "MATCH_END") {
-        // e.g. update player stats in D1 database here
         console.log(`Match ${data.matchId} ended! Processing ${data.players.length} players...`);
-        // await env.DB.prepare(...).run()
+        
+        if (env.DB && Array.isArray(data.players)) {
+          const stmts = data.players.map((playerId: string) => {
+            const isWinner = playerId === data.winnerId;
+            const pointsAdded = isWinner ? 10 : 2;
+            const playerName = "Player"; // We can resolve name later or assume it's just 'Player'
+
+            return env.DB.prepare(
+              `INSERT INTO leaderboard (leaderboard_id, player_id, player_name, score) 
+               VALUES ('global_rank', ?, ?, ?) 
+               ON CONFLICT(leaderboard_id, player_id) DO UPDATE SET 
+               score = leaderboard.score + excluded.score, 
+               updated_at = CURRENT_TIMESTAMP`
+            ).bind(playerId, playerName, pointsAdded);
+          });
+
+          if (stmts.length > 0) {
+            try {
+              await env.DB.batch(stmts);
+              console.log(`Successfully updated D1 leaderboard for ${stmts.length} players.`);
+            } catch (err) {
+              console.error("Failed to update D1 leaderboard batch", err);
+            }
+          }
+        }
       }
 
       message.ack();

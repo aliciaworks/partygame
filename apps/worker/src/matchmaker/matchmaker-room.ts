@@ -143,6 +143,12 @@ export class MatchmakerRoom implements DurableObject {
         for (const player of group) {
           matchedPlayerIds.add(player.playerId);
           allocations.set(player.playerId, { roomId, gameType, allocatedAt });
+          if (this.env.ANALYTICS) {
+            this.env.ANALYTICS.writeDataPoint({
+              blobs: ["match_allocated", player.playerId, gameType, roomId],
+              doubles: [1],
+            });
+          }
         }
       }
     }
@@ -185,6 +191,13 @@ export class MatchmakerRoom implements DurableObject {
       // Remove any existing queue entry for this player before re-adding
       queue = queue.filter((e) => e.playerId !== playerId);
       queue.push({ playerId, gameType, joinedAt: Date.now() });
+
+      if (this.env.ANALYTICS) {
+        this.env.ANALYTICS.writeDataPoint({
+          blobs: ["match_queued", playerId, gameType],
+          doubles: [1],
+        });
+      }
 
       // Attempt to match players before saving
       ({ queue, allocations } = this.tryMatch(queue, allocations));

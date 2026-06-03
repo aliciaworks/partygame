@@ -31,7 +31,7 @@ This repository uses a modern `npm` workspace monorepo structure:
 partygame/
   ├── apps/
   │   ├── worker/          # The Core Serverless Engine (Cloudflare Workers)
-  │   ├── admin/           # SvelteKit Admin Control Plane (Cloudflare Pages)
+  │   ├── admin/           # React + Vite Admin Control Plane (Cloudflare Pages)
   │   └── example-game/    # Web-based Reference Game (Babylon.js)
   ├── sdks/
   │   ├── unity/           # Generated & Template C# SDK for Unity
@@ -61,7 +61,7 @@ The backend will run on `http://localhost:8787` with:
 - `/ws?roomId=...` - The Core Game WebSocket
 
 ### 2. The Admin Control Plane
-A beautiful, separate SvelteKit dashboard to manage your game empire.
+A beautiful, separate React dashboard to manage your game empire, styled with Cloudflare Kumo and built with Vite.
 
 ```bash
 cd apps/admin
