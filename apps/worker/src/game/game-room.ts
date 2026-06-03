@@ -1,6 +1,7 @@
 import type { GameTickUpdate } from "@partygame/shared";
 import type { GamePlugin, Session } from "./plugin";
 import { getGamePlugin } from "../plugins/registry";
+import { encode, decode } from "@msgpack/msgpack";
 
 // ---------------------------------------------------------------------------
 // GameRoom Durable Object — uses the WebSocket Hibernation API so that
@@ -40,7 +41,7 @@ export class GameRoom implements DurableObject {
     // Initialize plugin state for this player immediately
     const session = this.getOrCreateSession(server, playerId);
     this.plugin.onJoin(session);
-    server.send(JSON.stringify({ type: "init", playerId }));
+    server.send(encode({ type: "init", playerId }));
 
     if (this.env.ANALYTICS) {
       this.env.ANALYTICS.writeDataPoint({
@@ -69,6 +70,18 @@ export class GameRoom implements DurableObject {
 
     try {
       if (message instanceof ArrayBuffer) {
+        try {
+          // Try to decode as MessagePack first
+          const parsed = decode(new Uint8Array(message)) as any;
+          if (parsed && parsed.type === "input") {
+            this.plugin.onInput(session, parsed.inputType, parsed.data);
+            this.flushBroadcasts();
+            return;
+          }
+        } catch (err) {
+          // Fallback to pure binary payload for custom C++/C# binary handlers
+        }
+
         if (this.plugin.onBinaryInput) {
           this.plugin.onBinaryInput(session, message);
           this.flushBroadcasts();
@@ -256,7 +269,7 @@ export class GameRoom implements DurableObject {
         this.persistSession(session);
       }
 
-      const updateMsg = JSON.stringify(update);
+      const updateMsg = encode(update);
       for (const ws of this.state.getWebSockets()) {
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(updateMsg);

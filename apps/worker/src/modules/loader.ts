@@ -1,4 +1,5 @@
 import type { Hono } from "hono";
+import type { AppEnv } from "../env";
 import { playerAuthModule } from "./player_auth/index";
 import { playerProgressModule } from "./player_progress/index";
 
@@ -18,9 +19,9 @@ export type ModuleManifest = {
   icon?: string;
 };
 
-export type WorkerModule<Bindings = Record<string, unknown>> = {
+export type WorkerModule<Bindings = AppEnv> = {
   manifest: ModuleManifest;
-  init: (app: Hono<any>) => void;
+  init: (app: Hono<AppEnv>) => void;
 };
 
 const defaultModules = [
@@ -41,9 +42,9 @@ export function getModuleManifests(): ModuleManifest[] {
   return defaultModules.map((module) => module.manifest);
 }
 
-export function mountModules<Bindings = Record<string, unknown>>(
-  app: Hono<any>,
-  modules: readonly WorkerModule<Bindings>[] = defaultModules,
+export function mountModules(
+  app: Hono<AppEnv>,
+  modules: readonly WorkerModule[] = defaultModules,
 ): void {
   for (const module of modules) {
     module.init(app);

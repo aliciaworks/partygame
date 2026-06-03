@@ -231,8 +231,8 @@ export const playerAuthModule: WorkerModule = {
   init(app: Hono<any>) {
     app.post("/auth/register", async (c) => {
       const ip = c.req.header("CF-Connecting-IP") ?? "unknown-ip";
-      if ((c.env as any).AUTH_RATE_LIMITER) {
-        const { success } = await (c.env as any).AUTH_RATE_LIMITER.limit({ key: ip });
+      if (c.env.AUTH_RATE_LIMITER) {
+        const { success } = await c.env.AUTH_RATE_LIMITER.limit({ key: ip });
         if (!success) return c.json({ error: "RATE_LIMITED", message: "Too many requests" }, 429);
       }
 
@@ -244,7 +244,7 @@ export const playerAuthModule: WorkerModule = {
       // Verify Turnstile CAPTCHA to block bot-driven account creation
       const turnstileOk = await verifyTurnstile(
         body.turnstileToken,
-        (c.env as any).TURNSTILE_SECRET,
+        c.env.TURNSTILE_SECRET,
         ip,
       );
       if (!turnstileOk) {
@@ -284,8 +284,8 @@ export const playerAuthModule: WorkerModule = {
 
     app.post("/auth/login", async (c) => {
       const ip = c.req.header("CF-Connecting-IP") ?? "unknown-ip";
-      if ((c.env as any).AUTH_RATE_LIMITER) {
-        const { success } = await (c.env as any).AUTH_RATE_LIMITER.limit({ key: ip });
+      if (c.env.AUTH_RATE_LIMITER) {
+        const { success } = await c.env.AUTH_RATE_LIMITER.limit({ key: ip });
         if (!success) return c.json({ error: "RATE_LIMITED", message: "Too many requests" }, 429);
       }
 
@@ -352,7 +352,7 @@ export const playerAuthModule: WorkerModule = {
 
       let secret: string | null;
       try {
-        secret = requirePlayerSecret(c.req.raw, (c.env as any).PLAYER_SECRET);
+        secret = requirePlayerSecret(c.req.raw, c.env.PLAYER_SECRET);
       } catch (error) {
         return c.json({ error: "SERVER_MISCONFIG", message: (error as Error).message }, 500);
       }
@@ -397,7 +397,7 @@ export const playerAuthModule: WorkerModule = {
 
         let secret: string | null;
         try {
-          secret = requirePlayerSecret(c.req.raw, (c.env as any).PLAYER_SECRET);
+          secret = requirePlayerSecret(c.req.raw, c.env.PLAYER_SECRET);
         } catch (error) {
           return c.json({ error: "SERVER_MISCONFIG", message: (error as Error).message }, 500);
         }

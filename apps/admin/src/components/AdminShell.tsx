@@ -8,10 +8,6 @@ export function AdminShell() {
   const [token, setToken] = useState(localStorage.getItem("partygame.portal.adminToken"));
   const { t, i18n } = useTranslation();
 
-  if (!token) {
-    return <LoginScreen onLogin={(t) => setToken(t)} />;
-  }
-
   const [theme, setTheme] = useState<"light" | "dark" | "system">(
     (localStorage.getItem("partygame.theme") as any) || "system"
   );
@@ -30,6 +26,10 @@ export function AdminShell() {
       document.documentElement.style.colorScheme = theme;
     }
   }, [theme]);
+
+  if (!token) {
+    return <LoginScreen onLogin={(t) => setToken(t)} />;
+  }
 
   const handleLangChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     i18n.changeLanguage(e.target.value);

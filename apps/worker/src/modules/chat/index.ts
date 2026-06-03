@@ -27,7 +27,7 @@ export const chatModule: WorkerModule = {
      * Durable Object identified by roomId.
      */
     app.get("/chat/ws", (c) => {
-      const namespace: DurableObjectNamespace | undefined = (c.env as any).CHAT_ROOM;
+      const namespace: DurableObjectNamespace | undefined = c.env.CHAT_ROOM;
       if (!namespace) {
         return c.json({ error: "CHAT_ROOM binding is not configured" }, 500);
       }
@@ -45,7 +45,7 @@ export const chatModule: WorkerModule = {
      * Retrieves the last 50 persisted messages from a ChatRoom instance.
      */
     app.get("/chat/history", async (c) => {
-      const namespace: DurableObjectNamespace | undefined = (c.env as any).CHAT_ROOM;
+      const namespace: DurableObjectNamespace | undefined = c.env.CHAT_ROOM;
       if (!namespace) {
         return c.json({ error: "CHAT_ROOM binding is not configured" }, 500);
       }

@@ -18,23 +18,7 @@ export { GameRoom } from "./game/game-room";
 export { MatchmakerRoom } from "./matchmaker/matchmaker-room";
 export { ChatRoom } from "./chat/chat-room";
 
-type AppEnv = {
-  Variables: {
-    platformState: PlatformState;
-    isAdmin: boolean;
-  };
-  Bindings: {
-    PLATFORM_BUCKET?: R2Bucket;
-    ADMIN_SECRET?: string;
-    ADMIN_TOKEN?: string;
-    PLAYER_SECRET?: string;
-    GAME_ROOM?: DurableObjectNamespace;
-    MATCHMAKER_ROOM?: DurableObjectNamespace;
-    CHAT_ROOM?: DurableObjectNamespace;
-    CALLS_APP_ID?: string;
-    CALLS_APP_SECRET?: string;
-  };
-};
+import type { AppEnv } from "./env";
 
 const app = new Hono<AppEnv>();
 

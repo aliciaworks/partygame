@@ -52,7 +52,7 @@ export const voiceModule: WorkerModule = {
      * Response:     { sessionId: string, sessionToken: string }
      */
     app.post("/voice/session", async (c) => {
-      const creds = resolveCallsCredentials(c.env as any);
+      const creds = resolveCallsCredentials(c.env);
       if (!creds) {
         // Calls credentials not configured – tell the client the feature is unavailable
         return c.json({ error: "VOICE_NOT_CONFIGURED" }, 501);
@@ -107,7 +107,7 @@ export const voiceModule: WorkerModule = {
      * Request body: { sessionId: string, tracks: any[] }
      */
     app.post("/voice/tracks", async (c) => {
-      const creds = resolveCallsCredentials(c.env as any);
+      const creds = resolveCallsCredentials(c.env);
       if (!creds) {
         return c.json({ error: "VOICE_NOT_CONFIGURED" }, 501);
       }
@@ -158,7 +158,7 @@ export const voiceModule: WorkerModule = {
      * Response: { success: true }
      */
     app.delete("/voice/session/:sessionId", async (c) => {
-      const creds = resolveCallsCredentials(c.env as any);
+      const creds = resolveCallsCredentials(c.env);
       if (!creds) {
         return c.json({ error: "VOICE_NOT_CONFIGURED" }, 501);
       }

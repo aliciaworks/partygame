@@ -1,20 +1,17 @@
-import { useEffect, useState } from "react";
-import { portal, type PlatformState } from "../lib/portal";
+import { useQuery } from "@tanstack/react-query";
+import { portal } from "../lib/portal";
 import { useTranslation } from "react-i18next";
 
 export function Dashboard() {
-  const [state, setState] = useState<PlatformState | null>(null);
-  const [error, setError] = useState("");
+  const { data: state, error, isLoading } = useQuery({
+    queryKey: ['platformState'],
+    queryFn: () => portal.getPlatformState()
+  });
+
   const { t } = useTranslation();
 
-  useEffect(() => {
-    portal.getPlatformState()
-      .then(setState)
-      .catch(e => setError(e.message));
-  }, []);
-
-  if (error) return <div style={{ color: "red" }}>{t('common.error')}: {error}</div>;
-  if (!state) return <div>{t('common.loading')}</div>;
+  if (error) return <div style={{ color: "red" }}>{t('common.error')}: {(error as Error).message}</div>;
+  if (isLoading || !state) return <div>{t('common.loading')}</div>;
 
   return (
     <div>

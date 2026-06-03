@@ -1,13 +1,18 @@
-import React from "react";
+import React, { Suspense } from "react";
 import ReactDOM from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import "@cloudflare/kumo/styles";
 import "./index.css";
 import "./i18n";
 
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
 import { AdminShell } from "./components/AdminShell";
-import { Dashboard } from "./routes/Dashboard";
-import { Modules } from "./routes/Modules";
+
+const Dashboard = React.lazy(() => import("./routes/Dashboard").then(m => ({ default: m.Dashboard })));
+const Modules = React.lazy(() => import("./routes/Modules").then(m => ({ default: m.Modules })));
+
+const queryClient = new QueryClient();
 
 const router = createBrowserRouter([
   {
@@ -40,6 +45,10 @@ const router = createBrowserRouter([
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <RouterProvider router={router} />
+    <QueryClientProvider client={queryClient}>
+      <Suspense fallback={<div style={{ padding: "2rem" }}>Loading App...</div>}>
+        <RouterProvider router={router} />
+      </Suspense>
+    </QueryClientProvider>
   </React.StrictMode>
 );
