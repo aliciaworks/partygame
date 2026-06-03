@@ -15,11 +15,19 @@ export type Deprecation = {
   reason?: string;
 };
 
+export type MaintenanceWindow = {
+  enabled: boolean;
+  startTime?: string; // ISO date string
+  endTime?: string; // ISO date string
+  message?: string;
+};
+
 export type PlatformState = {
   features: PlatformFeatures;
   apiVersion: string; // ISO date (YYYY-MM-DD) - deployment date
   minClientVersion?: string; // minimum required client version (SemVer)
   deprecations: Deprecation[]; // APIs scheduled for removal
+  maintenance?: MaintenanceWindow;
   revision: number;
   updatedAt: string;
 };
@@ -143,6 +151,7 @@ export async function readPlatformState(
       apiVersion: parsed.apiVersion ?? getISODateString(),
       minClientVersion: parsed.minClientVersion,
       deprecations: normalizeDeprecations(parsed.deprecations),
+      maintenance: parsed.maintenance,
       revision: typeof parsed.revision === "number" ? parsed.revision : 0,
       updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : new Date().toISOString(),
     };
@@ -174,6 +183,7 @@ export async function patchPlatformFeatures(
     apiVersion: getISODateString(),
     minClientVersion: current.minClientVersion,
     deprecations: current.deprecations,
+    maintenance: current.maintenance,
     revision: current.revision + 1,
     updatedAt: new Date().toISOString(),
   };
@@ -206,6 +216,7 @@ export async function patchPlatformState(
     apiVersion: updates.apiVersion ?? getISODateString(),
     minClientVersion: updates.minClientVersion ?? current.minClientVersion,
     deprecations: normalizeDeprecations(updates.deprecations ?? current.deprecations),
+    maintenance: updates.maintenance !== undefined ? updates.maintenance : current.maintenance,
     revision: current.revision + 1,
     updatedAt: new Date().toISOString(),
   };

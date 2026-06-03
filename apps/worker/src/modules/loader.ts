@@ -5,6 +5,11 @@ import { playerProgressModule } from "./player_progress/index";
 import { hotfixModule } from "./hotfix/index";
 import { playerManagementModule } from "./player_management/index";
 import { matchmakingModule } from "./matchmaking/index";
+import { voiceModule } from "./voice/index";
+import { friendsModule } from "./friends/index";
+import { chatModule } from "./chat/index";
+import { leaderboardModule } from "./leaderboard/index";
+import { playerProfileModule } from "./player_profile/index";
 
 export type ModuleManifest = {
   id: string;
@@ -25,6 +30,11 @@ const defaultModules = [
   hotfixModule,
   playerManagementModule,
   matchmakingModule,
+  voiceModule,
+  friendsModule,
+  chatModule,
+  leaderboardModule,
+  playerProfileModule,
 ] as const;
 
 export function getModuleManifests(): ModuleManifest[] {

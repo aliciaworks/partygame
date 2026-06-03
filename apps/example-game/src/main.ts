@@ -2,6 +2,9 @@ import * as BABYLON from "@babylonjs/core";
 import { GameManager } from "./core/game-manager";
 import { MOBAGame } from "./games/moba/moba-game";
 import { FPSGame } from "./games/fps/fps-game";
+import { CardGame } from "./games/card/card-game";
+import { BattleRoyaleGame } from "./games/battle_royale/br-game";
+import { RacingGame } from "./games/racing/racing-game";
 import { NetworkManager } from "./core/network-manager";
 
 const DEFAULT_BACKEND_URL =
@@ -15,7 +18,7 @@ class PartyGameApp {
   private engine: BABYLON.Engine;
   private gameManager: GameManager;
   private networkManager: NetworkManager;
-  private currentGame: MOBAGame | FPSGame | null = null;
+  private currentGame: any = null;
   private selectedGameType: string = "moba";
 
   constructor() {
@@ -111,6 +114,12 @@ class PartyGameApp {
         this.currentGame = new MOBAGame(scene, this.networkManager);
       } else if (gameType === "fps") {
         this.currentGame = new FPSGame(scene, this.networkManager);
+      } else if (gameType === "card") {
+        this.currentGame = new CardGame(scene, this.networkManager);
+      } else if (gameType === "battle_royale") {
+        this.currentGame = new BattleRoyaleGame(scene, this.networkManager);
+      } else if (gameType === "racing") {
+        this.currentGame = new RacingGame(scene, this.networkManager);
       }
 
       if (this.currentGame) {

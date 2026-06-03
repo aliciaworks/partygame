@@ -16,6 +16,7 @@ import { enforceRateLimit, rateLimitResponse } from "./rate-limit";
 import { PlatformStateConflictError } from "./platform-state";
 export { GameRoom } from "./game/game-room";
 export { MatchmakerRoom } from "./matchmaker/matchmaker-room";
+export { ChatRoom } from "./chat/chat-room";
 
 type AppEnv = {
   Variables: {
@@ -29,6 +30,9 @@ type AppEnv = {
     PLAYER_SECRET?: string;
     GAME_ROOM?: DurableObjectNamespace;
     MATCHMAKER_ROOM?: DurableObjectNamespace;
+    CHAT_ROOM?: DurableObjectNamespace;
+    CALLS_APP_ID?: string;
+    CALLS_APP_SECRET?: string;
   };
 };
 
@@ -87,6 +91,29 @@ app.use("*", async (c, next) => {
     isAdmin = true;
   }
   c.set("isAdmin", isAdmin);
+
+  // Check for maintenance mode
+  if (!isAdmin && platformState.maintenance?.enabled) {
+    const now = new Date();
+    const startTime = platformState.maintenance.startTime ? new Date(platformState.maintenance.startTime) : null;
+    const endTime = platformState.maintenance.endTime ? new Date(platformState.maintenance.endTime) : null;
+
+    let inMaintenance = true;
+    if (startTime && now < startTime) inMaintenance = false;
+    if (endTime && now > endTime) inMaintenance = false;
+
+    if (inMaintenance) {
+      return c.json(
+        {
+          error: "MAINTENANCE_MODE",
+          message: platformState.maintenance.message || "Server is down for maintenance.",
+          startTime: platformState.maintenance.startTime,
+          endTime: platformState.maintenance.endTime,
+        },
+        503,
+      );
+    }
+  }
 
   await next();
 
@@ -226,4 +253,21 @@ app.patch("/admin/platform", async (c) => {
   }
 });
 
-export default app;
+export default {
+  fetch: app.fetch,
+  async queue(batch: MessageBatch<any>, env: any, ctx: ExecutionContext) {
+    // Process background tasks (e.g., post-match XP/Coins processing)
+    for (const message of batch.messages) {
+      console.log(`Processing message from queue:`, message.id);
+      
+      const data = message.body;
+      if (data.type === "MATCH_END") {
+        // e.g. update player stats in D1 database here
+        console.log(`Match ${data.matchId} ended! Processing ${data.players.length} players...`);
+        // await env.DB.prepare(...).run()
+      }
+
+      message.ack();
+    }
+  }
+};

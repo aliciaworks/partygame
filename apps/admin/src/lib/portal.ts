@@ -16,11 +16,19 @@ export type PlatformFeatures = {
   playerProfile: boolean;
 };
 
+export type MaintenanceWindow = {
+  enabled: boolean;
+  startTime?: string;
+  endTime?: string;
+  message?: string;
+};
+
 export type PlatformState = {
   features: PlatformFeatures;
   apiVersion?: string;
   minClientVersion?: string;
   deprecations?: Array<{ path: string; removedAt: string; alternative?: string; reason?: string }>;
+  maintenance?: MaintenanceWindow;
   revision?: number;
   updatedAt?: string;
 };
@@ -421,6 +429,18 @@ export async function patchPlatformFeatures(
   expectedRevision?: number,
 ): Promise<PlatformState> {
   return adminFetch<PlatformState>(backendUrl, "/admin/platform/features", {
+    method: "PATCH",
+    headers: expectedRevision === undefined ? undefined : { "If-Match": String(expectedRevision) },
+    body: JSON.stringify(updates),
+  });
+}
+
+export async function patchPlatformState(
+  backendUrl: string,
+  updates: Partial<PlatformState>,
+  expectedRevision?: number,
+): Promise<PlatformState> {
+  return adminFetch<PlatformState>(backendUrl, "/admin/platform", {
     method: "PATCH",
     headers: expectedRevision === undefined ? undefined : { "If-Match": String(expectedRevision) },
     body: JSON.stringify(updates),

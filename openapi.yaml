@@ -1,0 +1,275 @@
+openapi: 3.0.3
+info:
+  title: PartyGame Backend API
+  description: OpenAPI specification for the PartyGame serverless backend, designed for auto-generating native SDKs.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8787
+    description: Local development server
+paths:
+  /auth/login:
+    post:
+      summary: Login via Player ID / Name
+      operationId: login
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                playerId:
+                  type: string
+                playerName:
+                  type: string
+      responses:
+        '200':
+          description: Successful login
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+  /auth/google:
+    post:
+      summary: Login via Google ID Token
+      operationId: loginWithGoogle
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                idToken:
+                  type: string
+      responses:
+        '200':
+          description: Successful login
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+  /auth/apple:
+    post:
+      summary: Login via Apple ID Token
+      operationId: loginWithApple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                idToken:
+                  type: string
+                name:
+                  type: string
+      responses:
+        '200':
+          description: Successful login
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+  /matchmaking/join:
+    post:
+      summary: Join the matchmaking queue
+      operationId: joinMatchmaking
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                playerId:
+                  type: string
+                gameType:
+                  type: string
+                  default: moba
+      responses:
+        '200':
+          description: Joined queue
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+  /matchmaking/status:
+    get:
+      summary: Check matchmaking status
+      operationId: getMatchmakingStatus
+      parameters:
+        - name: playerId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Current match status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [queued, matched, none]
+                  roomId:
+                    type: string
+                  gameType:
+                    type: string
+  /leaderboard/{id}:
+    get:
+      summary: Get Leaderboard
+      operationId: getLeaderboard
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Top players
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LeaderboardEntry'
+                  updatedAt:
+                    type: string
+                    format: date-time
+  /leaderboard/{id}/submit:
+    post:
+      summary: Submit Score
+      operationId: submitScore
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                playerId:
+                  type: string
+                playerName:
+                  type: string
+                score:
+                  type: number
+      responses:
+        '200':
+          description: Score submitted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+  /profile/{id}:
+    get:
+      summary: Get Player Profile
+      operationId: getProfile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Player profile data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerProfile'
+    patch:
+      summary: Update Player Profile
+      operationId: updateProfile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                playerId:
+                  type: string
+                level:
+                  type: number
+                winRate:
+                  type: number
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  profile:
+                    $ref: '#/components/schemas/PlayerProfile'
+
+components:
+  schemas:
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        playerId:
+          type: string
+        playerName:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+    LeaderboardEntry:
+      type: object
+      properties:
+        playerId:
+          type: string
+        playerName:
+          type: string
+        score:
+          type: number
+        timestamp:
+          type: string
+          format: date-time
+    PlayerProfile:
+      type: object
+      properties:
+        playerId:
+          type: string
+        playerName:
+          type: string
+        level:
+          type: number
+        winRate:
+          type: number
+        items:
+          type: array
+          items:
+            type: string
+        lastSeen:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time

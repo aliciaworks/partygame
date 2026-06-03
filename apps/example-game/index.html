@@ -141,8 +141,8 @@
 
       .game-grid {
         display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 24px;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 20px;
         margin-bottom: 40px;
       }
 
@@ -398,6 +398,27 @@
             <h3>CyberArena</h3>
             <p>
               First-person combat. Tests 60Hz tick rates, 3D transform sync, and latency compensation.
+            </p>
+          </div>
+          <div class="game-card" data-game="card">
+            <div class="game-tag">Turn-Based</div>
+            <h3>Card Clash</h3>
+            <p>
+              Event-driven card game. Tests no-tick inputs and custom state overlays.
+            </p>
+          </div>
+          <div class="game-card" data-game="battle_royale">
+            <div class="game-tag">BR Logic</div>
+            <h3>Shrinking Zone</h3>
+            <p>
+              Last man standing. Tests global environmental variables (Safe Zone) sync.
+            </p>
+          </div>
+          <div class="game-card" data-game="racing">
+            <div class="game-tag">Racing Logic</div>
+            <h3>Neon Track</h3>
+            <p>
+              Circuit racing. Tests checkpoints, laps, and custom player state variables.
             </p>
           </div>
         </div>

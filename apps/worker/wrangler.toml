@@ -10,10 +10,67 @@ class_name = "GameRoom"
 name = "MATCHMAKER_ROOM"
 class_name = "MatchmakerRoom"
 
+[[durable_objects.bindings]]
+name = "CHAT_ROOM"
+class_name = "ChatRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["GameRoom"]
+
 [[migrations]]
 tag = "v2"
 new_sqlite_classes = ["MatchmakerRoom"]
 
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["ChatRoom"]
+
 [[r2_buckets]]
 binding = "PLATFORM_BUCKET"
 bucket_name = "partygame-platform"
+
+# Cloudflare Calls credentials - set via wrangler secret or .dev.vars
+# CALLS_APP_ID = ""
+# CALLS_APP_SECRET = ""
+
+[[d1_databases]]
+binding = "DB"
+database_name = "partygame-db"
+database_id = "00000000-0000-0000-0000-000000000000" # Dummy ID for local dev
+
+[[queues.producers]]
+binding = "MATCH_QUEUE"
+queue = "match-queue"
+
+[[queues.consumers]]
+queue = "match-queue"
+max_batch_size = 10
+max_batch_timeout = 5
+
+# Workers AI — serverless GPU inference for chat moderation and AI NPCs
+[ai]
+binding = "AI"
+
+# Analytics Engine — custom game metrics (matches played, session duration, etc.)
+[[analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "partygame_events"
+
+# Observability — enable built-in Workers logs and traces in the dashboard
+[observability]
+enabled = true
+
+# Rate Limiting — built-in API to prevent abuse without a database
+[[ratelimits]]
+name = "AUTH_RATE_LIMITER"
+namespace_id = "1001"
+# Limit to 10 requests per minute per IP for authentication routes
+simple = { limit = 10, period = 60 }
+
+# Secrets (set via wrangler secret put, not stored in this file):
+# TURNSTILE_SECRET    — Cloudflare Turnstile secret key (get from dash.cloudflare.com)
+# ADMIN_SECRET        — Admin API secret
+# PLAYER_SECRET       — JWT signing secret for player tokens
+# CALLS_APP_ID        — Cloudflare Calls application ID
+# CALLS_APP_SECRET    — Cloudflare Calls application secret

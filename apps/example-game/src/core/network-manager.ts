@@ -221,6 +221,14 @@ export class NetworkManager {
   }
 
   /**
+   * Send custom input to server
+   */
+  sendRawInput(inputType: string, data: any): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    this.ws.send(JSON.stringify({ type: "input", inputType, data }));
+  }
+
+  /**
    * Register message handler for specific message type
    */
   onMessage(type: string, handler: MessageHandler): void {
@@ -237,6 +245,9 @@ export class NetworkManager {
     } else if (data.tick !== undefined) {
       const update: GameTickUpdate = data;
       this.messageHandlers.get("tick")?.(update);
+    } else if (data.type) {
+      // Handle custom events like card_played, race_finish
+      this.messageHandlers.get(data.type)?.(data);
     } else {
       console.warn("Unknown message type:", data);
     }

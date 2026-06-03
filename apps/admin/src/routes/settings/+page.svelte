@@ -54,7 +54,11 @@
     busy.set(true);
     clearError();
     try {
-      platformState.set(await fetchPlatformState($backendUrl));
+      const state = await fetchPlatformState($backendUrl);
+      if (!state.maintenance) {
+        state.maintenance = { enabled: false, startTime: "", endTime: "", message: "" };
+      }
+      platformState.set(state);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load platform");
     } finally {
@@ -94,6 +98,24 @@
       setStatus($translate("features.saved"));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save");
+      await loadPlatform();
+    } finally {
+      busy.set(false);
+    }
+  }
+
+  async function saveMaintenance() {
+    if (!$platformState) return;
+    busy.set(true);
+    clearError();
+    try {
+      const updates = { maintenance: $platformState.maintenance };
+      platformState.set(
+        await import("$lib/portal").then(m => m.patchPlatformState($backendUrl, updates))
+      );
+      setStatus("Maintenance settings saved");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save maintenance settings");
       await loadPlatform();
     } finally {
       busy.set(false);
@@ -198,6 +220,56 @@
     </div>
   {:else}
     <div class="empty">{$translate("features.loading")}</div>
+  {/if}
+</section>
+
+<section class="panel block">
+  <h2>Server Maintenance</h2>
+  <p class="hint">Schedule downtime or put the server in maintenance mode.</p>
+  {#if $platformState}
+    <div class="stack">
+      <div class="field toggle-field">
+        <label for="maint-enable">Enable Maintenance Mode</label>
+        <input 
+          id="maint-enable" 
+          type="checkbox" 
+          bind:checked={$platformState.maintenance.enabled} 
+          disabled={$busy} 
+        />
+      </div>
+      <div class="field">
+        <label for="maint-start">Start Time (ISO 8601)</label>
+        <input 
+          id="maint-start" 
+          placeholder="e.g. 2026-06-03T14:00:00Z" 
+          bind:value={$platformState.maintenance.startTime} 
+          disabled={$busy} 
+        />
+      </div>
+      <div class="field">
+        <label for="maint-end">End Time (ISO 8601)</label>
+        <input 
+          id="maint-end" 
+          placeholder="e.g. 2026-06-03T16:00:00Z" 
+          bind:value={$platformState.maintenance.endTime} 
+          disabled={$busy} 
+        />
+      </div>
+      <div class="field">
+        <label for="maint-msg">Maintenance Message</label>
+        <input 
+          id="maint-msg" 
+          placeholder="Server is down for maintenance." 
+          bind:value={$platformState.maintenance.message} 
+          disabled={$busy} 
+        />
+      </div>
+      <button class="btn btn-primary" type="button" on:click={saveMaintenance} disabled={$busy}>
+        Save Maintenance Settings
+      </button>
+    </div>
+  {:else}
+    <div class="empty">Loading...</div>
   {/if}
 </section>
 

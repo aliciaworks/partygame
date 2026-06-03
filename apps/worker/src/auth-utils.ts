@@ -4,91 +4,49 @@
  * - Admin secret: environment variable validation
  */
 
+import { SignJWT, jwtVerify } from "jose";
+
 /**
- * Create signed token using HMAC-SHA256
- * Format: base64(JSON.stringify({ playerId, timestamp, signature }))
+ * Create signed JWT token using jose
  */
 export async function createSignedToken(
   playerId: string,
   secretKey: string,
 ): Promise<string> {
-  const timestamp = Math.floor(Date.now() / 1000); // Unix seconds
-  const message = `${playerId}:${timestamp}`;
+  const secret = new TextEncoder().encode(secretKey);
+  const alg = "HS256";
 
-  // Use Web Crypto API (available in Cloudflare Workers)
-  const encoder = new TextEncoder();
-  const keyData = encoder.encode(secretKey);
-  const messageData = encoder.encode(message);
+  const jwt = await new SignJWT({ playerId })
+    .setProtectedHeader({ alg })
+    .setIssuedAt()
+    .setExpirationTime("5m") // Default 5 minutes
+    .sign(secret);
 
-  const key = await crypto.subtle.importKey("raw", keyData, { name: "HMAC", hash: "SHA-256" }, false, [
-    "sign",
-  ]);
-
-  const signature = await crypto.subtle.sign("HMAC", key, messageData);
-  const signatureHex = Array.from(new Uint8Array(signature))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-
-  const token = {
-    playerId,
-    timestamp,
-    signature: signatureHex,
-  };
-
-  return btoa(JSON.stringify(token));
+  return jwt;
 }
 
 export interface TokenPayload {
   playerId: string;
-  timestamp: number;
-  signature: string;
 }
 
 /**
- * Verify signed token and extract playerId
- * Returns null if invalid, expired, or signature mismatch
+ * Verify signed JWT token and extract playerId
  */
 export async function verifySignedToken(
   token: string,
   secretKey: string,
-  maxAgeSeconds: number = 300, // 5 minutes default
+  maxAgeSeconds?: number, // Maintained for backwards compatibility, though exp handles it
 ): Promise<string | null> {
   try {
-    // Parse token
-    const payload = JSON.parse(atob(token)) as Partial<TokenPayload>;
+    const secret = new TextEncoder().encode(secretKey);
+    const { payload } = await jwtVerify(token, secret);
 
-    if (!payload.playerId || !payload.timestamp || !payload.signature) {
-      return null;
+    if (payload && typeof payload.playerId === "string") {
+      return payload.playerId;
     }
-
-    // Check expiration
-    const now = Math.floor(Date.now() / 1000);
-    if (now - payload.timestamp > maxAgeSeconds) {
-      return null;
-    }
-
-    // Verify signature
-    const message = `${payload.playerId}:${payload.timestamp}`;
-    const encoder = new TextEncoder();
-    const keyData = encoder.encode(secretKey);
-    const messageData = encoder.encode(message);
-
-    const key = await crypto.subtle.importKey("raw", keyData, { name: "HMAC", hash: "SHA-256" }, false, [
-      "verify",
-    ]);
-
-    const expectedSignature = payload.signature;
-    const computedSig = await crypto.subtle.sign("HMAC", key, messageData);
-    const computedHex = Array.from(new Uint8Array(computedSig))
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
-
-    if (computedHex !== expectedSignature) {
-      return null;
-    }
-
-    return payload.playerId;
+    return null;
   } catch {
+    // Return null on expired or invalid signature
     return null;
   }
 }

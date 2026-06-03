@@ -9,7 +9,9 @@
   },
   "dependencies": {
     "@partygame/shared": "file:../../packages/shared",
-    "hono": "^4.12.21"
+    "arctic": "^3.7.0",
+    "hono": "^4.12.21",
+    "jose": "^6.2.3"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260519.1",

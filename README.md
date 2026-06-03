@@ -1,236 +1,145 @@
-# PartyGame - A Serverless Game Backend Framework
+# PartyGame - The Ultimate Serverless Game Engine
 
-An open-source, out-of-the-box Serverless Game Backend Framework built natively for Cloudflare Workers, Durable Objects, and D1. It is designed to bridge the gap between web-native infrastructure and traditional game engines (Unity, Godot, and Unreal Engine).
+An open-source, enterprise-grade Serverless Game Backend Engine built natively on Cloudflare's Edge Infrastructure (Workers, Durable Objects, D1, R2, and Queues). 
 
-**📜 Dual Licensed:** Available under [AGPL-3.0](LICENSE) for personal/open-source use, or [Commercial License](LICENSE-COMMERCIAL.md) for commercial products. See [LICENSING.md](LICENSING.md) for details.
+Designed specifically for Indie Developers and Studios, PartyGame bridges the gap between web-native cloud infrastructure and traditional game engines (Unity, Godot, Unreal Engine), providing infinite scalability with **zero server maintenance** and **zero idle costs**.
 
-## Features
+**📜 Dual Licensed:** Available under [AGPL-3.0](LICENSE) for personal/open-source use, or [Commercial License](LICENSE-COMMERCIAL.md) for commercial products.
 
-- **Authoritative GameRoom (`apps/worker/src/game`)**: Built directly into the Cloudflare Worker Durable Object runtime. Features a fixed tick-rate loop, server-authoritative movement validation, and per-room state isolation.
-- **Worker-Owned Backend Runtime (`apps/worker`)**: The Worker owns room routing, WebSocket upgrades, public player sessions, and admin-only operations without a separate backend framework package.
-- **Public Player Sessions**: Example clients can request lightweight session tokens through `/api/session/login`; admin and operations routes require `ADMIN_TOKEN`.
-- **Cross-Engine Type Generation (`@partygame/shared`)**: Single source of truth. Define your networking models and database schemas in TypeScript (Zod), and automatically generate `C#` for Unity, `GDScript` for Godot, and `C++ Structs` for Unreal Engine simultaneously.
-- **Operational Surface**: Health, SLA, room status, and admin room management endpoints are exposed from the Worker.
+---
 
-## Project Structure
+## 🌟 Enterprise-Grade Features
 
-This repository uses a native `npm` workspace monorepo structure:
+We didn't just build a WebSocket server. We built a full ecosystem:
 
-### Shared Packages
+- **Stateful Game Rooms (Durable Objects)**: The core `GameRoom` runs on Cloudflare Durable Objects, providing a fixed tick-rate loop, server-authoritative state validation, and persistent WebSockets at the edge.
+- **Native Engine SDKs (Unity / Godot / Unreal)**: Fully automated SDK generation using OpenAPI. Define your backend once, and automatically generate strongly-typed `C#` and `GDScript` network clients.
+- **Binary Protocol Support**: Bypass JSON overhead. Send `ArrayBuffer` directly from C# or C++ to the backend, triggering `plugin.onBinaryInput()` for zero-latency frame syncing.
+- **Over-The-Air (OTA) Hotfixes (R2)**: A built-in patch delivery system. Upload Unity `.assetbundle` or Godot `.pck` files via the Admin Panel, and the backend securely serves them to clients globally using Cloudflare R2 (which has **$0 Egress Fees**).
+- **Serverless SQL Leaderboards (D1)**: Highly concurrent, globally distributed leaderboards backed by Cloudflare D1. Handle 100,000 players finishing matches simultaneously without database locks.
+- **Asynchronous Match Settlement (Queues)**: Post-match XP and Coin calculations are instantly offloaded to Cloudflare Queues, ensuring the GameRoom Durable Object is immediately freed for the next match.
+- **Zero-Trust Player Auth (`jose`)**: Enterprise-grade JWT authentication supporting Google and Apple Login. The backend securely fetches remote JWKS (Public Keys) to verify client-provided tokens without native SDK bloat.
+- **Edge Voice Chat (Cloudflare Calls)**: Built-in WebRTC SFU support for low-latency Voice Chat, routed entirely through Cloudflare's massive edge network.
 
-- `packages/shared`: Zod schemas (single source of truth) and cross-engine code generation.
+---
 
-### Applications
+## 🏗️ Project Architecture
 
-- `apps/worker`: Cloudflare Workers backend with Durable Object room routing, local ECS runtime, public player sessions, and protected admin routes.
-- `apps/example-game`: Web frontend built with Babylon.js - multiplayer game collection (Arena Wars MOBA, CyberArena FPS).
-- `apps/admin`: Admin control plane (SvelteKit + Cloudflare Pages).
+This repository uses a modern `npm` workspace monorepo structure:
 
-### Generated Engine Packages
-
-- `engines/unity/`: Auto-generated C# types for Unity.
-- `engines/godot/`: Auto-generated GDScript types for Godot.
-- `engines/unreal/`: Auto-generated C++ types for Unreal Engine.
-
-## Getting Started
-
-### Backend Setup
-
-```bash
-npm install
-npm run typecheck
+```text
+partygame/
+  ├── apps/
+  │   ├── worker/          # The Core Serverless Engine (Cloudflare Workers)
+  │   ├── admin/           # SvelteKit Admin Control Plane (Cloudflare Pages)
+  │   └── example-game/    # Web-based Reference Game (Babylon.js)
+  ├── sdks/
+  │   ├── unity/           # Generated & Template C# SDK for Unity
+  │   └── godot/           # Generated & Template GDScript SDK for Godot
+  └── packages/
+      └── shared/          # Shared Zod Schemas and OpenAPI Specs
 ```
 
-Start the backend server:
+---
+
+## 🚀 Getting Started
+
+### 1. The Core Engine (Worker)
+The backend is completely serverless. You only pay when players are online.
 
 ```bash
 cd apps/worker
-npx wrangler dev
+npm install
+
+# Run the local Miniflare simulator (simulates D1, DO, R2, Queues)
+npm run dev
 ```
+The backend will run on `http://localhost:8787` with:
+- `POST /auth/apple` / `POST /auth/google` - Secure Player Login
+- `/matchmaker/ws` - Matchmaking Queue
+- `/chat/ws` - Global Text Chat
+- `/ws?roomId=...` - The Core Game WebSocket
 
-The backend runs on `http://localhost:8787` with:
-
-- `POST /api/session/login` - Authenticate and get token
-- `/ws` - WebSocket game connection
-- `/rooms` - List active game rooms
-- `/health` - Health check endpoint
-
-### Frontend Setup
-
-In a new terminal:
+### 2. The Admin Control Plane
+A beautiful, separate SvelteKit dashboard to manage your game empire.
 
 ```bash
-cd apps/example-game
+cd apps/admin
 npm install
 npm run dev
 ```
+From the Admin Panel, you can:
+- Apply **Game Presets** (FPS, MOBA, Card Games) to instantly reconfigure backend feature flags.
+- **Drag & Drop** game patches to distribute Hotfixes globally.
+- Manage Toxic Players and view Server Health.
 
-Frontend runs on `http://localhost:5173` with:
-
-- Game launcher with game selection
-- Arena Wars (3v3 MOBA-style battles)
-- CyberArena (8-player FPS)
-
-### Multi-Game Architecture
-
-The example-game demonstrates how to build multiple games on the same backend:
-
+### 3. Generate Native SDKs
+If you update the backend API, simply run:
+```bash
+npm run generate-sdk
 ```
-apps/example-game/
-  ├── src/
-  │   ├── main.ts              # Game launcher & menu
-  │   ├── core/
-  │   │   ├── game-manager.ts  # Babylon.js scene setup
-  │   │   ├── base-game.ts     # Abstract game class
-  │   │   └── network-manager.ts # WebSocket client
-  │   └── games/
-  │       ├── moba/
-  │       │   └── moba-game.ts # Arena Wars (3v3 battles)
-  │       └── fps/
-  │           └── fps-game.ts  # CyberArena (FPS)
-```
+This reads the `openapi.yaml` specification and automatically regenerates your C# and GDScript client libraries in the `sdks/` folder.
 
-**Key Points:**
+---
 
-- Each game extends `BaseGame` class
-- Games use shared `NetworkManager` for server communication
-- Babylon.js renders both 2D (MOBA) and 3D (FPS) games
-- Same backend handles any number of game types; each type is a custom preset of enabled platform features (voice, chat, matchmaking, hotfix, etc.) configured in the admin panel
+## 🎮 Game Plugin System
 
-## Game Examples
+The engine is completely decoupled from your specific game logic. To add a new game mode (e.g., Battle Royale), you simply implement the `GamePlugin` interface in the backend:
 
-### Arena Wars (MOBA)
-
-- **Type**: 3v3 isometric team battles
-- **Players**: Up to 6
-- **Mechanics**: Top-down movement, team colors, health display
-- **Rendering**: Babylon.js isometric camera with grid arena
-
-### CyberArena (FPS)
-
-- **Type**: Fast-paced first-person shooter
-- **Players**: Up to 8
-- **Mechanics**: FPS controls, jumping, sprinting, collision detection
-- **Rendering**: Babylon.js 3D with neon environment, physics simulation
-
-## Adding New Games
-
-To add a new game type:
-
-1. Create `src/games/your-game/your-game.ts`
-2. Extend `BaseGame` class
-3. Implement: `initialize()`, `start()`, `stop()`, `update()`, `processGameUpdate()`
-4. Add game to menu in `main.ts`
-5. Define custom components/systems in `apps/worker/src/game` if needed
-
-Example:
-
-````typescript
-import { BaseGame } from "../core/base-game";
-import { NetworkManager } from "../core/network-manager";
-import type { GameTickUpdate } from "@partygame/shared";
-
-export class MyGame extends BaseGame {
-  async initialize(): Promise<void> {
-    // Setup Babylon.js scene
-  }
-
-  start(): void {
-    // Start game
-  }
-
-  update(): void {
-    // Send inputs to server
-  }
-
-  processGameUpdate(update: GameTickUpdate): void {
-    // Update game state from server
-  }
+```typescript
+export interface GamePlugin {
+  onJoin(session: Session): void;
+  onInput(session: Session, inputType: string, data: any): void;
+  
+  // High-performance binary injection for Unity/Unreal
+  onBinaryInput?(session: Session, data: ArrayBuffer): void; 
+  
+  onTick(sessions: Map<string, Session>): void;
+  readonly tickIntervalMs: number;
 }
-   ```bash
-   cd apps/admin
-   npm run dev
-````
+```
+Currently included plugins: `FPS`, `MOBA`, `Battle Royale`, `Card Game`, and `Racing`.
 
-## Deployment
+---
 
-### Worker backend
+## ☁️ Deployment
 
-The worker entrypoint is [apps/worker](apps/worker). Deploy it with Wrangler from that directory:
+Cloudflare Native CI/CD is fully supported.
+To deploy manually:
 
+1. **Provision Infrastructure**:
+```bash
+# Create the D1 Database
+npx wrangler d1 create partygame-db
+# Apply the schema
+npx wrangler d1 execute partygame-db --file=./schema.sql
+# Create the Message Queue
+npx wrangler queues create match-queue
+```
+
+2. **Deploy the Engine**:
 ```bash
 cd apps/worker
 npm run deploy
 ```
 
-Before deploying, make sure these values are set in `wrangler.toml`:
-
-- `database_id` for your D1 database
-- any Durable Object migration state you need for the current version
-
-If you changed the Durable Object class name or schema, create and apply a new migration before deploying.
-
-### Pages admin app
-
-The admin UI lives in [apps/admin](apps/admin) and deploys separately as a Cloudflare Pages site:
-
+3. **Deploy the Admin Panel**:
 ```bash
 cd apps/admin
 npm run build
 npx wrangler pages deploy build --project-name partygame-admin
 ```
 
-If you have not created the Pages project yet, you can do that in the Cloudflare dashboard or let Wrangler create it the first time you deploy.
+---
 
-### Required environment values
+## 🛠️ Quality Gates
 
-The worker backend expects the following runtime bindings or secrets depending on which endpoints you use:
-
-- `GAME_ROOM` for the Durable Object binding
-- `ADMIN_TOKEN` for `/admin/*` routes
-- `PLATFORM_BUCKET` for platform features, hotfix assets, player profile/progress, and leaderboard data
-
-Platform state is stored at `admin/platform-state.json` and exposed as:
-
-- `GET /api/platform` (public; returns `{ features }`)
-- `GET /admin/platform` (admin only; returns `{ features }`)
-- `PATCH /admin/platform/features` (admin only; updates feature flags)
-
-## Quality Gates
-
-Run these commands from the repository root before opening a pull request:
+Run these commands from the repository root to ensure your engine is stable:
 
 ```bash
-npm run generate:types
+npm run generate-sdk
 npm run typecheck
-npm run lint
-npm run test
 npm run format
 ```
 
-## Admin UI
-
-The management interface now lives in [apps/admin](apps/admin). It is a separate SvelteKit workspace that is built for Pages-style deployment rather than the Worker runtime, so the control plane stays isolated from the game backend.
-
-## Notes On Abuse Resistance
-
-The Worker keeps player sessions lightweight for public game access and protects admin operations with `ADMIN_TOKEN`. Add distributed rate limiting before exposing sensitive economy, inventory, or account mutation endpoints in production.
-
-## Runtime Endpoints
-
-```bash
-# Check service health
-curl http://localhost:8787/health
-# {"status":"ok","timestamp":...,"activeRooms":0,"totalPlayers":0}
-
-# List active rooms
-curl http://localhost:8787/rooms
-# {"rooms":[],"total":0}
-
-# SLA status
-curl http://localhost:8787/sla
-# {"uptime_percent":99.95,"meets_sla":true,...}
-
-# Admin room list
-curl -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8787/admin/rooms
-```
+Welcome to the future of Game Development. Zero servers. Infinite scale.

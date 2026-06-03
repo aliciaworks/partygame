@@ -1,51 +1,13 @@
 import type { GameTickUpdate } from "@partygame/shared";
+import type { GamePlugin, Session } from "./plugin";
+import { getGamePlugin } from "../plugins/registry";
 
-interface Session {
-  playerId: string;
-  ws: WebSocket;
-  transform: { x: number; y: number; rotation: number; scaleX: number; scaleY: number };
-  state?: any; // Game-specific state
-}
-
-interface GamePlugin {
-  onJoin(session: Session): void;
-  onInput(session: Session, inputType: string, data: any): void;
-  onTick(sessions: Map<string, Session>): void;
-}
-
-// Simulated dynamic plugins (In a true micro-service architecture, these would be RPC calls to separate Workers)
-class MobaPlugin implements GamePlugin {
-  onJoin(session: Session) {}
-  onInput(session: Session, inputType: string, data: any) {
-    if (inputType === "MOVE") {
-      const moveX = Number(data?.moveX || 0);
-      const moveY = Number(data?.moveY || 0);
-      const speed = Boolean(data?.isSprinting) ? 2 : 1;
-      session.transform.x += moveX * speed;
-      session.transform.y += moveY * speed;
-    }
-  }
-  onTick(sessions: Map<string, Session>) {
-    // Basic MOBA logic (e.g. cooldowns, lane pressure) could go here
-  }
-}
-
-class FpsPlugin implements GamePlugin {
-  onJoin(session: Session) {}
-  onInput(session: Session, inputType: string, data: any) {
-    if (inputType === "MOVE") {
-      const moveX = Number(data?.moveX || 0);
-      const moveY = Number(data?.moveY || 0);
-      // FPS movement might be faster or include Z-axis jumping
-      session.transform.x += moveX * 3;
-      session.transform.y += moveY * 3;
-    }
-  }
-  onTick(sessions: Map<string, Session>) {}
-}
-
+// ---------------------------------------------------------------------------
+// GameRoom Durable Object — uses the WebSocket Hibernation API so that
+// the DO is only billed while actively processing messages, not while
+// clients are idle between game ticks.
+// ---------------------------------------------------------------------------
 export class GameRoom implements DurableObject {
-  private sessions = new Map<string, Session>();
   private tick = 0;
   private interval: number | null = null;
   private env: any;
@@ -53,8 +15,7 @@ export class GameRoom implements DurableObject {
 
   constructor(private state: DurableObjectState, env: any) {
     this.env = env;
-    // Default to MOBA if no gameType is specified yet
-    this.plugin = new MobaPlugin();
+    this.plugin = getGamePlugin("moba");
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -64,69 +25,192 @@ export class GameRoom implements DurableObject {
     }
 
     const gameType = url.searchParams.get("gameType") || "moba";
-    if (gameType === "fps") this.plugin = new FpsPlugin();
-    else this.plugin = new MobaPlugin();
+    this.plugin = getGamePlugin(gameType);
 
     const playerId = url.searchParams.get("playerId") || `anonymous-${crypto.randomUUID()}`;
+
+    // Use the Hibernation API: acceptWebSocket() instead of ws.accept()
+    // This allows the DO to hibernate between messages — zero cost when idle
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
 
-    this.handleSession(server, playerId);
+    // Attach metadata so we can recover session info after hibernation wakes the DO
+    this.state.acceptWebSocket(server, [playerId, gameType]);
 
-    return new Response(null, {
-      status: 101,
-      webSocket: client,
-    });
+    // Initialize plugin state for this player immediately
+    const session = this.getOrCreateSession(server, playerId);
+    this.plugin.onJoin(session);
+    server.send(JSON.stringify({ type: "init", playerId }));
+
+    // Only start the game loop when the plugin requires ticking
+    if (this.interval === null && this.plugin.tickIntervalMs > 0) {
+      this.startGameLoop();
+    }
+
+    return new Response(null, { status: 101, webSocket: client });
   }
 
-  private handleSession(ws: WebSocket, playerId: string) {
-    ws.accept();
+  // ---------------------------------------------------------------------------
+  // Hibernation API handlers — called by the runtime after the DO wakes
+  // ---------------------------------------------------------------------------
 
-    const session: Session = {
-      playerId,
-      ws,
-      transform: { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },
-    };
+  /** Called by the runtime when a hibernated WebSocket receives a message. */
+  async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+    const tags = this.state.getTags(ws);
+    const playerId = tags[0] ?? "unknown";
+    const session = this.getOrCreateSession(ws, playerId);
 
-    this.sessions.set(playerId, session);
-    this.plugin.onJoin(session);
-
-    ws.addEventListener("message", (msg) => {
-      try {
-        const data = JSON.parse(msg.data as string);
-        if (data.type === "input") {
-          this.plugin.onInput(session, data.inputType, data.data);
+    try {
+      if (message instanceof ArrayBuffer) {
+        if (this.plugin.onBinaryInput) {
+          this.plugin.onBinaryInput(session, message);
+          this.flushBroadcasts();
         }
-      } catch (err) {
-        console.error("Failed to parse message", err);
+        return;
       }
-    });
 
-    ws.addEventListener("close", () => {
-      this.sessions.delete(playerId);
-      if (this.sessions.size === 0 && this.interval !== null) {
-        clearInterval(this.interval as any);
-        this.interval = null;
+      const parsed = JSON.parse(message);
+      if (parsed.type === "input") {
+        this.plugin.onInput(session, parsed.inputType, parsed.data);
+        this.flushBroadcasts();
       }
-    });
-
-    ws.addEventListener("error", () => {
-      this.sessions.delete(playerId);
-    });
-
-    ws.send(JSON.stringify({ type: "init", playerId }));
-
-    if (this.interval === null) {
-      this.startGameLoop();
+    } catch (err) {
+      console.error("Failed to parse message", err);
     }
   }
 
+  /** Called by the runtime when a hibernated WebSocket closes. */
+  async webSocketClose(ws: WebSocket, _code: number, _reason: string): Promise<void> {
+    const tags = this.state.getTags(ws);
+    const playerId = tags[0];
+    if (playerId) {
+      this.state.getWebSockets().forEach(() => {}); // ensure state is current
+      if (this.interval !== null && this.state.getWebSockets().length === 0) {
+        clearInterval(this.interval as any);
+        this.interval = null;
+      }
+    }
+  }
+
+  /** Called by the runtime when a hibernated WebSocket errors. */
+  async webSocketError(ws: WebSocket, _error: unknown): Promise<void> {
+    const tags = this.state.getTags(ws);
+    const playerId = tags[0];
+    if (playerId) console.error(`[GameRoom] WebSocket error for player ${playerId}`);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Session management — reconstructed from WebSocket tags after hibernation
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Reconstruct or create a Session object from an accepted WebSocket.
+   * Since the DO can hibernate, we cannot store sessions in a Map across
+   * cold wakes. We store minimal transform state in the WS attachment instead.
+   */
+  private getOrCreateSession(ws: WebSocket, playerId: string): Session {
+    // Try to retrieve existing transform from WS deserialized state
+    const attachment = ws.deserializeAttachment() as {
+      transform?: Session["transform"];
+      state?: any;
+    } | null;
+
+    return {
+      playerId,
+      ws,
+      transform: attachment?.transform ?? { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },
+      state: attachment?.state ?? undefined,
+    };
+  }
+
+  /** Persist session state into the WebSocket attachment for survival across hibernation. */
+  private persistSession(session: Session): void {
+    session.ws.serializeAttachment({
+      transform: session.transform,
+      state: session.state,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Broadcast helpers
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Flush pending broadcast messages that plugins placed in
+   * session.state._broadcasts during onInput. Then persist the session.
+   */
+  private flushBroadcasts() {
+    // Iterate all currently-active WebSockets managed by the Hibernation API
+    for (const ws of this.state.getWebSockets()) {
+      const tags = this.state.getTags(ws);
+      const playerId = tags[0] ?? "unknown";
+      const attachment = ws.deserializeAttachment() as any;
+      const broadcasts: Array<{ exclude: string; message: string }> =
+        attachment?.state?._broadcasts ?? [];
+
+      if (broadcasts.length === 0) continue;
+
+      for (const { exclude, message } of broadcasts) {
+        // Intercept match-ending events and enqueue for background processing
+        if (message.includes('"race_finish"')) {
+          try {
+            if (this.env.MATCH_QUEUE) {
+              this.env.MATCH_QUEUE.send({
+                type: "MATCH_END",
+                matchId: "room-" + Date.now(),
+                players: this.state.getWebSockets().map((w) => this.state.getTags(w)[0]),
+                winnerId: playerId,
+                timestamp: Date.now(),
+              });
+            }
+          } catch (e) {
+            console.error("Failed to enqueue match stats", e);
+          }
+        }
+
+        for (const target of this.state.getWebSockets()) {
+          const targetId = this.state.getTags(target)[0];
+          if (targetId === exclude) continue;
+          if (target.readyState === WebSocket.OPEN) {
+            target.send(message);
+          }
+        }
+      }
+
+      // Clear broadcast queue and persist updated attachment
+      if (attachment?.state) {
+        attachment.state._broadcasts = [];
+        ws.serializeAttachment(attachment);
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Game loop
+  // ---------------------------------------------------------------------------
+
   private startGameLoop() {
+    const pluginTickMs = this.plugin.tickIntervalMs;
+    if (pluginTickMs <= 0) return;
+
     this.interval = setInterval(() => {
       this.tick++;
-      
-      // Execute game-specific logic per tick
-      this.plugin.onTick(this.sessions);
+
+      // Rebuild the sessions map from active WebSockets for this tick
+      const sessions = new Map<string, Session>();
+      for (const ws of this.state.getWebSockets()) {
+        const tags = this.state.getTags(ws);
+        const playerId = tags[0] ?? "unknown";
+        sessions.set(playerId, this.getOrCreateSession(ws, playerId));
+      }
+
+      if (sessions.size === 0) {
+        clearInterval(this.interval as any);
+        this.interval = null;
+        return;
+      }
+
+      this.plugin.onTick(sessions);
 
       const update: GameTickUpdate = {
         v: 1,
@@ -135,18 +219,33 @@ export class GameRoom implements DurableObject {
         entities: {},
       };
 
-      for (const [id, session] of this.sessions) {
-        update.entities[id] = {
-          transform: session.transform,
-        };
+      for (const [id, session] of sessions) {
+        const entityData: any = { transform: session.transform };
+
+        if (session.state) {
+          for (const key of Object.keys(session.state)) {
+            if (key !== "_broadcasts") {
+              entityData[key] = session.state[key];
+            }
+          }
+        }
+
+        if (session.state?.__zoneTick) {
+          (update.entities as any)["__zone"] = session.state.__zoneTick;
+        }
+
+        update.entities[id] = entityData;
+
+        // Persist updated state back into the WS attachment
+        this.persistSession(session);
       }
 
       const updateMsg = JSON.stringify(update);
-      for (const session of this.sessions.values()) {
-        if (session.ws.readyState === WebSocket.OPEN) {
-          session.ws.send(updateMsg);
+      for (const ws of this.state.getWebSockets()) {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(updateMsg);
         }
       }
-    }, 50) as unknown as number; // 20 FPS
+    }, pluginTickMs) as unknown as number;
   }
 }

@@ -1,6 +1,30 @@
 import type { Hono } from "hono";
 import type { ModuleManifest, WorkerModule } from "../loader";
 import { createSignedToken, verifySignedToken } from "../../auth-utils";
+import { createRemoteJWKSet, jwtVerify } from "jose";
+
+/**
+ * Verify a Cloudflare Turnstile token submitted by the client.
+ * Returns true if valid or if TURNSTILE_SECRET is not configured (dev mode).
+ */
+async function verifyTurnstile(
+  token: string | undefined,
+  secret: string | undefined,
+  ip: string,
+): Promise<boolean> {
+  // Skip verification in dev mode (no secret configured)
+  if (!secret) return true;
+  if (!token) return false;
+
+  const res = await fetch("https://challenges.cloudflare.com/turnstile/v1/siteverify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ secret, response: token, remoteip: ip }),
+  });
+
+  const data = (await res.json()) as { success: boolean };
+  return data.success === true;
+}
 
 type AuthSession = {
   playerId: string;
@@ -257,9 +281,27 @@ export const playerAuthModule: WorkerModule = {
   manifest: playerAuthManifest,
   init(app: Hono<any>) {
     app.post("/auth/register", async (c) => {
+      const ip = c.req.header("CF-Connecting-IP") ?? "unknown-ip";
+      if ((c.env as any).AUTH_RATE_LIMITER) {
+        const { success } = await (c.env as any).AUTH_RATE_LIMITER.limit({ key: ip });
+        if (!success) return c.json({ error: "RATE_LIMITED", message: "Too many requests" }, 429);
+      }
+
       const body = (await c.req.json().catch(() => ({}))) as {
         playerName?: unknown;
+        turnstileToken?: string;
       };
+
+      // Verify Turnstile CAPTCHA to block bot-driven account creation
+      const ip = c.req.header("CF-Connecting-IP") ?? "";
+      const turnstileOk = await verifyTurnstile(
+        body.turnstileToken,
+        (c.env as any).TURNSTILE_SECRET,
+        ip,
+      );
+      if (!turnstileOk) {
+        return c.json({ error: "TURNSTILE_FAILED", message: "Bot verification failed" }, 403);
+      }
 
       const playerName =
         typeof body.playerName === "string" && body.playerName.trim()
@@ -295,6 +337,12 @@ export const playerAuthModule: WorkerModule = {
     });
 
     app.post("/auth/login", async (c) => {
+      const ip = c.req.header("CF-Connecting-IP") ?? "unknown-ip";
+      if ((c.env as any).AUTH_RATE_LIMITER) {
+        const { success } = await (c.env as any).AUTH_RATE_LIMITER.limit({ key: ip });
+        if (!success) return c.json({ error: "RATE_LIMITED", message: "Too many requests" }, 429);
+      }
+
       const body = (await c.req.json().catch(() => ({}))) as {
         playerId?: unknown;
         playerName?: unknown;
@@ -331,6 +379,93 @@ export const playerAuthModule: WorkerModule = {
         playerName,
         expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
       });
+    });
+
+    app.post("/auth/google", async (c) => {
+      const body = (await c.req.json().catch(() => ({}))) as {
+        idToken?: string;
+      };
+
+      if (!body.idToken) {
+        return c.json({ error: "MISSING_TOKEN" }, 400);
+      }
+
+      // Verify Google ID token via tokeninfo endpoint
+      const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${body.idToken}`);
+      if (!response.ok) {
+        return c.json({ error: "INVALID_GOOGLE_TOKEN" }, 401);
+      }
+
+      const payload = await response.json() as any;
+      const googleId = payload.sub;
+      const playerName = payload.name || "Google Player";
+      const playerId = `google-${googleId}`;
+
+      await upsertAccount(c.env.PLATFORM_BUCKET, playerId, playerName);
+
+      let secret: string | null;
+      try {
+        secret = requirePlayerSecret(c.req.raw, (c.env as any).PLAYER_SECRET);
+      } catch (error) {
+        return c.json({ error: "SERVER_MISCONFIG", message: (error as Error).message }, 500);
+      }
+      const signedToken = secret
+        ? await createSignedTokenForPlayer(playerId, secret)
+        : createToken(playerId, playerName);
+
+      return c.json({
+        token: signedToken,
+        playerId,
+        playerName,
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+      });
+    });
+
+    app.post("/auth/apple", async (c) => {
+      const body = (await c.req.json().catch(() => ({}))) as {
+        idToken?: string;
+        name?: string; // Apple only sends name on first login
+      };
+
+      if (!body.idToken) {
+        return c.json({ error: "MISSING_TOKEN" }, 400);
+      }
+
+      try {
+        const JWKS = createRemoteJWKSet(new URL('https://appleid.apple.com/auth/keys'));
+        const { payload } = await jwtVerify(body.idToken, JWKS, {
+          issuer: 'https://appleid.apple.com',
+          // In a real app, audience should be verified against your Apple App ID
+          // audience: 'com.your.app' 
+        });
+
+        const appleId = payload.sub;
+        if (!appleId) throw new Error("No sub in token");
+
+        const playerName = body.name || payload.email?.toString().split('@')[0] || "Apple Player";
+        const playerId = `apple-${appleId}`;
+
+        await upsertAccount(c.env.PLATFORM_BUCKET, playerId, playerName);
+
+        let secret: string | null;
+        try {
+          secret = requirePlayerSecret(c.req.raw, (c.env as any).PLAYER_SECRET);
+        } catch (error) {
+          return c.json({ error: "SERVER_MISCONFIG", message: (error as Error).message }, 500);
+        }
+        const signedToken = secret
+          ? await createSignedTokenForPlayer(playerId, secret)
+          : createToken(playerId, playerName);
+
+        return c.json({
+          token: signedToken,
+          playerId,
+          playerName,
+          expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+        });
+      } catch (e) {
+        return c.json({ error: "INVALID_APPLE_TOKEN" }, 401);
+      }
     });
 
     app.get("/auth/me", async (c) => {

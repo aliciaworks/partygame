@@ -14,7 +14,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "format": "prettier --check .",
-    "generate:types": "npm run generate:types --workspace=@partygame/shared"
+    "generate:types": "npm run generate:types --workspace=@partygame/shared",
+    "generate-sdk": "npx @openapitools/openapi-generator-cli generate -i openapi.yaml -g csharp -o sdks/unity --additional-properties=targetFramework=net472,packageName=PartyGameSDK"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
