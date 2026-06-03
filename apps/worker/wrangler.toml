@@ -37,7 +37,7 @@ bucket_name = "partygame-platform"
 [[d1_databases]]
 binding = "DB"
 database_name = "partygame-db"
-database_id = "00000000-0000-0000-0000-000000000000" # Dummy ID for local dev
+database_id = "4248ed68-76ce-448f-a0f5-45601905c81b"
 
 [[queues.producers]]
 binding = "MATCH_QUEUE"
