@@ -1,6 +1,6 @@
 import type { Hono } from "hono";
 import type { ModuleManifest, WorkerModule } from "../loader";
-import { getPlayerAccount, listPlayerAccounts, revokePlayerSessions } from "../player_auth/index";
+import { getPlayerAccount, listPlayerAccounts } from "../player_auth/index";
 
 type BanRecord = {
   playerId: string;
@@ -153,7 +153,7 @@ export const playerManagementModule: WorkerModule = {
         }
       }
 
-      revokePlayerSessions(playerId);
+
       await writeAudit(c.env.PLATFORM_BUCKET, {
         action: "ban",
         targetPlayerId: playerId,
@@ -169,7 +169,7 @@ export const playerManagementModule: WorkerModule = {
       const playerId = c.req.param("id");
       const timestamp = new Date().toISOString();
 
-      revokePlayerSessions(playerId);
+
       await writeAudit(c.env.PLATFORM_BUCKET, {
         action: "kick",
         targetPlayerId: playerId,

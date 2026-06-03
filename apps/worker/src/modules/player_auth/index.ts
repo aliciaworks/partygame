@@ -48,17 +48,8 @@ type AuthResponse = {
   expiresAt: string;
 };
 
-const sessions = new Map<string, AuthSession>();
-const sessionIndex = new Map<string, Set<string>>();
-
 const PLAYER_ACCOUNT_PREFIX = "players/";
 const PLAYER_ACCOUNT_SUFFIX = "/account.json";
-
-function createToken(playerId: string, _playerName: string): string {
-  // Deprecated: only for session storage key
-  // Real tokens are created via createSignedToken in routes
-  return `${playerId}:legacy`;
-}
 
 function isLocalDevelopmentRequest(request: Request): boolean {
   const host = new URL(request.url).hostname;
@@ -92,28 +83,6 @@ function readBearerToken(request: Request): string | null {
   }
 
   return token;
-}
-
-function createSession(playerId: string, playerName: string): AuthResponse {
-  const createdAt = new Date().toISOString();
-  const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 minutes
-  // Token will be created asynchronously in the route handler
-  // For now, use placeholder
-  const token = `${playerId}:unsigned`;
-
-  sessions.set(token, {
-    playerId,
-    playerName,
-    createdAt,
-    expiresAt,
-  });
-
-  return {
-    token,
-    playerId,
-    playerName,
-    expiresAt,
-  };
 }
 
 async function saveAccount(bucket: R2Bucket | undefined, account: PlayerAccount) {
@@ -221,18 +190,6 @@ export async function listPlayerAccounts(
   return { players, cursor: listed.truncated ? listed.cursor : undefined };
 }
 
-export function revokePlayerSessions(playerId: string): number {
-  let removed = 0;
-  for (const [token, session] of sessions.entries()) {
-    if (session.playerId === playerId) {
-      sessions.delete(token);
-      removed += 1;
-    }
-  }
-  sessionIndex.delete(playerId);
-  return removed;
-}
-
 async function readSession(
   request: Request,
   secretKey: string | undefined,
@@ -258,16 +215,8 @@ async function readSession(
     }
   }
 
-  // Fallback: check in-memory sessions (for legacy/testing)
-  const session = sessions.get(token);
-  if (!session) return null;
-
-  if (Date.parse(session.expiresAt) <= Date.now()) {
-    sessions.delete(token);
-    return null;
-  }
-
-  return session;
+  // Without a valid signed token, we cannot authenticate
+  return null;
 }
 
 export const playerAuthManifest: ModuleManifest = {
@@ -320,9 +269,7 @@ export const playerAuthModule: WorkerModule = {
       } catch (error) {
         return c.json({ error: "SERVER_MISCONFIG", message: (error as Error).message }, 500);
       }
-      const signedToken = secret
-        ? await createSignedTokenForPlayer(playerId, secret)
-        : createToken(playerId, playerName);
+      const signedToken = await createSignedTokenForPlayer(playerId, secret ?? undefined);
 
       return c.json(
         {
@@ -368,9 +315,7 @@ export const playerAuthModule: WorkerModule = {
       } catch (error) {
         return c.json({ error: "SERVER_MISCONFIG", message: (error as Error).message }, 500);
       }
-      const signedToken = secret
-        ? await createSignedTokenForPlayer(playerId, secret)
-        : createToken(playerId, playerName);
+      const signedToken = await createSignedTokenForPlayer(playerId, secret ?? undefined);
 
       return c.json({
         token: signedToken,
@@ -411,9 +356,7 @@ export const playerAuthModule: WorkerModule = {
       } catch (error) {
         return c.json({ error: "SERVER_MISCONFIG", message: (error as Error).message }, 500);
       }
-      const signedToken = secret
-        ? await createSignedTokenForPlayer(playerId, secret)
-        : createToken(playerId, playerName);
+        const signedToken = await createSignedTokenForPlayer(playerId, secret ?? undefined);
 
         return c.json({
           token: signedToken,
@@ -458,9 +401,7 @@ export const playerAuthModule: WorkerModule = {
         } catch (error) {
           return c.json({ error: "SERVER_MISCONFIG", message: (error as Error).message }, 500);
         }
-        const signedToken = secret
-          ? await createSignedTokenForPlayer(playerId, secret)
-          : createToken(playerId, playerName);
+        const signedToken = await createSignedTokenForPlayer(playerId, secret ?? undefined);
 
         return c.json({
           token: signedToken,
@@ -508,9 +449,7 @@ export const playerAuthModule: WorkerModule = {
       } catch (error) {
         return c.json({ error: "SERVER_MISCONFIG", message: (error as Error).message }, 500);
       }
-      const signedToken = secret
-        ? await createSignedTokenForPlayer(session.playerId, secret)
-        : createToken(session.playerId, session.playerName);
+      const signedToken = await createSignedTokenForPlayer(session.playerId, secret ?? undefined);
 
       return c.json({
         token: signedToken,
@@ -521,11 +460,8 @@ export const playerAuthModule: WorkerModule = {
     });
 
     app.post("/auth/logout", (c) => {
-      const token = readBearerToken(c.req.raw) ?? new URL(c.req.url).searchParams.get("token");
-      if (token) {
-        sessions.delete(token);
-      }
-
+      // With stateless JWTs, logout is purely a client-side action (dropping the token).
+      // We no longer track active sessions on the server.
       return c.json({ success: true });
     });
 

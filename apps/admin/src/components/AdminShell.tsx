@@ -1,7 +1,7 @@
 import { Outlet, NavLink } from "react-router-dom";
 import { Button } from "@cloudflare/kumo/components/button";
 import { portal } from "../lib/portal";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
 export function AdminShell() {
@@ -11,6 +11,25 @@ export function AdminShell() {
   if (!token) {
     return <LoginScreen onLogin={(t) => setToken(t)} />;
   }
+
+  const [theme, setTheme] = useState<"light" | "dark" | "system">(
+    (localStorage.getItem("partygame.theme") as any) || "system"
+  );
+
+  useEffect(() => {
+    localStorage.setItem("partygame.theme", theme);
+    if (theme === "system") {
+      delete document.documentElement.dataset.theme;
+      if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+        document.documentElement.style.colorScheme = "dark";
+      } else {
+        document.documentElement.style.colorScheme = "light";
+      }
+    } else {
+      document.documentElement.dataset.theme = theme;
+      document.documentElement.style.colorScheme = theme;
+    }
+  }, [theme]);
 
   const handleLangChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     i18n.changeLanguage(e.target.value);
@@ -53,6 +72,21 @@ export function AdminShell() {
             <option value="zh">中文</option>
             <option value="ja">日本語</option>
             <option value="ko">한국어</option>
+          </select>
+          <select 
+            value={theme} 
+            onChange={(e) => setTheme(e.target.value as any)}
+            style={{ 
+              padding: "0.5rem", 
+              borderRadius: "4px", 
+              border: "1px solid var(--kumo-colors-gray-6)",
+              backgroundColor: "white",
+              color: "black"
+            }}
+          >
+            <option value="system">🖥️ System</option>
+            <option value="light">☀️ Light</option>
+            <option value="dark">🌙 Dark</option>
           </select>
           <Button variant="secondary" onClick={() => {
             portal.logout();
