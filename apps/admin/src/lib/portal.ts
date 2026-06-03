@@ -16,8 +16,20 @@ export type PlatformFeatures = {
   playerProfile: boolean;
 };
 
+export type MaintenanceWindow = {
+  enabled: boolean;
+  startTime?: string;
+  endTime?: string;
+  message?: string;
+};
+
 export type PlatformState = {
   features: PlatformFeatures;
+  apiVersion?: string;
+  minClientVersion?: string;
+  deprecations?: any[];
+  maintenance?: MaintenanceWindow;
+  revision?: number;
   updatedAt?: string;
 };
 
@@ -65,6 +77,13 @@ class PortalClient {
     return this.request<PlatformState>("/admin/platform");
   }
 
+  async updatePlatformStateFull(updates: Partial<PlatformState>): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>("/admin/platform", {
+      method: "PATCH",
+      body: JSON.stringify(updates),
+    });
+  }
+
   async updatePlatformState(updates: Partial<PlatformFeatures>): Promise<{ success: boolean }> {
     return this.request<{ success: boolean }>("/admin/platform/settings", {
       method: "POST",
@@ -74,6 +93,50 @@ class PortalClient {
 
   async getModules(): Promise<ModuleFlag[]> {
     return this.request<ModuleFlag[]>("/admin/modules");
+  }
+
+  // --- Players ---
+
+  async getPlayers(limit = 50, cursor?: string): Promise<{ players: any[], cursor: string | null }> {
+    return this.request<{ players: any[], cursor: string | null }>(`/admin/players?limit=${limit}${cursor ? `&cursor=${cursor}` : ''}`);
+  }
+
+  async banPlayer(playerId: string, reason?: string, expiresAt?: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/admin/players/${playerId}/ban`, {
+      method: "POST",
+      body: JSON.stringify({ reason, expiresAt })
+    });
+  }
+
+  async unbanPlayer(playerId: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/admin/players/${playerId}/ban`, {
+      method: "DELETE"
+    });
+  }
+
+  // --- Operations (Hotfixes) ---
+
+  async getHotfixes(): Promise<{ manifests: any[] }> {
+    return this.request<{ manifests: any[] }>("/hotfix/list");
+  }
+
+  async uploadHotfix(formData: FormData): Promise<{ success: boolean, version: string }> {
+    return this.request<{ success: boolean, version: string }>("/hotfix/upload", {
+      method: "POST",
+      body: formData
+    });
+  }
+
+  async promoteHotfix(version: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/hotfix/promote/${version}`, {
+      method: "POST"
+    });
+  }
+
+  async rollbackHotfix(version: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/hotfix/rollback/${version}`, {
+      method: "POST"
+    });
   }
 
   // --- Utility ---

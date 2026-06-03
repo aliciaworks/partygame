@@ -11,6 +11,9 @@ import { AdminShell } from "./components/AdminShell";
 
 const Dashboard = React.lazy(() => import("./routes/Dashboard").then(m => ({ default: m.Dashboard })));
 const Modules = React.lazy(() => import("./routes/Modules").then(m => ({ default: m.Modules })));
+const Players = React.lazy(() => import("./routes/Players").then(m => ({ default: m.Players })));
+const Operations = React.lazy(() => import("./routes/Operations").then(m => ({ default: m.Operations })));
+const Settings = React.lazy(() => import("./routes/Settings").then(m => ({ default: m.Settings })));
 
 const queryClient = new QueryClient();
 
@@ -29,15 +32,15 @@ const router = createBrowserRouter([
       },
       {
         path: "operations",
-        element: <div>Operations (WIP)</div>,
+        element: <Operations />,
       },
       {
         path: "players",
-        element: <div>Players (WIP)</div>,
+        element: <Players />,
       },
       {
         path: "settings",
-        element: <div>Settings (WIP)</div>,
+        element: <Settings />,
       }
     ],
   },
