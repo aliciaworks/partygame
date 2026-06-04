@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { portal } from "../lib/portal";
 import { Button } from "@cloudflare/kumo/components/button";
+import { Table } from "@cloudflare/kumo/components/table";
+import { Badge } from "@cloudflare/kumo/components/badge";
 
 export function Players() {
   const queryClient = useQueryClient();
@@ -26,46 +28,48 @@ export function Players() {
 
   return (
     <div>
-      <h1>Player Management</h1>
+      <h1 style={{ marginBottom: "2rem" }}>Player Management</h1>
       
-      <div style={{ marginTop: "2rem", backgroundColor: "white", padding: "1.5rem", borderRadius: "8px", border: "1px solid var(--kumo-colors-gray-4)" }}>
-        <table style={{ width: "100%", textAlign: "left", borderCollapse: "collapse" }}>
-          <thead>
-            <tr style={{ borderBottom: "1px solid var(--kumo-colors-gray-4)", color: "var(--kumo-colors-gray-11)" }}>
-              <th style={{ padding: "0.75rem 0" }}>Player ID</th>
-              <th>Name</th>
-              <th>Created At</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {players.length === 0 ? (
-              <tr><td colSpan={5} style={{ padding: "1rem", textAlign: "center" }}>No players found.</td></tr>
-            ) : players.map(p => (
-              <tr key={p.playerId} style={{ borderBottom: "1px solid var(--kumo-colors-gray-3)" }}>
-                <td style={{ padding: "0.75rem 0", fontFamily: "monospace" }}>{p.playerId}</td>
-                <td style={{ fontWeight: 600 }}>{p.playerName || "Unknown"}</td>
-                <td style={{ color: "var(--kumo-colors-gray-11)" }}>{new Date(p.createdAt).toLocaleString()}</td>
-                <td>
-                  {p.ban ? (
-                    <span style={{ color: "var(--kumo-colors-red-9)", backgroundColor: "var(--kumo-colors-red-2)", padding: "0.25rem 0.5rem", borderRadius: "4px", fontSize: "0.875rem" }}>Banned</span>
-                  ) : (
-                    <span style={{ color: "var(--kumo-colors-green-9)", backgroundColor: "var(--kumo-colors-green-2)", padding: "0.25rem 0.5rem", borderRadius: "4px", fontSize: "0.875rem" }}>Active</span>
-                  )}
-                </td>
-                <td>
-                  {p.ban ? (
-                    <Button variant="secondary" onClick={() => unbanMutation.mutate(p.playerId)}>Unban</Button>
-                  ) : (
-                    <Button variant="destructive" onClick={() => banMutation.mutate(p.playerId)}>Ban</Button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Table>
+        <Table.Header>
+          <Table.Row>
+            <Table.Head>Player ID</Table.Head>
+            <Table.Head>Name</Table.Head>
+            <Table.Head>Created At</Table.Head>
+            <Table.Head>Status</Table.Head>
+            <Table.Head>Actions</Table.Head>
+          </Table.Row>
+        </Table.Header>
+        <Table.Body>
+          {players.length === 0 ? (
+            <Table.Row>
+              <Table.Cell colSpan={5} style={{ textAlign: "center", padding: "2rem" }}>
+                No players found.
+              </Table.Cell>
+            </Table.Row>
+          ) : players.map((p: any) => (
+            <Table.Row key={p.playerId}>
+              <Table.Cell style={{ fontFamily: "monospace" }}>{p.playerId}</Table.Cell>
+              <Table.Cell style={{ fontWeight: 600 }}>{p.playerName || "Unknown"}</Table.Cell>
+              <Table.Cell>{new Date(p.createdAt).toLocaleString()}</Table.Cell>
+              <Table.Cell>
+                {p.ban ? (
+                  <Badge variant="error" appearance="dot">Banned</Badge>
+                ) : (
+                  <Badge variant="success" appearance="dot">Active</Badge>
+                )}
+              </Table.Cell>
+              <Table.Cell>
+                {p.ban ? (
+                  <Button variant="secondary" onClick={() => unbanMutation.mutate(p.playerId)}>Unban</Button>
+                ) : (
+                  <Button variant="destructive" onClick={() => banMutation.mutate(p.playerId)}>Ban</Button>
+                )}
+              </Table.Cell>
+            </Table.Row>
+          ))}
+        </Table.Body>
+      </Table>
     </div>
   );
 }
