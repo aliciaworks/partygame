@@ -6,6 +6,9 @@ export type PlatformFeatures = {
   leaderboard: boolean;
   friends: boolean;
   playerProfile: boolean;
+  seasons: boolean;
+  replays: boolean;
+  guilds: boolean;
 };
 
 export type Deprecation = {
@@ -22,8 +25,18 @@ export type MaintenanceWindow = {
   message?: string;
 };
 
+export type CurrencyDef = {
+  name: string;
+  type: "hard" | "soft";
+};
+
 export type PlatformState = {
   features: PlatformFeatures;
+  currencies: Record<string, CurrencyDef>;
+  seasons: {
+    currentSeasonId: string;
+    endsAt: string;
+  };
   apiVersion: string; // ISO date (YYYY-MM-DD) - deployment date
   minClientVersion?: string; // minimum required client version (SemVer)
   deprecations: Deprecation[]; // APIs scheduled for removal
@@ -43,6 +56,9 @@ const DEFAULT_FEATURES: PlatformFeatures = {
   leaderboard: true,
   friends: true,
   playerProfile: true,
+  seasons: true,
+  replays: true,
+  guilds: true,
 };
 
 const FEATURE_KEYS = Object.keys(DEFAULT_FEATURES) as Array<keyof PlatformFeatures>;
@@ -86,6 +102,14 @@ function getISODateString(): string {
 function getDefaultState(): PlatformState {
   return {
     features: { ...DEFAULT_FEATURES },
+    currencies: {
+      "coin": { name: "Coin", type: "soft" },
+      "gem": { name: "Gem", type: "hard" }
+    },
+    seasons: {
+      currentSeasonId: "season_1",
+      endsAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
+    },
     apiVersion: getISODateString(),
     deprecations: [],
     revision: 0,
@@ -124,6 +148,37 @@ function normalizeDeprecations(input: unknown): Deprecation[] {
     .filter((item): item is Deprecation => item !== undefined);
 }
 
+function normalizeCurrencies(input: unknown): Record<string, CurrencyDef> {
+  const currencies: Record<string, CurrencyDef> = {};
+  if (typeof input === "object" && input !== null) {
+    for (const [key, val] of Object.entries(input)) {
+      if (typeof val === "object" && val !== null) {
+        const v = val as Partial<CurrencyDef>;
+        if (typeof v.name === "string" && (v.type === "hard" || v.type === "soft")) {
+          currencies[key] = { name: v.name, type: v.type };
+        }
+      }
+    }
+  }
+  return Object.keys(currencies).length > 0 ? currencies : {
+    "coin": { name: "Coin", type: "soft" },
+    "gem": { name: "Gem", type: "hard" }
+  };
+}
+
+function normalizeSeasons(input: unknown): { currentSeasonId: string; endsAt: string } {
+  if (typeof input === "object" && input !== null) {
+    const v = input as Partial<{ currentSeasonId: string; endsAt: string }>;
+    if (typeof v.currentSeasonId === "string" && typeof v.endsAt === "string") {
+      return { currentSeasonId: v.currentSeasonId, endsAt: v.endsAt };
+    }
+  }
+  return {
+    currentSeasonId: "season_1",
+    endsAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
+  };
+}
+
 export async function readPlatformState(
   bucket: R2Bucket | undefined,
 ): Promise<PlatformState> {
@@ -148,6 +203,8 @@ export async function readPlatformState(
     const parsed = JSON.parse(await object.text()) as Partial<PlatformState>;
     const state: PlatformState = {
       features: normalizeFeatures(parsed.features),
+      currencies: normalizeCurrencies(parsed.currencies),
+      seasons: normalizeSeasons(parsed.seasons),
       apiVersion: parsed.apiVersion ?? getISODateString(),
       minClientVersion: parsed.minClientVersion,
       deprecations: normalizeDeprecations(parsed.deprecations),
@@ -180,6 +237,8 @@ export async function patchPlatformFeatures(
   });
   const state: PlatformState = {
     features: merged,
+    currencies: current.currencies,
+    seasons: current.seasons,
     apiVersion: getISODateString(),
     minClientVersion: current.minClientVersion,
     deprecations: current.deprecations,
@@ -213,6 +272,8 @@ export async function patchPlatformState(
       ...current.features,
       ...(updates.features as Partial<PlatformFeatures>),
     }),
+    currencies: updates.currencies ? normalizeCurrencies(updates.currencies) : current.currencies,
+    seasons: updates.seasons ? normalizeSeasons(updates.seasons) : current.seasons,
     apiVersion: updates.apiVersion ?? getISODateString(),
     minClientVersion: updates.minClientVersion ?? current.minClientVersion,
     deprecations: normalizeDeprecations(updates.deprecations ?? current.deprecations),

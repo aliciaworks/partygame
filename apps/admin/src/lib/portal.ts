@@ -27,7 +27,7 @@ export type PlatformState = {
   features: PlatformFeatures;
   apiVersion?: string;
   minClientVersion?: string;
-  deprecations?: any[];
+  deprecations?: unknown[];
   maintenance?: MaintenanceWindow;
   revision?: number;
   updatedAt?: string;
@@ -97,8 +97,8 @@ class PortalClient {
 
   // --- Players ---
 
-  async getPlayers(limit = 50, cursor?: string): Promise<{ players: any[], cursor: string | null }> {
-    return this.request<{ players: any[], cursor: string | null }>(`/admin/players?limit=${limit}${cursor ? `&cursor=${cursor}` : ''}`);
+  async getPlayers(limit = 50, cursor?: string): Promise<{ players: Record<string, unknown>[], cursor: string | null }> {
+    return this.request<{ players: Record<string, unknown>[], cursor: string | null }>(`/admin/players?limit=${limit}${cursor ? `&cursor=${cursor}` : ''}`);
   }
 
   async banPlayer(playerId: string, reason?: string, expiresAt?: string): Promise<{ success: boolean }> {
@@ -116,8 +116,8 @@ class PortalClient {
 
   // --- Operations (Hotfixes) ---
 
-  async getHotfixes(): Promise<{ manifests: any[] }> {
-    return this.request<{ manifests: any[] }>("/hotfix/list");
+  async getHotfixes(): Promise<{ manifests: Record<string, unknown>[] }> {
+    return this.request<{ manifests: Record<string, unknown>[] }>("/hotfix/list");
   }
 
   async uploadHotfix(formData: FormData): Promise<{ success: boolean, version: string }> {

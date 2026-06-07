@@ -47,7 +47,7 @@ export function Players() {
                 No players found.
               </Table.Cell>
             </Table.Row>
-          ) : players.map((p: any) => (
+          ) : players.map((p: { playerId: string; playerName: string; createdAt: string; ban: boolean }) => (
             <Table.Row key={p.playerId}>
               <Table.Cell style={{ fontFamily: "monospace" }}>{p.playerId}</Table.Cell>
               <Table.Cell style={{ fontWeight: 600 }}>{p.playerName || "Unknown"}</Table.Cell>

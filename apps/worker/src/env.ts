@@ -13,6 +13,7 @@ export type AppEnv = {
     GAME_ROOM?: DurableObjectNamespace;
     MATCHMAKER_ROOM?: DurableObjectNamespace;
     CHAT_ROOM?: DurableObjectNamespace;
+    GUILD_ROOM?: DurableObjectNamespace;
     CALLS_APP_ID?: string;
     CALLS_APP_SECRET?: string;
     DB?: D1Database;

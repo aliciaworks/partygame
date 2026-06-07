@@ -82,7 +82,7 @@ export function Operations() {
                     No hotfixes deployed.
                   </Table.Cell>
                 </Table.Row>
-              ) : manifests.map((m: any) => (
+              ) : manifests.map((m: { version: string; size: number; uploadedAt: string; active: boolean }) => (
                 <Table.Row key={m.version}>
                   <Table.Cell style={{ fontFamily: "monospace" }}>{m.version}</Table.Cell>
                   <Table.Cell>{(m.size / 1024).toFixed(1)} KB</Table.Cell>

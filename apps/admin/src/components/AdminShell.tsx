@@ -9,7 +9,7 @@ export function AdminShell() {
   const { t, i18n } = useTranslation();
 
   const [theme, setTheme] = useState<"light" | "dark" | "system">(
-    (localStorage.getItem("partygame.theme") as any) || "system"
+    (localStorage.getItem("partygame.theme") as "light" | "dark" | "system") || "system"
   );
 
   useEffect(() => {
@@ -75,7 +75,7 @@ export function AdminShell() {
           </select>
           <select 
             value={theme} 
-            onChange={(e) => setTheme(e.target.value as any)}
+            onChange={(e) => setTheme(e.target.value as "light" | "dark" | "system")}
             style={{ 
               padding: "0.5rem", 
               borderRadius: "4px", 

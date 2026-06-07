@@ -1,6 +1,7 @@
 name = "partygame-example-backend"
 main = "src/index.ts"
 compatibility_date = "2026-05-18"
+compatibility_flags = ["nodejs_compat"]
 
 [[durable_objects.bindings]]
 name = "GAME_ROOM"
@@ -14,6 +15,10 @@ class_name = "MatchmakerRoom"
 name = "CHAT_ROOM"
 class_name = "ChatRoom"
 
+[[durable_objects.bindings]]
+name = "GUILD_ROOM"
+class_name = "GuildRoom"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["GameRoom"]
@@ -25,6 +30,10 @@ new_sqlite_classes = ["MatchmakerRoom"]
 [[migrations]]
 tag = "v3"
 new_sqlite_classes = ["ChatRoom"]
+
+[[migrations]]
+tag = "v4"
+new_sqlite_classes = ["GuildRoom"]
 
 [[r2_buckets]]
 binding = "PLATFORM_BUCKET"

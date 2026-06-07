@@ -2,6 +2,7 @@ import type { GameTickUpdate } from "@partygame/shared";
 import type { GamePlugin, Session } from "./plugin";
 import { getGamePlugin } from "../plugins/registry";
 import { encode, decode } from "@msgpack/msgpack";
+import { isFeatureEnabled } from "../platform-state";
 
 // ---------------------------------------------------------------------------
 // GameRoom Durable Object — uses the WebSocket Hibernation API so that
@@ -13,10 +14,13 @@ export class GameRoom implements DurableObject {
   private interval: number | null = null;
   private env: any;
   private plugin: GamePlugin;
+  private replayTicks: any[] = [];
+  private roomId: string;
 
   constructor(private state: DurableObjectState, env: any) {
     this.env = env;
     this.plugin = getGamePlugin("moba");
+    this.roomId = state.id.toString();
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -117,6 +121,7 @@ export class GameRoom implements DurableObject {
       if (this.interval !== null && this.state.getWebSockets().length === 0) {
         clearInterval(this.interval as any);
         this.interval = null;
+        this.closeGame();
       }
     }
   }
@@ -218,6 +223,16 @@ export class GameRoom implements DurableObject {
   // Game loop
   // ---------------------------------------------------------------------------
 
+  private async closeGame() {
+    if (this.env.PLATFORM_BUCKET && this.replayTicks.length > 0) {
+      if (await isFeatureEnabled(this.env.PLATFORM_BUCKET, "replays")) {
+        const json = JSON.stringify(this.replayTicks);
+        await this.env.PLATFORM_BUCKET.put('replays/' + this.roomId + '.json', json);
+      }
+      this.replayTicks = [];
+    }
+  }
+
   private startGameLoop() {
     const pluginTickMs = this.plugin.tickIntervalMs;
     if (pluginTickMs <= 0) return;
@@ -236,6 +251,7 @@ export class GameRoom implements DurableObject {
       if (sessions.size === 0) {
         clearInterval(this.interval as any);
         this.interval = null;
+        this.closeGame();
         return;
       }
 
@@ -268,6 +284,8 @@ export class GameRoom implements DurableObject {
         // Persist updated state back into the WS attachment
         this.persistSession(session);
       }
+
+      this.replayTicks.push(update);
 
       const updateMsg = encode(update);
       for (const ws of this.state.getWebSockets()) {

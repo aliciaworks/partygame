@@ -16,6 +16,7 @@ export function Settings() {
 
   useEffect(() => {
     if (state) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setMaintenance(state.maintenance?.enabled || false);
       setMaintenanceMsg(state.maintenance?.message || "");
     }

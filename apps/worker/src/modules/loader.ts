@@ -11,6 +11,9 @@ import { friendsModule } from "./friends/index";
 import { chatModule } from "./chat/index";
 import { leaderboardModule } from "./leaderboard/index";
 import { playerProfileModule } from "./player_profile/index";
+import { economyModule } from "./economy/index";
+// import { guildsModule } from "./guilds/index";
+import { seasonsModule } from "./seasons/index";
 
 export type ModuleManifest = {
   id: string;
@@ -36,6 +39,9 @@ const defaultModules = [
   chatModule,
   leaderboardModule,
   playerProfileModule,
+  economyModule,
+  // guildsModule,
+  seasonsModule,
 ] as const;
 
 export function getModuleManifests(): ModuleManifest[] {

@@ -17,6 +17,7 @@ import { PlatformStateConflictError } from "./platform-state";
 export { GameRoom } from "./game/game-room";
 export { MatchmakerRoom } from "./matchmaker/matchmaker-room";
 export { ChatRoom } from "./chat/chat-room";
+export { GuildRoom } from "./guilds/guild-room";
 
 import type { AppEnv } from "./env";
 

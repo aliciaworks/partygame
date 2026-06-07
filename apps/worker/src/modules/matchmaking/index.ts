@@ -15,8 +15,8 @@ async function proxyMatchmakerRequest(c: any, path: string, method: string, body
     return c.json({ error: "MATCHMAKER_ROOM binding missing" }, 500);
   }
   
-  // We use a single global matchmaker instance for simplicity
-  const id = namespace.idFromName("global-matchmaker");
+  const region = c.req.query("region") || "global";
+  const id = namespace.idFromName("matchmaker-" + region);
   const stub = namespace.get(id);
   
   const url = `https://matchmaker.internal${path}`;
@@ -59,6 +59,17 @@ export const matchmakingModule: WorkerModule = {
         return c.json({ error: "playerId is required" }, 400);
       }
       return proxyMatchmakerRequest(c, "/leave", "POST", { playerId: body.playerId });
+    });
+
+    app.get("/matchmaking/ws", async (c) => {
+      const namespace = c.env.MATCHMAKER_ROOM as DurableObjectNamespace | undefined;
+      if (!namespace) {
+        return c.json({ error: "MATCHMAKER_ROOM binding missing" }, 500);
+      }
+      const region = c.req.query("region") || "global";
+      const id = namespace.idFromName("matchmaker-" + region);
+      const stub = namespace.get(id);
+      return stub.fetch(c.req.raw);
     });
   },
 };
