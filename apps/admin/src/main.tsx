@@ -2,7 +2,6 @@
 import React, { Suspense } from "react";
 import ReactDOM from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
-import "@cloudflare/kumo/styles";
 import "./index.css";
 import "./i18n";
 

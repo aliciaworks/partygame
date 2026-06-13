@@ -1,8 +1,10 @@
 import { Outlet, NavLink } from "react-router-dom";
-import { Button } from "@cloudflare/kumo/components/button";
+import { Button } from "./ui/button";
 import { portal } from "../lib/portal";
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { cn } from "../lib/utils";
+import { LogOut, Sun, Moon, Monitor, Languages } from "lucide-react";
 
 export function AdminShell() {
   const [token, setToken] = useState(localStorage.getItem("partygame.portal.adminToken"));
@@ -36,84 +38,126 @@ export function AdminShell() {
   };
 
   return (
-    <div style={{ display: "flex", height: "100vh", backgroundColor: "var(--kumo-colors-gray-2)" }}>
+    <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
       {/* Sidebar */}
-      <nav style={{ 
-        width: "250px", 
-        backgroundColor: "var(--kumo-colors-gray-1)", 
-        borderRight: "1px solid var(--kumo-colors-gray-4)",
-        padding: "1rem",
-        display: "flex",
-        flexDirection: "column",
-        gap: "0.5rem"
-      }}>
-        <div style={{ marginBottom: "2rem", paddingLeft: "1rem" }}>
-          <h2>{t('app.title')}</h2>
+      <nav className="w-64 bg-card border-r border-border p-4 flex flex-col gap-2 shrink-0">
+        <div className="mb-8 pl-2 mt-2">
+          <h2 className="text-xl font-bold tracking-tight text-primary">{t('app.title')}</h2>
+          <p className="text-xs text-muted-foreground mt-1">Management Portal</p>
         </div>
         
-        <NavLink to="/" end style={navLinkStyle}>{t('nav.dashboard')}</NavLink>
-        <NavLink to="/modules" style={navLinkStyle}>{t('nav.modules')}</NavLink>
-        <NavLink to="/operations" style={navLinkStyle}>{t('nav.operations')}</NavLink>
-        <NavLink to="/players" style={navLinkStyle}>{t('nav.players')}</NavLink>
-        <NavLink to="/settings" style={navLinkStyle}>{t('nav.settings')}</NavLink>
+        <div className="flex flex-col gap-1.5 flex-1">
+          <NavLink 
+            to="/" 
+            end 
+            className={({ isActive }) => cn(
+              "px-3 py-2 rounded-md text-sm font-medium transition-all duration-200",
+              isActive 
+                ? "bg-primary text-primary-foreground shadow-sm" 
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
+          >
+            {t('nav.dashboard')}
+          </NavLink>
+          <NavLink 
+            to="/modules" 
+            className={({ isActive }) => cn(
+              "px-3 py-2 rounded-md text-sm font-medium transition-all duration-200",
+              isActive 
+                ? "bg-primary text-primary-foreground shadow-sm" 
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
+          >
+            {t('nav.modules')}
+          </NavLink>
+          <NavLink 
+            to="/operations" 
+            className={({ isActive }) => cn(
+              "px-3 py-2 rounded-md text-sm font-medium transition-all duration-200",
+              isActive 
+                ? "bg-primary text-primary-foreground shadow-sm" 
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
+          >
+            {t('nav.operations')}
+          </NavLink>
+          <NavLink 
+            to="/players" 
+            className={({ isActive }) => cn(
+              "px-3 py-2 rounded-md text-sm font-medium transition-all duration-200",
+              isActive 
+                ? "bg-primary text-primary-foreground shadow-sm" 
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
+          >
+            {t('nav.players')}
+          </NavLink>
+          <NavLink 
+            to="/settings" 
+            className={({ isActive }) => cn(
+              "px-3 py-2 rounded-md text-sm font-medium transition-all duration-200",
+              isActive 
+                ? "bg-primary text-primary-foreground shadow-sm" 
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
+          >
+            {t('nav.settings')}
+          </NavLink>
+        </div>
 
-        <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-          <select 
-            value={i18n.language} 
-            onChange={handleLangChange}
-            style={{ 
-              padding: "0.5rem", 
-              borderRadius: "4px", 
-              border: "1px solid var(--kumo-colors-gray-6)",
-              backgroundColor: "white"
+        <div className="mt-auto flex flex-col gap-3 pt-4 border-t border-border">
+          {/* Language Selector */}
+          <div className="relative flex items-center">
+            <Languages className="absolute left-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <select 
+              value={i18n.language} 
+              onChange={handleLangChange}
+              className="w-full pl-9 pr-3 py-1.5 text-sm bg-background border border-input rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors"
+            >
+              <option value="en">English</option>
+              <option value="zh">中文</option>
+              <option value="ja">日本語</option>
+              <option value="ko">한국어</option>
+            </select>
+          </div>
+
+          {/* Theme Selector */}
+          <div className="relative flex items-center">
+            {theme === "system" && <Monitor className="absolute left-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />}
+            {theme === "light" && <Sun className="absolute left-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />}
+            {theme === "dark" && <Moon className="absolute left-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />}
+            <select 
+              value={theme} 
+              onChange={(e) => setTheme(e.target.value as "light" | "dark" | "system")}
+              className="w-full pl-9 pr-3 py-1.5 text-sm bg-background border border-input rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors"
+            >
+              <option value="system">System</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+          </div>
+
+          <Button 
+            variant="outline" 
+            size="sm"
+            className="w-full flex items-center justify-center gap-2"
+            onClick={() => {
+              portal.logout();
+              setToken(null);
             }}
           >
-            <option value="en">English</option>
-            <option value="zh">中文</option>
-            <option value="ja">日本語</option>
-            <option value="ko">한국어</option>
-          </select>
-          <select 
-            value={theme} 
-            onChange={(e) => setTheme(e.target.value as "light" | "dark" | "system")}
-            style={{ 
-              padding: "0.5rem", 
-              borderRadius: "4px", 
-              border: "1px solid var(--kumo-colors-gray-6)",
-              backgroundColor: "white",
-              color: "black"
-            }}
-          >
-            <option value="system">🖥️ System</option>
-            <option value="light">☀️ Light</option>
-            <option value="dark">🌙 Dark</option>
-          </select>
-          <Button variant="secondary" onClick={() => {
-            portal.logout();
-            setToken(null);
-          }}>
+            <LogOut className="h-4 w-4" />
             {t('nav.logout')}
           </Button>
         </div>
       </nav>
 
       {/* Main Content */}
-      <main style={{ flex: 1, padding: "2rem", overflowY: "auto" }}>
+      <main className="flex-1 p-8 overflow-y-auto bg-background">
         <Outlet />
       </main>
     </div>
   );
-}
-
-function navLinkStyle({ isActive }: { isActive: boolean }) {
-  return {
-    padding: "0.5rem 1rem",
-    textDecoration: "none",
-    color: isActive ? "var(--kumo-colors-blue-9)" : "var(--kumo-colors-gray-11)",
-    backgroundColor: isActive ? "var(--kumo-colors-blue-3)" : "transparent",
-    borderRadius: "6px",
-    fontWeight: isActive ? 600 : 400,
-  };
 }
 
 function LoginScreen({ onLogin }: { onLogin: (t: string) => void }) {
@@ -127,28 +171,23 @@ function LoginScreen({ onLogin }: { onLogin: (t: string) => void }) {
   };
 
   return (
-    <div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center", backgroundColor: "var(--kumo-colors-gray-2)" }}>
-      <form onSubmit={handleLogin} style={{ 
-        backgroundColor: "var(--kumo-colors-gray-1)", 
-        padding: "2rem", 
-        borderRadius: "8px", 
-        boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-        display: "flex",
-        flexDirection: "column",
-        gap: "1rem",
-        minWidth: "300px"
-      }}>
-        <h2>{t('login.title')}</h2>
-        <div>
-          <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>{t('login.secret_label')}</label>
+    <div className="flex h-screen w-screen items-center justify-center bg-background text-foreground">
+      <form onSubmit={handleLogin} className="bg-card border border-border p-8 rounded-lg shadow-lg flex flex-col gap-6 w-full max-w-sm">
+        <div className="flex flex-col gap-1 text-center">
+          <h2 className="text-2xl font-bold tracking-tight">{t('login.title')}</h2>
+          <p className="text-sm text-muted-foreground">Enter your portal secret key</p>
+        </div>
+        <div className="flex flex-col gap-2">
+          <label className="text-sm font-semibold text-foreground">{t('login.secret_label')}</label>
           <input 
             type="password" 
             value={secret} 
             onChange={(e) => setSecret(e.target.value)}
-            style={{ width: "100%", padding: "0.5rem", borderRadius: "4px", border: "1px solid var(--kumo-colors-gray-6)" }}
+            className="w-full px-3 py-2 text-sm bg-background border border-input rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            placeholder="••••••••"
           />
         </div>
-        <Button type="submit">{t('login.button')}</Button>
+        <Button type="submit" className="w-full font-semibold">{t('login.button')}</Button>
       </form>
     </div>
   );

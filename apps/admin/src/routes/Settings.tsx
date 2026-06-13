@@ -1,8 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { portal, type PlatformState } from "../lib/portal";
-import { Button } from "@cloudflare/kumo/components/button";
-import { Checkbox } from "@cloudflare/kumo/components/checkbox";
+import { Button } from "../components/ui/button";
+import { Checkbox } from "../components/ui/checkbox";
 import { useState, useEffect } from "react";
+import { Settings as SettingsIcon, AlertCircle } from "lucide-react";
 
 export function Settings() {
   const queryClient = useQueryClient();
@@ -40,49 +41,49 @@ export function Settings() {
     });
   };
 
-  if (isLoading) return <div>Loading...</div>;
+  if (isLoading) return <div className="text-muted-foreground animate-pulse">Loading...</div>;
 
   return (
-    <div>
-      <h1 style={{ marginBottom: "2rem" }}>Platform Settings</h1>
+    <div className="flex flex-col gap-8 max-w-2xl">
+      <div className="flex items-center gap-3">
+        <SettingsIcon className="h-8 w-8 text-primary" />
+        <h1 className="text-3xl font-bold tracking-tight">Platform Settings</h1>
+      </div>
 
-      <div style={{ maxWidth: "600px" }}>
-        <h3 style={{ marginBottom: "0.5rem" }}>Maintenance Mode</h3>
-        <p style={{ color: "var(--kumo-colors-gray-11)", marginBottom: "1.5rem", display: "block" }}>
-          Enable maintenance mode to prevent new player logins. Existing active connections will not be dropped immediately.
-        </p>
+      <div className="bg-card border border-border p-6 rounded-xl shadow-sm flex flex-col gap-6">
+        <div>
+          <h3 className="text-lg font-semibold tracking-tight mb-1">Maintenance Mode</h3>
+          <p className="text-sm text-muted-foreground">
+            Enable maintenance mode to prevent new player logins. Existing active connections will not be dropped immediately.
+          </p>
+        </div>
 
-        <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-          <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontWeight: 600, cursor: "pointer" }}>
+        <form onSubmit={handleSave} className="flex flex-col gap-6">
+          <label className="flex items-center gap-3 cursor-pointer select-none">
             <Checkbox 
               checked={maintenance}
               onCheckedChange={(checked) => setMaintenance(checked as boolean)}
             />
-            <span>Enable Maintenance</span>
+            <span className="text-sm font-semibold text-foreground">Enable Maintenance Mode</span>
           </label>
 
           {maintenance && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              <label style={{ fontSize: "0.875rem", fontWeight: 600 }}>Downtime Message</label>
+            <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
+              <label className="text-sm font-semibold flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+                <AlertCircle className="h-4 w-4" />
+                Downtime Message
+              </label>
               <textarea 
                 value={maintenanceMsg}
                 onChange={(e) => setMaintenanceMsg(e.target.value)}
                 placeholder="Server is undergoing scheduled maintenance..."
-                style={{ 
-                  padding: "0.75rem", 
-                  borderRadius: "6px", 
-                  border: "1px solid var(--kumo-colors-gray-6)", 
-                  minHeight: "100px",
-                  backgroundColor: "var(--kumo-colors-gray-1)",
-                  fontFamily: "inherit",
-                  fontSize: "0.875rem"
-                }}
+                className="w-full min-h-[100px] p-3 text-sm bg-background border border-input rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-ring font-sans"
               />
             </div>
           )}
 
-          <div>
-            <Button type="submit" disabled={updateMutation.isPending}>
+          <div className="pt-2 border-t border-border flex justify-end">
+            <Button type="submit" disabled={updateMutation.isPending} className="w-full sm:w-auto">
               {updateMutation.isPending ? "Saving..." : "Save Settings"}
             </Button>
           </div>
