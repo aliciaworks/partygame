@@ -197,35 +197,53 @@ function LoginScreen({ onLogin }: { onLogin: (t: string) => void }) {
     setLoading(true);
     setError(null);
     try {
-      // Try better-auth sign-in first
+      // 1. Try better-auth sign-in
       const r = await fetch(new URL("/admin/auth/sign-in/email", portal.baseUrl), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email || "admin@partygame.local", password }),
-        credentials: "include",
       });
       if (r.ok) {
         const data = await r.json();
-        const token = data.token || data.session?.token || "";
-        if (token) {
-          localStorage.setItem("partygame.portal.adminToken", token);
-          onLogin(token);
-          return;
-        }
-        // Cookie-based session: just set a flag
-        localStorage.setItem("partygame.portal.adminToken", "better-auth-session");
-        onLogin("better-auth-session");
+        const token = data.token || "";
+        localStorage.setItem("partygame.portal.adminToken", token || password);
+        onLogin(token || password);
         return;
       }
-      // Fallback: old ADMIN_SECRET check
-      if (!email) {
-        const r2 = await fetch(new URL("/admin/platform", portal.baseUrl), {
-          headers: { Authorization: `Bearer ${password}` },
+
+      // 2. Try bootstrap (first-time setup)
+      const br = await fetch(new URL("/admin/auth/bootstrap", portal.baseUrl), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (br.ok) {
+        // Bootstrap succeeded, now sign in
+        const r2 = await fetch(new URL("/admin/auth/sign-in/email", portal.baseUrl), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: "admin@partygame.local", password }),
         });
-        if (r2.ok) { localStorage.setItem("partygame.portal.adminToken", password); onLogin(password); return; }
+        if (r2.ok) {
+          const data = await r2.json();
+          const token = data.token || "";
+          localStorage.setItem("partygame.portal.adminToken", token || password);
+          onLogin(token || password);
+          return;
+        }
       }
-      const b = await r.json().catch(() => ({}));
-      setError(b.message || "Login failed");
+
+      // 3. Fallback: old ADMIN_SECRET (password-as-token)
+      const r3 = await fetch(new URL("/admin/platform", portal.baseUrl), {
+        headers: { Authorization: `Bearer ${password}` },
+      });
+      if (r3.ok) {
+        localStorage.setItem("partygame.portal.adminToken", password);
+        onLogin(password);
+        return;
+      }
+
+      setError("Login failed. Check your credentials.");
     } catch {
       setError("Cannot reach server");
     } finally {

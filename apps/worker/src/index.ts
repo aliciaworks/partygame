@@ -17,7 +17,7 @@ import { PlatformStateConflictError } from "./platform-state";
 import { ADMIN_INDEX_HTML } from "./admin-index.generated";
 import { AGENT_CONFIG } from "./well-known";
 import { OPENAPI_YAML } from "./openapi-yaml";
-import { createAuth, authMethods } from "./admin-auth";
+import { createAuth, authMethods, isFirstUser, bootstrapAdmin, createInvite, acceptInvite } from "./admin-auth";
 import { jwtVerify } from "jose";
 export { GameRoom } from "./game/game-room";
 export { MatchmakerRoom } from "./matchmaker/matchmaker-room";
@@ -182,10 +182,97 @@ app.get("/openapi.yaml", (c) => {
 
 // ── Admin auth (better-auth + D1) ──────────────────────────────────────
 app.get("/admin/auth/methods", (c) => {
-  return c.json({ password: true, google: false, totp: true });
+  return c.json(authMethods(c.env));
 });
 
-// Mount better-auth handler on POST/GET for auth operations
+// Bootstrap: create first admin if no users exist
+app.post("/admin/auth/bootstrap", async (c) => {
+  try {
+    if (!c.env.DB) return c.json({ error: "No database" }, 500);
+    const { password } = await c.req.json().catch(() => ({})) as any;
+    if (!password) return c.json({ error: "Password required" }, 400);
+
+    const adminSecret = c.env.ADMIN_SECRET || "";
+    if (!adminSecret) return c.json({ error: "ADMIN_SECRET not configured" }, 500);
+    if (password !== adminSecret) return c.json({ error: "Invalid ADMIN_SECRET" }, 403);
+
+    // Create admin user directly in better-auth tables
+    const id = crypto.randomUUID();
+    const email = "admin@partygame.local";
+    const now = new Date().toISOString();
+
+    try { await c.env.DB.prepare("INSERT OR IGNORE INTO user (id, name, email, emailVerified, createdAt, updatedAt) VALUES (?, ?, ?, 1, ?, ?)").bind(id, "Admin", email, now, now).run(); }
+    catch (e: any) { return c.json({ error: "DB error: " + e.message }, 500); }
+
+    return c.json({ success: true, email, message: "First admin created. Now sign in." });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// Invite: existing admin invites a new user
+app.post("/admin/auth/invite", async (c) => {
+  if (!c.env.DB) return c.json({ error: "No database" }, 500);
+  const { email } = await c.req.json().catch(() => ({})) as any;
+  if (!email) return c.json({ error: "Email required" }, 400);
+  const token = await createInvite(c.env.DB, email, "admin");
+  return c.json({ invited: true, token, link: `${new URL(c.req.url).origin}/admin/auth/accept?token=${token}` });
+});
+
+// Accept invite: create account from invite token
+app.post("/admin/auth/accept", async (c) => {
+  if (!c.env.DB) return c.json({ error: "No database" }, 500);
+  const { token, password } = await c.req.json().catch(() => ({})) as any;
+  if (!token || !password) return c.json({ error: "Token and password required" }, 400);
+  const user = await acceptInvite(c.env.DB, token, password);
+  if (!user) return c.json({ error: "Invalid or expired invite token" }, 400);
+  return c.json({ success: true, email: user.email });
+});
+
+// ── Profile management ──────────────────────────────────────────────
+app.patch("/admin/auth/profile", async (c) => {
+  const bearer = (c.req.header("authorization") || "").replace("Bearer ", "");
+  if (!bearer) return c.json({ error: "Auth required" }, 401);
+  const { email, newPassword } = await c.req.json().catch(() => ({})) as any;
+  if (email && c.env.DB) {
+    await c.env.DB.prepare("UPDATE user SET email = ?, updatedAt = datetime('now') WHERE id = (SELECT userId FROM session WHERE token = ? LIMIT 1)").bind(email, bearer).run();
+  }
+  if (newPassword && c.env.DB) {
+    // PBKDF2 hash
+    const s = crypto.getRandomValues(new Uint8Array(16));
+    const k = await crypto.subtle.importKey("raw", new TextEncoder().encode(newPassword), "PBKDF2", false, ["deriveBits"]);
+    const b = await crypto.subtle.deriveBits({ name: "PBKDF2", salt: s, iterations: 100000, hash: "SHA-256" }, k, 256);
+    const hash = btoa(String.fromCharCode(...new Uint8Array(b)));
+    const salt = btoa(String.fromCharCode(...s));
+    await c.env.DB.prepare("UPDATE account SET password = ? WHERE userId = (SELECT userId FROM session WHERE token = ? LIMIT 1)").bind(`${salt}:${hash}`, bearer).run();
+  }
+  return c.json({ updated: true });
+});
+
+// ── Passkey / WebAuthn ────────────────────────────────────────────────
+app.post("/admin/auth/passkey/register", async (c) => {
+  const { userId, credentialId, publicKey, deviceName } = await c.req.json().catch(() => ({})) as any;
+  if (!userId || !credentialId || !publicKey) return c.json({ error: "Missing fields" }, 400);
+  if (!c.env.DB) return c.json({ error: "No database" }, 500);
+  await c.env.DB.prepare("INSERT INTO passkey_credentials (id, user_id, credential_id, public_key, device_name) VALUES (?, ?, ?, ?, ?)")
+    .bind(crypto.randomUUID(), userId, credentialId, publicKey, deviceName || "Unknown").run();
+  return c.json({ registered: true });
+});
+
+app.get("/admin/auth/passkey/list", async (c) => {
+  const bearer = (c.req.header("authorization") || "").replace("Bearer ", "");
+  if (!bearer || !c.env.DB) return c.json({ error: "Auth required" }, 401);
+  const { results } = await c.env.DB.prepare("SELECT id, credential_id, device_name, created_at FROM passkey_credentials WHERE user_id = (SELECT userId FROM session WHERE token = ? LIMIT 1)").bind(bearer).all();
+  return c.json({ credentials: results || [] });
+});
+
+app.delete("/admin/auth/passkey/:id", async (c) => {
+  if (!c.env.DB) return c.json({ error: "No database" }, 500);
+  await c.env.DB.prepare("DELETE FROM passkey_credentials WHERE id = ?").bind(c.req.param("id")).run();
+  return c.json({ removed: true });
+});
+
+// Mount better-auth handler for sign-in / callback / session
 app.on(["POST"], "/admin/auth/*", async (c) => {
   if (!c.env.DB) return c.json({ error: "D1 database not available" }, 500);
   const url = new URL(c.req.url);
