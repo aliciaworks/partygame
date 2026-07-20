@@ -17,8 +17,7 @@ import { PlatformStateConflictError } from "./platform-state";
 import { ADMIN_INDEX_HTML } from "./admin-index.generated";
 import { AGENT_CONFIG } from "./well-known";
 import { OPENAPI_YAML } from "./openapi-yaml";
-import { createAuth, authMethods, isFirstUser, bootstrapAdmin, createInvite, acceptInvite } from "./admin-auth";
-import { jwtVerify } from "jose";
+import { authMethods, hashPassword, verifyPassword, generateTOTPSecret, verifyTOTP } from "./admin-auth";
 export { GameRoom } from "./game/game-room";
 export { MatchmakerRoom } from "./matchmaker/matchmaker-room";
 export { ChatRoom } from "./chat/chat-room";
@@ -76,11 +75,11 @@ app.use("*", async (c, next) => {
   if (isAdminRoute && !isAuthRoute) {
     const bearerToken = (c.req.header("authorization") || "").replace("Bearer ", "");
 
-    // Try better-auth session first
-    if (bearerToken && c.env.DB && c.env.BETTER_AUTH_SECRET) {
+    // Try D1-based auth token
+    if (bearerToken && c.env.DB) {
       try {
-        const { payload } = await jwtVerify(bearerToken, new TextEncoder().encode(c.env.BETTER_AUTH_SECRET));
-        if (payload.sub) { isAdmin = true; }
+        const row = await c.env.DB.prepare("SELECT user_id FROM sessions WHERE token = ? AND expires_at > datetime('now')").bind(bearerToken).first<{ user_id: string }>();
+        if (row) { isAdmin = true; }
       } catch {}
     }
 
@@ -185,100 +184,123 @@ app.get("/admin/auth/methods", (c) => {
   return c.json(authMethods(c.env));
 });
 
-// Bootstrap: create first admin if no users exist (no ADMIN_SECRET needed)
+// Bootstrap: create first admin if no users exist
 app.post("/admin/auth/bootstrap", async (c) => {
   try {
-    if (!c.env.DB) return c.json({ error: "No database" }, 500);
     const { email, password } = await c.req.json().catch(() => ({})) as any;
     if (!email || !password) return c.json({ error: "Email and password required" }, 400);
-
-    // Only allow bootstrap if no users exist
-    const r = await c.env.DB.prepare("SELECT COUNT(*) as c FROM user").first<{ c: number }>();
-    if (r && r.c > 0) return c.json({ error: "Users already exist. Use sign-in." }, 400);
-
+    if (!c.env.DB) return c.json({ error: "No database" }, 500);
+    const r = await c.env.DB.prepare("SELECT COUNT(*) as c FROM admin_users").first<{ c: number }>();
+    if (r && r.c > 0) return c.json({ error: "Setup already complete" }, 400);
     const id = crypto.randomUUID(); const now = new Date().toISOString();
-    await c.env.DB.prepare("INSERT OR IGNORE INTO user (id, name, email, emailVerified, createdAt, updatedAt) VALUES (?, ?, ?, 1, ?, ?)").bind(id, email.split("@")[0], email, now, now).run();
+    const { hash, salt } = await hashPassword(password);
+    await c.env.DB.prepare("INSERT INTO admin_users (id, email, name, password_hash, password_salt, role, created_at) VALUES (?, ?, ?, ?, ?, 'admin', ?)").bind(id, email, email.split("@")[0], hash, salt, now).run();
     return c.json({ success: true, email });
-  } catch (e: any) { return c.json({ error: e.message }, 500); }
+  } catch (e: any) {
+    return c.json({ error: "BOOTSTRAP_FAILED: " + (e.message || String(e)) }, 500);
+  }
 });
 
-// Check if bootstrap needed (no users yet)
 app.get("/admin/auth/state", async (c) => {
   if (!c.env.DB) return c.json({ needsSetup: true });
-  try {
-    const r = await c.env.DB.prepare("SELECT COUNT(*) as c FROM user").first<{ c: number }>();
-    return c.json({ needsSetup: !r || r.c === 0 });
-  } catch { return c.json({ needsSetup: true }); }
+  try { const r = await c.env.DB.prepare("SELECT COUNT(*) as c FROM admin_users").first<{ c: number }>(); return c.json({ needsSetup: !r || r.c === 0 }); }
+  catch { return c.json({ needsSetup: true }); }
 });
 
-// Invite: existing admin invites a new user
+// Sign in
+app.post("/admin/auth/sign-in", async (c) => {
+  const { email, password, code } = await c.req.json().catch(() => ({})) as any;
+  if (!email || !password) return c.json({ error: "Email and password required" }, 400);
+  if (!c.env.DB) return c.json({ error: "No database" }, 500);
+  const user = await c.env.DB.prepare("SELECT * FROM admin_users WHERE email = ?").bind(email).first<any>();
+  if (!user) return c.json({ error: "Invalid credentials" }, 401);
+
+  // Verify password
+  const valid = await verifyPassword(password, user.password_hash, user.password_salt);
+  if (!valid) return c.json({ error: "Invalid credentials" }, 401);
+
+  // 2FA check
+  if (user.totp_enabled) {
+    if (!code) return c.json({ error: "2FA code required", needs2FA: true }, 401);
+    if (!verifyTOTP(user.totp_secret, code)) return c.json({ error: "Invalid 2FA code" }, 401);
+  }
+
+  // Create session
+  const token = crypto.randomUUID();
+  const expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  await c.env.DB.prepare("INSERT INTO sessions (id, user_id, token, expires_at, created_at) VALUES (?, ?, ?, ?, datetime('now'))").bind(crypto.randomUUID(), user.id, token, expires).run();
+
+  return c.json({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role, totp_enabled: !!user.totp_enabled } });
+});
+
+// Invite
 app.post("/admin/auth/invite", async (c) => {
-  if (!c.env.DB) return c.json({ error: "No database" }, 500);
   const { email } = await c.req.json().catch(() => ({})) as any;
-  if (!email) return c.json({ error: "Email required" }, 400);
-  const token = await createInvite(c.env.DB, email, "admin");
-  return c.json({ invited: true, token, link: `${new URL(c.req.url).origin}/admin/auth/accept?token=${token}` });
+  if (!email || !c.env.DB) return c.json({ error: "Email required" }, 400);
+  const token = crypto.randomUUID();
+  const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  await c.env.DB.prepare("INSERT INTO admin_invites (id, email, token, expires_at, created_at) VALUES (?, ?, ?, ?, datetime('now'))").bind(crypto.randomUUID(), email, token, expires).run();
+  return c.json({ token, link: `${new URL(c.req.url).origin}/admin?token=${token}` });
 });
 
-// Accept invite: create account from invite token
+// Accept invite
 app.post("/admin/auth/accept", async (c) => {
-  if (!c.env.DB) return c.json({ error: "No database" }, 500);
-  const { token, password } = await c.req.json().catch(() => ({})) as any;
-  if (!token || !password) return c.json({ error: "Token and password required" }, 400);
-  const user = await acceptInvite(c.env.DB, token, password);
-  if (!user) return c.json({ error: "Invalid or expired invite token" }, 400);
-  return c.json({ success: true, email: user.email });
+  const { token, email, password } = await c.req.json().catch(() => ({})) as any;
+  if (!token || !email || !password || !c.env.DB) return c.json({ error: "Token, email and password required" }, 400);
+  const inv = await c.env.DB.prepare("SELECT * FROM admin_invites WHERE token = ? AND used = 0 AND expires_at > datetime('now')").bind(token).first<any>();
+  if (!inv) return c.json({ error: "Invalid or expired invite" }, 400);
+  const id = crypto.randomUUID(); const now = new Date().toISOString();
+  const { hash, salt } = await hashPassword(password);
+  await c.env.DB.prepare("INSERT INTO admin_users (id, email, name, password_hash, password_salt, role, created_at) VALUES (?, ?, ?, ?, ?, 'admin', ?)").bind(id, email, email.split("@")[0], hash, salt, now).run();
+  await c.env.DB.prepare("UPDATE admin_invites SET used = 1 WHERE id = ?").bind(inv.id).run();
+  return c.json({ success: true, email });
 });
 
-// ── Profile management ──────────────────────────────────────────────
-app.patch("/admin/auth/profile", async (c) => {
+// 2FA enable
+app.post("/admin/auth/2fa/enable", async (c) => {
   const bearer = (c.req.header("authorization") || "").replace("Bearer ", "");
-  if (!bearer) return c.json({ error: "Auth required" }, 401);
-  const { email, newPassword } = await c.req.json().catch(() => ({})) as any;
-  if (email && c.env.DB) {
-    await c.env.DB.prepare("UPDATE user SET email = ?, updatedAt = datetime('now') WHERE id = (SELECT userId FROM session WHERE token = ? LIMIT 1)").bind(email, bearer).run();
-  }
-  if (newPassword && c.env.DB) {
-    // PBKDF2 hash
-    const s = crypto.getRandomValues(new Uint8Array(16));
-    const k = await crypto.subtle.importKey("raw", new TextEncoder().encode(newPassword), "PBKDF2", false, ["deriveBits"]);
-    const b = await crypto.subtle.deriveBits({ name: "PBKDF2", salt: s, iterations: 100000, hash: "SHA-256" }, k, 256);
-    const hash = btoa(String.fromCharCode(...new Uint8Array(b)));
-    const salt = btoa(String.fromCharCode(...s));
-    await c.env.DB.prepare("UPDATE account SET password = ? WHERE userId = (SELECT userId FROM session WHERE token = ? LIMIT 1)").bind(`${salt}:${hash}`, bearer).run();
-  }
-  return c.json({ updated: true });
+  if (!bearer || !c.env.DB) return c.json({ error: "Auth required" }, 401);
+  const s = await c.env.DB.prepare("SELECT user_id FROM sessions WHERE token = ? AND expires_at > datetime('now')").bind(bearer).first<{ user_id: string }>();
+  if (!s) return c.json({ error: "Invalid session" }, 401);
+  const secret = generateTOTPSecret();
+  await c.env.DB.prepare("UPDATE admin_users SET totp_secret = ?, totp_enabled = 1 WHERE id = ?").bind(secret, s.user_id).run();
+  return c.json({ secret });
 });
 
-// ── Passkey / WebAuthn ────────────────────────────────────────────────
+// Passkey register
 app.post("/admin/auth/passkey/register", async (c) => {
+  const bearer = (c.req.header("authorization") || "").replace("Bearer ", "");
   const { userId, credentialId, publicKey, deviceName } = await c.req.json().catch(() => ({})) as any;
-  if (!userId || !credentialId || !publicKey) return c.json({ error: "Missing fields" }, 400);
-  if (!c.env.DB) return c.json({ error: "No database" }, 500);
-  await c.env.DB.prepare("INSERT INTO passkey_credentials (id, user_id, credential_id, public_key, device_name) VALUES (?, ?, ?, ?, ?)")
-    .bind(crypto.randomUUID(), userId, credentialId, publicKey, deviceName || "Unknown").run();
+  if (!userId || !credentialId || !publicKey || !c.env.DB) return c.json({ error: "Missing fields" }, 400);
+  await c.env.DB.prepare("INSERT INTO passkey_credentials (id, user_id, credential_id, public_key, device_name) VALUES (?, ?, ?, ?, ?)").bind(crypto.randomUUID(), userId, credentialId, publicKey, deviceName || "Unknown").run();
   return c.json({ registered: true });
 });
 
+// Passkey list
 app.get("/admin/auth/passkey/list", async (c) => {
   const bearer = (c.req.header("authorization") || "").replace("Bearer ", "");
   if (!bearer || !c.env.DB) return c.json({ error: "Auth required" }, 401);
-  const { results } = await c.env.DB.prepare("SELECT id, credential_id, device_name, created_at FROM passkey_credentials WHERE user_id = (SELECT userId FROM session WHERE token = ? LIMIT 1)").bind(bearer).all();
+  const s = await c.env.DB.prepare("SELECT user_id FROM sessions WHERE token = ? AND expires_at > datetime('now')").bind(bearer).first<{ user_id: string }>();
+  if (!s) return c.json({ error: "Invalid session" }, 401);
+  const { results } = await c.env.DB.prepare("SELECT id, credential_id, device_name, created_at FROM passkey_credentials WHERE user_id = ?").bind(s.user_id).all();
   return c.json({ credentials: results || [] });
 });
 
-app.delete("/admin/auth/passkey/:id", async (c) => {
-  if (!c.env.DB) return c.json({ error: "No database" }, 500);
-  await c.env.DB.prepare("DELETE FROM passkey_credentials WHERE id = ?").bind(c.req.param("id")).run();
-  return c.json({ removed: true });
+// Profile
+app.patch("/admin/auth/profile", async (c) => {
+  const bearer = (c.req.header("authorization") || "").replace("Bearer ", "");
+  if (!bearer || !c.env.DB) return c.json({ error: "Auth required" }, 401);
+  const s = await c.env.DB.prepare("SELECT user_id FROM sessions WHERE token = ? AND expires_at > datetime('now')").bind(bearer).first<{ user_id: string }>();
+  if (!s) return c.json({ error: "Invalid session" }, 401);
+  const { email, newPassword } = await c.req.json().catch(() => ({})) as any;
+  if (email) await c.env.DB.prepare("UPDATE admin_users SET email = ? WHERE id = ?").bind(email, s.user_id).run();
+  if (newPassword) { const { hash, salt } = await hashPassword(newPassword); await c.env.DB.prepare("UPDATE admin_users SET password_hash = ?, password_salt = ? WHERE id = ?").bind(hash, salt, s.user_id).run(); }
+  return c.json({ updated: true });
 });
 
 // Mount better-auth handler for sign-in / callback / session
 app.on(["POST"], "/admin/auth/*", async (c) => {
-  if (!c.env.DB) return c.json({ error: "D1 database not available" }, 500);
-  const url = new URL(c.req.url);
-  const auth = createAuth(c.env.DB, url.origin, c.env);
-  return auth.handler(c.req.raw);
+  return c.json({ error: "Not found" }, 404);
 });
 
 app.get("/admin/modules", async (c) => {
