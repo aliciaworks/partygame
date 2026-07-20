@@ -26,6 +26,9 @@ import type { AppEnv } from "./env";
 
 const app = new Hono<AppEnv>();
 
+// CORS must run first so error responses still get CORS headers
+app.use("*", cors({ origin: "*" }));
+
 const moduleFeatureRequirements: Partial<Record<string, Array<keyof PlatformFeatures>>> = {
   communication: ["textChat", "voiceChat"],
   hotfix: ["gameUpdates"],
@@ -129,8 +132,6 @@ app.use("*", async (c, next) => {
 });
 
 mountModules(app);
-
-app.use("*", cors({ origin: "*" }));
 
 app.get("/", (c) =>
   c.json({

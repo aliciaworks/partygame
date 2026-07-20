@@ -109,7 +109,7 @@ export function Settings() {
       <div className="bg-kumo-elevated border border-kumo-line p-6 rounded-xl flex flex-col gap-4">
         <div>
           <h3 className="text-lg font-semibold text-kumo-default flex items-center gap-2">
-            <Server className="h-5 w-5" />
+            <HardDrives className="h-5 w-5" />
             Server Tiers (Environments)
           </h3>
           <p className="text-sm text-kumo-subtle mt-1">
