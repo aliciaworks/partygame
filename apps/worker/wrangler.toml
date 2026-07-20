@@ -83,3 +83,7 @@ simple = { limit = 10, period = 60 }
 # PLAYER_SECRET       — JWT signing secret for player tokens
 # CALLS_APP_ID        — Cloudflare Calls application ID
 # CALLS_APP_SECRET    — Cloudflare Calls application secret
+
+# Static assets: admin panel SPA served at /admin/
+[assets]
+directory = "./admin-dist"

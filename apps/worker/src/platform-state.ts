@@ -72,6 +72,12 @@ const DEFAULT_FEATURES: PlatformFeatures = {
 };
 
 const FEATURE_KEYS = Object.keys(DEFAULT_FEATURES) as Array<keyof PlatformFeatures>;
+
+const DEFAULT_SERVER_TIERS: ServerTierDef[] = [
+  { id: "main", name: "Main Server", isDefault: true },
+  { id: "internal-testing", name: "Internal Testing", description: "Internal QA and dev testing" },
+  { id: "public-testing", name: "Public Testing", description: "Public beta / PTR" },
+];
 let platformStateCache:
   | {
       value: PlatformState;
@@ -122,6 +128,7 @@ function getDefaultState(): PlatformState {
     },
     apiVersion: getISODateString(),
     deprecations: [],
+    serverTiers: [...DEFAULT_SERVER_TIERS],
     revision: 0,
     updatedAt: new Date().toISOString(),
   };
@@ -176,6 +183,18 @@ function normalizeCurrencies(input: unknown): Record<string, CurrencyDef> {
   };
 }
 
+function normalizeServerTiers(input: unknown): ServerTierDef[] {
+  if (!Array.isArray(input) || input.length === 0) return [...DEFAULT_SERVER_TIERS];
+  const out: ServerTierDef[] = [];
+  for (const item of input) {
+    const obj = item as Partial<ServerTierDef>;
+    if (typeof obj.id === "string" && typeof obj.name === "string") {
+      out.push({ id: obj.id, name: obj.name, description: obj.description, isDefault: obj.isDefault === true });
+    }
+  }
+  return out.length > 0 ? out : [...DEFAULT_SERVER_TIERS];
+}
+
 function normalizeSeasons(input: unknown): { currentSeasonId: string; endsAt: string } {
   if (typeof input === "object" && input !== null) {
     const v = input as Partial<{ currentSeasonId: string; endsAt: string }>;
@@ -219,6 +238,7 @@ export async function readPlatformState(
       minClientVersion: parsed.minClientVersion,
       deprecations: normalizeDeprecations(parsed.deprecations),
       maintenance: parsed.maintenance,
+      serverTiers: normalizeServerTiers(parsed.serverTiers),
       revision: typeof parsed.revision === "number" ? parsed.revision : 0,
       updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : new Date().toISOString(),
     };
@@ -253,6 +273,7 @@ export async function patchPlatformFeatures(
     minClientVersion: current.minClientVersion,
     deprecations: current.deprecations,
     maintenance: current.maintenance,
+    serverTiers: current.serverTiers,
     revision: current.revision + 1,
     updatedAt: new Date().toISOString(),
   };
@@ -288,6 +309,7 @@ export async function patchPlatformState(
     minClientVersion: updates.minClientVersion ?? current.minClientVersion,
     deprecations: normalizeDeprecations(updates.deprecations ?? current.deprecations),
     maintenance: updates.maintenance !== undefined ? updates.maintenance : current.maintenance,
+    serverTiers: updates.serverTiers ? normalizeServerTiers(updates.serverTiers) : current.serverTiers,
     revision: current.revision + 1,
     updatedAt: new Date().toISOString(),
   };

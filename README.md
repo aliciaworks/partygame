@@ -1,145 +1,226 @@
-# PartyGame - The Ultimate Serverless Game Engine
+# PartyGame — Serverless Game Engine
 
-An open-source, enterprise-grade Serverless Game Backend Engine built natively on Cloudflare's Edge Infrastructure (Workers, Durable Objects, D1, R2, and Queues). 
+An open-source, serverless game backend engine built natively on Cloudflare's edge infrastructure (Workers, Durable Objects, D1, R2, Queues, AI, Calls).
 
-Designed specifically for Indie Developers and Studios, PartyGame bridges the gap between web-native cloud infrastructure and traditional game engines (Unity, Godot, Unreal Engine), providing infinite scalability with **zero server maintenance** and **zero idle costs**.
+Designed for indie developers and studios. Zero server maintenance. Zero idle cost. Pay only when players are online.
 
-**📜 Dual Licensed:** Available under [AGPL-3.0](LICENSE) for personal/open-source use, or [Commercial License](LICENSE-COMMERCIAL.md) for commercial products.
-
----
-
-## 🌟 Enterprise-Grade Features
-
-We didn't just build a WebSocket server. We built a full ecosystem:
-
-- **Stateful Game Rooms (Durable Objects)**: The core `GameRoom` runs on Cloudflare Durable Objects, providing a fixed tick-rate loop, server-authoritative state validation, and persistent WebSockets at the edge.
-- **Native Engine SDKs (Unity / Godot / Unreal)**: Fully automated SDK generation using OpenAPI. Define your backend once, and automatically generate strongly-typed `C#` and `GDScript` network clients.
-- **Binary Protocol Support**: Bypass JSON overhead. Send `ArrayBuffer` directly from C# or C++ to the backend, triggering `plugin.onBinaryInput()` for zero-latency frame syncing.
-- **Over-The-Air (OTA) Hotfixes (R2)**: A built-in patch delivery system. Upload Unity `.assetbundle` or Godot `.pck` files via the Admin Panel, and the backend securely serves them to clients globally using Cloudflare R2 (which has **$0 Egress Fees**).
-- **Serverless SQL Leaderboards (D1)**: Highly concurrent, globally distributed leaderboards backed by Cloudflare D1. Handle 100,000 players finishing matches simultaneously without database locks.
-- **Asynchronous Match Settlement (Queues)**: Post-match XP and Coin calculations are instantly offloaded to Cloudflare Queues, ensuring the GameRoom Durable Object is immediately freed for the next match.
-- **Zero-Trust Player Auth (`jose`)**: Enterprise-grade JWT authentication supporting Google and Apple Login. The backend securely fetches remote JWKS (Public Keys) to verify client-provided tokens without native SDK bloat.
-- **Edge Voice Chat (Cloudflare Calls)**: Built-in WebRTC SFU support for low-latency Voice Chat, routed entirely through Cloudflare's massive edge network.
+**License:** [AGPL-3.0](LICENSE) for open-source / [Commercial](LICENSE-COMMERCIAL.md) for commercial products.
 
 ---
 
-## 🏗️ Project Architecture
+## Features
 
-This repository uses a modern `npm` workspace monorepo structure:
+| Feature | Implementation |
+|---------|---------------|
+| **Stateful Game Rooms** | Durable Objects with fixed tick-rate loop, server-authoritative validation, persistent WebSockets |
+| **Matchmaking** | Durable Objects matchmaking queue with configurable game types (FPS, MOBA, etc.) |
+| **Voice Chat** | WebRTC SFU via Cloudflare Calls — low-latency, edge-routed |
+| **Text Chat** | WebSocket chat rooms with AI-powered moderation (Workers AI) |
+| **Leaderboards** | D1 SQL — globally distributed, highly concurrent |
+| **Player Profiles & Friends** | R2-stored JSON profiles, friend lists |
+| **OTA Hotfixes** | R2-stored patches, upload via Admin, served globally with $0 egress |
+| **Hidden Watermark & A/B Testing** | Browser-side HMAC watermarking on asset upload, deterministic variant distribution for leak tracing |
+| **Server Tiers** | Manage environments (internal-testing, main, public-testing) from admin panel |
+| **Engine SDKs** | Unity (C#), Godot (GDScript), Unreal (C++) — auto-generated from OpenAPI |
+| **AI-Agent-Friendly Config** | OpenAPI spec endpoint, `.well-known/agent-config.json`, CLI tool (`npx partygame`) |
+| **Admin Panel** | React SPA with Kumo UI, served from the same Worker |
 
-```text
+---
+
+## Project Structure
+
+```
 partygame/
-  ├── apps/
-  │   ├── worker/          # The Core Serverless Engine (Cloudflare Workers)
-  │   ├── admin/           # React + Vite Admin Control Plane (Cloudflare Pages)
-  │   └── example-game/    # Web-based Reference Game (Babylon.js)
-  ├── sdks/
-  │   ├── unity/           # Generated & Template C# SDK for Unity
-  │   └── godot/           # Generated & Template GDScript SDK for Godot
-  └── packages/
-      └── shared/          # Shared Zod Schemas and OpenAPI Specs
+├── apps/
+│   ├── worker/         # Core serverless engine (Cloudflare Worker + Hono)
+│   ├── admin/          # React admin SPA (Vite, Kumo UI)
+│   └── landing/        # Marketing landing page (Astro → Cloudflare Pages)
+├── engines/
+│   ├── unity/          # C# SDK for Unity
+│   ├── godot/          # GDScript SDK for Godot
+│   └── unreal/         # C++ SDK for Unreal Engine
+├── packages/
+│   ├── shared/         # Zod schemas, type generation, OpenAPI types
+│   └── cli/            # AI-agent-friendly CLI (`npx partygame`)
+├── sdks/               # Legacy SDK output (Unity .unitypackage)
+├── openapi.yaml        # Full OpenAPI 3.0.3 spec (35+ endpoints)
+└── scripts/            # Build helpers
 ```
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
-### 1. The Core Engine (Worker)
-The backend is completely serverless. You only pay when players are online.
+### Prerequisites
+- Node.js 20+
+- Cloudflare account (free tier works)
+
+### 1. Core Engine (Worker)
 
 ```bash
 cd apps/worker
 npm install
-
-# Run the local Miniflare simulator (simulates D1, DO, R2, Queues)
-npm run dev
+npm run dev          # Miniflare local simulator (D1, DO, R2, Queues)
 ```
-The backend will run on `http://localhost:8787` with:
-- `POST /auth/apple` / `POST /auth/google` - Secure Player Login
-- `/matchmaker/ws` - Matchmaking Queue
-- `/chat/ws` - Global Text Chat
-- `/ws?roomId=...` - The Core Game WebSocket
 
-### 2. The Admin Control Plane
-A beautiful, separate React dashboard to manage your game empire, styled with Cloudflare Kumo and built with Vite.
+Worker runs at `http://localhost:8787`.
+
+### 2. Admin Panel
 
 ```bash
 cd apps/admin
 npm install
-npm run dev
-```
-From the Admin Panel, you can:
-- Apply **Game Presets** (FPS, MOBA, Card Games) to instantly reconfigure backend feature flags.
-- **Drag & Drop** game patches to distribute Hotfixes globally.
-- Manage Toxic Players and view Server Health.
-
-### 3. Generate Native SDKs
-If you update the backend API, simply run:
-```bash
-npm run generate-sdk
-```
-This reads the `openapi.yaml` specification and automatically regenerates your C# and GDScript client libraries in the `sdks/` folder.
-
----
-
-## 🎮 Game Plugin System
-
-The engine is completely decoupled from your specific game logic. To add a new game mode (e.g., Battle Royale), you simply implement the `GamePlugin` interface in the backend:
-
-```typescript
-export interface GamePlugin {
-  onJoin(session: Session): void;
-  onInput(session: Session, inputType: string, data: any): void;
-  
-  // High-performance binary injection for Unity/Unreal
-  onBinaryInput?(session: Session, data: ArrayBuffer): void; 
-  
-  onTick(sessions: Map<string, Session>): void;
-  readonly tickIntervalMs: number;
-}
-```
-Currently included plugins: `FPS`, `MOBA`, `Battle Royale`, `Card Game`, and `Racing`.
-
----
-
-## ☁️ Deployment
-
-Cloudflare Native CI/CD is fully supported.
-To deploy manually:
-
-1. **Provision Infrastructure**:
-```bash
-# Create the D1 Database
-npx wrangler d1 create partygame-db
-# Apply the schema
-npx wrangler d1 execute partygame-db --file=./schema.sql
-# Create the Message Queue
-npx wrangler queues create match-queue
+npm run dev          # Vite dev server
 ```
 
-2. **Deploy the Engine**:
+The admin panel is also served from the Worker at `/admin/` in production (single deploy).
+
+### 3. Deploy Everything
+
 ```bash
 cd apps/worker
-npm run deploy
+npm run build-admin  # Builds admin SPA → admin-dist/
+npm run deploy       # Deploys Worker + admin static assets
 ```
 
-3. **Deploy the Admin Panel**:
+### 4. Landing Page
+
 ```bash
-cd apps/admin
-npm run build
-npx wrangler pages deploy build --project-name partygame-admin
+cd apps/landing
+npm install
+npm run dev          # Astro dev server
+```
+
+Deploys to Cloudflare Pages via GitHub Actions on push to `main`.
+
+---
+
+## API Overview
+
+| Path | Auth | Description |
+|------|------|-------------|
+| `GET /` | None | Worker info + module manifest |
+| `GET /health` | None | Health check |
+| `GET /openapi.yaml` | None | Full OpenAPI 3.0.3 spec (35+ endpoints) |
+| `GET /.well-known/agent-config.json` | None | AI-agent discovery manifest |
+| `POST /auth/login` | None | Player login |
+| `POST /auth/google` | None | Google OAuth login |
+| `POST /auth/apple` | None | Apple OAuth login |
+| `GET /api/platform` | None | Public platform state |
+| `GET /api/assets/:id` | None | Asset serving (deterministic variant) |
+| `GET /ws?roomId=` | Player | Game WebSocket |
+| `GET /matchmaker/ws` | Player | Matchmaking WebSocket |
+| `POST /matchmaking/join` | Player | Join match queue |
+| `GET /leaderboard/:id` | Player | Get leaderboard |
+| `POST /leaderboard/:id/submit` | Player | Submit score |
+| `GET /profile/:id` | Player | Get player profile |
+| `GET /hotfix/latest` | Player | Get latest hotfix |
+| `GET /admin/platform` | Admin | Full platform state |
+| `PATCH /admin/platform` | Admin | Update platform state |
+| `PATCH /admin/platform/features` | Admin | Toggle feature flags |
+| `GET /admin/modules` | Admin | List modules |
+| `GET /admin/players` | Admin | List players |
+| `POST /admin/players/:id/ban` | Admin | Ban player |
+| `DELETE /admin/players/:id/ban` | Admin | Unban player |
+| `GET /admin/assets` | Admin | List assets |
+| `POST /admin/assets` | Admin | Create asset |
+| `DELETE /admin/assets/:id` | Admin | Delete asset |
+| `PUT /admin/assets/:id/variant/:idx/upload` | Admin | Upload variant |
+| `POST /admin/assets/forensic/watermark` | Admin | Forensic extraction |
+| `POST /hotfix/upload` | Admin | Upload hotfix |
+| `GET /hotfix/list` | Admin | List hotfixes |
+| `POST /hotfix/promote/:version` | Admin | Promote hotfix |
+| `POST /hotfix/rollback/:version` | Admin | Rollback hotfix |
+| `GET /admin/*` | None | Admin SPA (static) |
+
+Full spec: `openapi.yaml` or `GET /openapi.yaml`.
+
+---
+
+## AI Agent Configuration
+
+AI agents (Claude, Cursor, Copilot) can configure PartyGame three ways:
+
+### 1. REST API + OpenAPI
+```bash
+curl https://your-worker.workers.dev/openapi.yaml    # Full spec
+curl https://your-worker.workers.dev/.well-known/agent-config.json  # Manifest
+```
+
+### 2. CLI Tool
+```bash
+PARTYGAME_URL=https://your-worker.workers.dev \
+PARTYGAME_TOKEN=<admin-secret> \
+npx partygame status
+
+npx partygame feature watermark on
+npx partygame assets list
+npx partygame players ban <playerId>
+```
+
+### 3. Direct API Calls
+```bash
+curl -X PATCH \
+  -H "Authorization: Bearer $ADMIN_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{"voiceChat": false}' \
+  https://your-worker.workers.dev/admin/platform/features
 ```
 
 ---
 
-## 🛠️ Quality Gates
+## Feature Flags
 
-Run these commands from the repository root to ensure your engine is stable:
+All platform features can be toggled via API, CLI, or Admin panel:
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `voiceChat` | true | WebRTC voice via Cloudflare Calls |
+| `textChat` | true | WebSocket text chat |
+| `gameUpdates` | true | OTA hotfix delivery |
+| `matchmaking` | true | Auto player matching |
+| `leaderboard` | true | Global rankings |
+| `friends` | true | Friend system |
+| `playerProfile` | true | Player profiles |
+| `seasons` | true | Seasonal content |
+| `replays` | true | Match replays |
+| `guilds` | true | Guild system |
+| `watermark` | false | Hidden watermark & A/B testing |
+
+---
+
+## Quality Gates
 
 ```bash
-npm run generate-sdk
-npm run typecheck
-npm run format
+npm run typecheck    # TypeScript check all packages
+npm run lint         # ESLint
+npm run test         # Vitest
+npm run format       # Prettier check
 ```
 
-Welcome to the future of Game Development. Zero servers. Infinite scale.
+---
+
+## Architecture
+
+```
+Clients (Unity / Godot / Unreal / Web)
+        │
+        ▼
+┌───────────────────────────────┐
+│     Cloudflare Edge Network   │
+│  ┌─────────────────────────┐  │
+│  │   Worker (Hono Router)  │  │
+│  │  ┌────────────────────┐ │  │
+│  │  │ GameRoom (DO)      │ │  │
+│  │  │ MatchmakerRoom (DO)│ │  │
+│  │  │ ChatRoom (DO)      │ │  │
+│  │  │ GuildRoom (DO)     │ │  │
+│  │  └────────────────────┘ │  │
+│  │  R2 ─── D1 ─── Queues  │  │
+│  │  AI ─── Calls ─── Rate │  │
+│  │  /admin/ (SPA static)  │  │
+│  └─────────────────────────┘  │
+└───────────────────────────────┘
+```
+
+Zero servers. Infinite scale. Built on Cloudflare.

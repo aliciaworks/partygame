@@ -1,0 +1,128 @@
+---
+// Base layout for the PartyGame landing page
+---
+
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="PartyGame — The serverless game engine. Replace traditional game servers with Cloudflare Workers, R2, D1, and Durable Objects. Built-in voice chat, matchmaking, leaderboards, hot updates, and AI moderation." />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="PartyGame — The Serverless Game Engine" />
+    <meta property="og:description" content="Replace traditional game servers with Cloudflare Workers, R2, D1, and Durable Objects." />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="PartyGame" />
+
+    <title>PartyGame — The Serverless Game Engine</title>
+
+    <!-- Tailwind CSS v4 via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ["Inter", "system-ui", "-apple-system", "sans-serif"],
+              mono: ["JetBrains Mono", "Fira Code", "monospace"],
+            },
+            colors: {
+              accent: {
+                400: "#818cf8",
+                500: "#6366f1",
+                600: "#4f46e5",
+              },
+            },
+          },
+        },
+      };
+    </script>
+
+    <!-- Custom styles -->
+    <style is:global>
+      @import "../styles/global.css";
+    </style>
+
+    <!-- Inter font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Mermaid for architecture diagram -->
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({
+        startOnLoad: true,
+        theme: "dark",
+        themeVariables: {
+          primaryColor: "#6366f1",
+          primaryTextColor: "#e2e8f0",
+          primaryBorderColor: "#818cf8",
+          lineColor: "#818cf8",
+          secondaryColor: "#1e293b",
+          tertiaryColor: "#0f172a",
+        },
+      });
+    </script>
+  </head>
+
+  <body class="bg-slate-950 text-slate-200 font-sans antialiased min-h-screen">
+    <slot />
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800 bg-slate-900/50">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <!-- Brand -->
+          <div>
+            <h3 class="text-lg font-bold text-white mb-2">PartyGame</h3>
+            <p class="text-slate-400 text-sm leading-relaxed">
+              The open-source serverless game engine. Built on Cloudflare's edge network.
+            </p>
+          </div>
+
+          <!-- Links -->
+          <div>
+            <h4 class="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-3">Links</h4>
+            <ul class="space-y-2 text-sm">
+              <li>
+                <a href="https://github.com/partygame/partygame" class="text-slate-400 hover:text-white transition-colors">
+                  GitHub Repository
+                </a>
+              </li>
+              <li>
+                <a href="#" class="text-slate-400 hover:text-white transition-colors">Documentation</a>
+              </li>
+              <li>
+                <a href="#" class="text-slate-400 hover:text-white transition-colors">API Reference</a>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Legal -->
+          <div>
+            <h4 class="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-3">Legal</h4>
+            <ul class="space-y-2 text-sm">
+              <li><span class="text-slate-400">License: MIT</span></li>
+              <li><span class="text-slate-400">Built on Cloudflare</span></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="mt-10 pt-6 border-t border-slate-800 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <p class="text-slate-500 text-xs">
+            &copy; {new Date().getFullYear()} PartyGame. Released under the MIT License.
+          </p>
+          <p class="text-slate-500 text-xs">
+            Powered by Cloudflare Workers, R2, D1 &amp; Durable Objects
+          </p>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

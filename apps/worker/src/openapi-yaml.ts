@@ -1,4 +1,11 @@
-openapi: 3.0.3
+/**
+ * Embedded OpenAPI 3.0.3 YAML specification.
+ *
+ * Cloudflare Workers cannot read files at runtime, so the full spec is
+ * inlined here as a template-literal string.  Keep in sync with the
+ * canonical source at `openapi.yaml` in the repo root.
+ */
+export const OPENAPI_YAML = `openapi: 3.0.3
 info:
   title: PartyGame Backend API
   description: |-
@@ -7,12 +14,12 @@ info:
 
     ## Authentication
 
-    - **Player endpoints** use `Authorization: Bearer <JWT>` (obtained via `/auth/*`).
-    - **Admin endpoints** require `Authorization: Bearer <ADMIN_SECRET>` (or `X-Admin-Token` header).
+    - **Player endpoints** use \`Authorization: Bearer <JWT>\` (obtained via \`/auth/*\`).
+    - **Admin endpoints** require \`Authorization: Bearer <ADMIN_SECRET>\` (or \`X-Admin-Token\` header).
 
     ## AI-Agent Discovery
 
-    Visit `/.well-known/agent-config.json` (no auth) for a machine-readable
+    Visit \`/.well-known/agent-config.json\` (no auth) for a machine-readable
     manifest describing available protocols and configuration endpoints.
   version: 1.0.0
 servers:
@@ -198,8 +205,8 @@ paths:
       summary: Update platform state
       description: |-
         Full patch of platform state. Supports optimistic concurrency via
-        `If-Match` header containing the expected `revision` number.
-        Returns 409 `CONFLICT` on revision mismatch.
+        \`If-Match\` header containing the expected \`revision\` number.
+        Returns 409 \`CONFLICT\` on revision mismatch.
       operationId: adminPatchPlatformState
       security:
         - AdminSecret: []
@@ -232,7 +239,7 @@ paths:
       summary: Update feature flags only
       description: |-
         Lightweight endpoint to enable/disable specific features.
-        Supports optimistic concurrency via `If-Match` header.
+        Supports optimistic concurrency via \`If-Match\` header.
       operationId: adminPatchPlatformFeatures
       security:
         - AdminSecret: []
@@ -675,7 +682,7 @@ paths:
       summary: Upload a hotfix patch
       description: |-
         Upload a new game patch (multipart/form-data or JSON with base64).
-        Auto-promotes to latest unless `?autoPromote=false`.
+        Auto-promotes to latest unless \`?autoPromote=false\`.
       operationId: hotfixUpload
       security:
         - AdminSecret: []
@@ -1075,13 +1082,13 @@ components:
       type: http
       scheme: bearer
       description: |-
-        Admin API key. Set via `ADMIN_SECRET` or `ADMIN_TOKEN` env variable.
-        Can also be passed as `X-Admin-Token` header.
+        Admin API key. Set via \`ADMIN_SECRET\` or \`ADMIN_TOKEN\` env variable.
+        Can also be passed as \`X-Admin-Token\` header.
 
     PlayerToken:
       type: http
       scheme: bearer
-      description: JWT obtained from `/auth/*` endpoints.
+      description: JWT obtained from \`/auth/*\` endpoints.
 
   responses:
     Unauthorized:
@@ -1630,3 +1637,4 @@ components:
           type: number
         winRate:
           type: number
+`;

@@ -14,6 +14,9 @@ import { verifyAdminSecret } from "./auth-utils";
 import { handleForbidden, errorCodeToStatus } from "./error-handler";
 import { enforceRateLimit, rateLimitResponse } from "./rate-limit";
 import { PlatformStateConflictError } from "./platform-state";
+import { ADMIN_INDEX_HTML } from "./admin-index.generated";
+import { AGENT_CONFIG } from "./well-known";
+import { OPENAPI_YAML } from "./openapi-yaml";
 export { GameRoom } from "./game/game-room";
 export { MatchmakerRoom } from "./matchmaker/matchmaker-room";
 export { ChatRoom } from "./chat/chat-room";
@@ -148,6 +151,13 @@ app.get("/ws", (c) => {
 
 app.get("/health", (c) => c.json({ status: "ok", timestamp: Date.now() }));
 
+// ── AI-Agent discoverable endpoints (no auth) ──
+app.get("/.well-known/agent-config.json", (c) => c.json(AGENT_CONFIG));
+app.get("/openapi.yaml", (c) => {
+  c.header("Content-Type", "text/yaml; charset=utf-8");
+  return c.body(OPENAPI_YAML);
+});
+
 app.get("/admin/modules", async (c) => {
   const state = await readPlatformState(c.env.PLATFORM_BUCKET);
 
@@ -237,6 +247,13 @@ app.patch("/admin/platform", async (c) => {
     throw error;
   }
 });
+
+// Admin SPA catch-all: serve index.html for /admin/* client-side routes.
+// Static files (/admin/assets/*) are handled by wrangler's [assets] system.
+// NOTE: this catch-all must be the LAST /admin route to avoid shadowing
+// specific /admin/* handlers defined above and by modules.
+app.get("/admin", (c) => c.html(ADMIN_INDEX_HTML));
+app.get("/admin/*", (c) => c.html(ADMIN_INDEX_HTML));
 
 export default {
   fetch: app.fetch,
