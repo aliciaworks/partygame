@@ -208,46 +208,23 @@ function LoginScreen({ onLogin }: { onLogin: (t: string) => void }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password }),
         });
-        if (r.ok) {
-          // Now sign in with the new account
-          const r2 = await fetch(new URL("/admin/auth/sign-in/email", portal.baseUrl), {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, password }),
-          });
-          if (r2.ok) {
-            const data = await r2.json();
-            localStorage.setItem("partygame.portal.adminToken", data.token || password);
-            onLogin(data.token || password);
-            return;
-          }
-        }
-        const b = await r.json().catch(() => ({}));
-        setError(b.error || "Registration failed");
-        return;
+        if (!r.ok) { const b = await r.json().catch(() => ({})); setError(b.error || "Registration failed"); return; }
       }
 
       // Sign in
-      const r = await fetch(new URL("/admin/auth/sign-in/email", portal.baseUrl), {
+      const r = await fetch(new URL("/admin/auth/sign-in", portal.baseUrl), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
       if (r.ok) {
         const data = await r.json();
-        const token = data.token || password;
-        localStorage.setItem("partygame.portal.adminToken", token);
-        onLogin(token);
+        localStorage.setItem("partygame.portal.adminToken", data.token);
+        onLogin(data.token);
         return;
       }
-
-      // Fallback old ADMIN_SECRET
-      const r3 = await fetch(new URL("/admin/platform", portal.baseUrl), {
-        headers: { Authorization: `Bearer ${password}` },
-      });
-      if (r3.ok) { localStorage.setItem("partygame.portal.adminToken", password); onLogin(password); return; }
-
-      setError("Login failed. Check your credentials.");
+      const b = await r.json().catch(() => ({}));
+      setError(b.error || "Invalid credentials");
     } catch { setError("Cannot reach server"); }
     finally { setLoading(false); }
   };
@@ -258,60 +235,63 @@ function LoginScreen({ onLogin }: { onLogin: (t: string) => void }) {
   };
 
   return (
-    <div className="flex h-screen w-screen items-center justify-center bg-kumo-base">
-      <div className="bg-kumo-elevated border border-kumo-line p-8 rounded-xl flex flex-col gap-6 w-full max-w-sm">
-        <div className="flex flex-col gap-1 text-center">
-          <h2 className="text-2xl font-bold tracking-tight text-kumo-default">
-            {needsSetup ? "Setup Admin Account" : t("login.title")}
-          </h2>
-          <p className="text-sm text-kumo-subtle">
-            {needsSetup ? "Create the first administrator account" : t("login.secret_label")}
-          </p>
+    <div className="flex h-screen w-screen items-center justify-center bg-kumo-recessed">
+      <div className="w-full max-w-md mx-4">
+        {/* Brand */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-extrabold tracking-tight text-kumo-default">
+            <span className="text-kumo-brand">Party</span>Game
+          </h1>
+          <p className="text-sm text-kumo-subtle mt-2">Admin Console</p>
         </div>
 
-        {error && (
-          <div className="text-sm text-kumo-danger bg-kumo-danger-tint border border-kumo-danger/30 p-3 rounded-md">
-            {error}
-          </div>
-        )}
+        {/* Card */}
+        <div className="bg-kumo-elevated border border-kumo-line rounded-2xl p-8">
+          <h2 className="text-xl font-bold text-kumo-default mb-1">
+            {needsSetup ? "Create Account" : "Sign In"}
+          </h2>
+          <p className="text-sm text-kumo-subtle mb-6">
+            {needsSetup ? "First-time setup — create your admin account." : "Enter your credentials to continue."}
+          </p>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="admin@example.com"
-            className="w-full px-3 py-2 text-sm bg-kumo-base border border-kumo-line rounded-md text-kumo-default focus:outline-none focus:ring-2 focus:ring-kumo-brand"
-          />
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Password"
-            className="w-full px-3 py-2 text-sm bg-kumo-base border border-kumo-line rounded-md text-kumo-default focus:outline-none focus:ring-2 focus:ring-kumo-brand"
-          />
-          <Button type="submit" variant="primary" className="w-full font-semibold" disabled={loading}>
-            {loading ? "..." : needsSetup ? "Create Account" : t("login.button")}
-          </Button>
-        </form>
-
-        {methods?.google && (
-          <>
-            <div className="flex items-center gap-3">
-              <div className="flex-1 h-px bg-kumo-line" />
-              <span className="text-xs text-kumo-subtle">or</span>
-              <div className="flex-1 h-px bg-kumo-line" />
+          {error && (
+            <div className="mb-4 text-sm bg-kumo-danger-tint text-kumo-danger border border-kumo-danger/20 rounded-lg px-4 py-3">
+              {error}
             </div>
-            <Button
-              variant="secondary"
-              className="w-full font-semibold justify-center gap-2"
-              onClick={handleGoogleLogin}
-            >
-              <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-              Login with Google
+          )}
+
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-kumo-subtle uppercase tracking-wider">Email</label>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                placeholder="admin@example.com" autoFocus
+                className="w-full px-4 py-2.5 text-sm bg-kumo-base border border-kumo-line rounded-lg text-kumo-default placeholder:text-kumo-subtle focus:outline-none focus:ring-2 focus:ring-kumo-brand focus:border-transparent transition" />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-kumo-subtle uppercase tracking-wider">Password</label>
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+                placeholder="········"
+                className="w-full px-4 py-2.5 text-sm bg-kumo-base border border-kumo-line rounded-lg text-kumo-default placeholder:text-kumo-subtle focus:outline-none focus:ring-2 focus:ring-kumo-brand focus:border-transparent transition" />
+            </div>
+            <Button type="submit" variant="primary" size="lg" className="w-full font-semibold mt-2" disabled={loading}>
+              {loading ? "Please wait..." : needsSetup ? "Create Account" : "Sign In"}
             </Button>
-          </>
-        )}
+          </form>
+
+          {methods?.google && (
+            <>
+              <div className="flex items-center gap-3 my-5">
+                <div className="flex-1 h-px bg-kumo-line" />
+                <span className="text-xs text-kumo-subtle">or</span>
+                <div className="flex-1 h-px bg-kumo-line" />
+              </div>
+              <Button variant="secondary" size="lg" className="w-full font-semibold justify-center gap-2" onClick={handleGoogleLogin}>
+                <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                Continue with Google
+              </Button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
