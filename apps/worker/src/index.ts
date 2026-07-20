@@ -130,6 +130,11 @@ app.use("*", async (c, next) => {
 
   // Inject version headers into response
   c.header("X-API-Version", platformState.apiVersion);
+
+  // Edge cache: cache public GET responses for 60s
+  if (c.req.method === "GET" && !c.req.path.startsWith("/admin") && !c.req.path.startsWith("/ws")) {
+    c.header("Cache-Control", "public, max-age=60, s-maxage=60");
+  }
   
   // Return feature list for client feature detection
   const featureList = Object.entries(platformState.features)

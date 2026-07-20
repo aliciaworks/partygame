@@ -1,7 +1,8 @@
 name = "partygame-example-backend"
 main = "src/index.ts"
-compatibility_date = "2026-05-18"
-compatibility_flags = ["nodejs_compat"]
+
+[cache]
+enabled = true
 
 [[durable_objects.bindings]]
 name = "GAME_ROOM"

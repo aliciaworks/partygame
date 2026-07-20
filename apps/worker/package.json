@@ -14,8 +14,7 @@
     "@partygame/shared": "file:../../packages/shared",
     "arctic": "^3.7.0",
     "hono": "^4.12.31",
-    "in-app-purchase": "^1.11.4",
-    "jose": "^6.2.3"
+    "in-app-purchase": "^1.11.4"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260719.1",

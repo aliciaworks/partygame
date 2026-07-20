@@ -1,7 +1,6 @@
 import type { Hono } from "hono";
 import type { ModuleManifest, WorkerModule } from "../loader";
-import { createSignedToken, verifySignedToken } from "../../auth-utils";
-import { createRemoteJWKSet, jwtVerify } from "jose";
+import { createSignedToken, verifySignedToken, verifyOAuthJWT } from "../../auth-utils";
 
 /**
  * Verify a Cloudflare Turnstile token submitted by the client.
@@ -203,7 +202,7 @@ async function readSession(
 
   // Try to verify signed token first
   if (secretKey) {
-    const playerId = await verifySignedToken(token, secretKey, 300); // 5 min
+    const playerId = await verifySignedToken(token, secretKey);
     if (playerId) {
       // Token is valid, return synthetic session
       return {
@@ -335,10 +334,8 @@ export const playerAuthModule: WorkerModule = {
       }
 
       try {
-        const JWKS = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'));
-        const { payload } = await jwtVerify(body.idToken, JWKS, {
-          issuer: ['https://accounts.google.com', 'accounts.google.com'],
-        });
+        const payload = await verifyOAuthJWT(body.idToken, 'https://www.googleapis.com/oauth2/v3/certs', 'https://accounts.google.com');
+        if (!payload) throw new Error("Invalid Google token");
 
         const googleId = payload.sub;
         if (!googleId) throw new Error("No sub in token");
@@ -378,12 +375,8 @@ export const playerAuthModule: WorkerModule = {
       }
 
       try {
-        const JWKS = createRemoteJWKSet(new URL('https://appleid.apple.com/auth/keys'));
-        const { payload } = await jwtVerify(body.idToken, JWKS, {
-          issuer: 'https://appleid.apple.com',
-          // In a real app, audience should be verified against your Apple App ID
-          // audience: 'com.your.app' 
-        });
+        const payload = await verifyOAuthJWT(body.idToken, 'https://appleid.apple.com/auth/keys', 'https://appleid.apple.com');
+        if (!payload) throw new Error("Invalid Apple token");
 
         const appleId = payload.sub;
         if (!appleId) throw new Error("No sub in token");
