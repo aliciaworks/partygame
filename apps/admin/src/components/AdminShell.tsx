@@ -180,6 +180,7 @@ function LoginScreen({ onLogin }: { onLogin: (t: string) => void }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [needsSetup, setNeedsSetup] = useState(false);
   const [methods, setMethods] = useState<any>(null);
   const { t } = useTranslation();
 
@@ -187,6 +188,9 @@ function LoginScreen({ onLogin }: { onLogin: (t: string) => void }) {
     fetch(portal.baseUrl + "admin/auth/methods")
       .then(r => r.json()).then(d => setMethods(d))
       .catch(() => setMethods({ password: true }));
+    fetch(portal.baseUrl + "admin/auth/state")
+      .then(r => r.json()).then(d => setNeedsSetup(d.needsSetup))
+      .catch(() => {});
     const p = new URLSearchParams(window.location.search);
     const tk = p.get("token");
     if (tk) { localStorage.setItem("partygame.portal.adminToken", tk); window.history.replaceState({},"",window.location.pathname); onLogin(tk); }
@@ -197,58 +201,55 @@ function LoginScreen({ onLogin }: { onLogin: (t: string) => void }) {
     setLoading(true);
     setError(null);
     try {
-      // 1. Try better-auth sign-in
+      // If no users yet, bootstrap (register first admin)
+      if (needsSetup) {
+        const r = await fetch(new URL("/admin/auth/bootstrap", portal.baseUrl), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+        if (r.ok) {
+          // Now sign in with the new account
+          const r2 = await fetch(new URL("/admin/auth/sign-in/email", portal.baseUrl), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password }),
+          });
+          if (r2.ok) {
+            const data = await r2.json();
+            localStorage.setItem("partygame.portal.adminToken", data.token || password);
+            onLogin(data.token || password);
+            return;
+          }
+        }
+        const b = await r.json().catch(() => ({}));
+        setError(b.error || "Registration failed");
+        return;
+      }
+
+      // Sign in
       const r = await fetch(new URL("/admin/auth/sign-in/email", portal.baseUrl), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email || "admin@partygame.local", password }),
+        body: JSON.stringify({ email, password }),
       });
       if (r.ok) {
         const data = await r.json();
-        const token = data.token || "";
-        localStorage.setItem("partygame.portal.adminToken", token || password);
-        onLogin(token || password);
+        const token = data.token || password;
+        localStorage.setItem("partygame.portal.adminToken", token);
+        onLogin(token);
         return;
       }
 
-      // 2. Try bootstrap (first-time setup)
-      const br = await fetch(new URL("/admin/auth/bootstrap", portal.baseUrl), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
-      });
-      if (br.ok) {
-        // Bootstrap succeeded, now sign in
-        const r2 = await fetch(new URL("/admin/auth/sign-in/email", portal.baseUrl), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: "admin@partygame.local", password }),
-        });
-        if (r2.ok) {
-          const data = await r2.json();
-          const token = data.token || "";
-          localStorage.setItem("partygame.portal.adminToken", token || password);
-          onLogin(token || password);
-          return;
-        }
-      }
-
-      // 3. Fallback: old ADMIN_SECRET (password-as-token)
+      // Fallback old ADMIN_SECRET
       const r3 = await fetch(new URL("/admin/platform", portal.baseUrl), {
         headers: { Authorization: `Bearer ${password}` },
       });
-      if (r3.ok) {
-        localStorage.setItem("partygame.portal.adminToken", password);
-        onLogin(password);
-        return;
-      }
+      if (r3.ok) { localStorage.setItem("partygame.portal.adminToken", password); onLogin(password); return; }
 
       setError("Login failed. Check your credentials.");
-    } catch {
-      setError("Cannot reach server");
-    } finally {
-      setLoading(false);
-    }
+    } catch { setError("Cannot reach server"); }
+    finally { setLoading(false); }
   };
 
   const handleGoogleLogin = () => {
@@ -261,10 +262,10 @@ function LoginScreen({ onLogin }: { onLogin: (t: string) => void }) {
       <div className="bg-kumo-elevated border border-kumo-line p-8 rounded-xl flex flex-col gap-6 w-full max-w-sm">
         <div className="flex flex-col gap-1 text-center">
           <h2 className="text-2xl font-bold tracking-tight text-kumo-default">
-            {t("login.title")}
+            {needsSetup ? "Setup Admin Account" : t("login.title")}
           </h2>
           <p className="text-sm text-kumo-subtle">
-            {t("login.secret_label")}
+            {needsSetup ? "Create the first administrator account" : t("login.secret_label")}
           </p>
         </div>
 
@@ -290,7 +291,7 @@ function LoginScreen({ onLogin }: { onLogin: (t: string) => void }) {
             className="w-full px-3 py-2 text-sm bg-kumo-base border border-kumo-line rounded-md text-kumo-default focus:outline-none focus:ring-2 focus:ring-kumo-brand"
           />
           <Button type="submit" variant="primary" className="w-full font-semibold" disabled={loading}>
-            {loading ? "..." : t("login.button")}
+            {loading ? "..." : needsSetup ? "Create Account" : t("login.button")}
           </Button>
         </form>
 

@@ -185,29 +185,30 @@ app.get("/admin/auth/methods", (c) => {
   return c.json(authMethods(c.env));
 });
 
-// Bootstrap: create first admin if no users exist
+// Bootstrap: create first admin if no users exist (no ADMIN_SECRET needed)
 app.post("/admin/auth/bootstrap", async (c) => {
   try {
     if (!c.env.DB) return c.json({ error: "No database" }, 500);
-    const { password } = await c.req.json().catch(() => ({})) as any;
-    if (!password) return c.json({ error: "Password required" }, 400);
+    const { email, password } = await c.req.json().catch(() => ({})) as any;
+    if (!email || !password) return c.json({ error: "Email and password required" }, 400);
 
-    const adminSecret = c.env.ADMIN_SECRET || "";
-    if (!adminSecret) return c.json({ error: "ADMIN_SECRET not configured" }, 500);
-    if (password !== adminSecret) return c.json({ error: "Invalid ADMIN_SECRET" }, 403);
+    // Only allow bootstrap if no users exist
+    const r = await c.env.DB.prepare("SELECT COUNT(*) as c FROM user").first<{ c: number }>();
+    if (r && r.c > 0) return c.json({ error: "Users already exist. Use sign-in." }, 400);
 
-    // Create admin user directly in better-auth tables
-    const id = crypto.randomUUID();
-    const email = "admin@partygame.local";
-    const now = new Date().toISOString();
+    const id = crypto.randomUUID(); const now = new Date().toISOString();
+    await c.env.DB.prepare("INSERT OR IGNORE INTO user (id, name, email, emailVerified, createdAt, updatedAt) VALUES (?, ?, ?, 1, ?, ?)").bind(id, email.split("@")[0], email, now, now).run();
+    return c.json({ success: true, email });
+  } catch (e: any) { return c.json({ error: e.message }, 500); }
+});
 
-    try { await c.env.DB.prepare("INSERT OR IGNORE INTO user (id, name, email, emailVerified, createdAt, updatedAt) VALUES (?, ?, ?, 1, ?, ?)").bind(id, "Admin", email, now, now).run(); }
-    catch (e: any) { return c.json({ error: "DB error: " + e.message }, 500); }
-
-    return c.json({ success: true, email, message: "First admin created. Now sign in." });
-  } catch (e: any) {
-    return c.json({ error: e.message }, 500);
-  }
+// Check if bootstrap needed (no users yet)
+app.get("/admin/auth/state", async (c) => {
+  if (!c.env.DB) return c.json({ needsSetup: true });
+  try {
+    const r = await c.env.DB.prepare("SELECT COUNT(*) as c FROM user").first<{ c: number }>();
+    return c.json({ needsSetup: !r || r.c === 0 });
+  } catch { return c.json({ needsSetup: true }); }
 });
 
 // Invite: existing admin invites a new user
