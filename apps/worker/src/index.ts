@@ -18,6 +18,7 @@ import { ADMIN_INDEX_HTML } from "./admin-index.generated";
 import { AGENT_CONFIG } from "./well-known";
 import { OPENAPI_YAML } from "./openapi-yaml";
 import { createAuth, authMethods } from "./admin-auth";
+import { jwtVerify } from "jose";
 export { GameRoom } from "./game/game-room";
 export { MatchmakerRoom } from "./matchmaker/matchmaker-room";
 export { ChatRoom } from "./chat/chat-room";
@@ -68,27 +69,37 @@ app.use("*", async (c, next) => {
   // Store platform state in context for later use
   c.set("platformState", platformState);
 
-  // Check admin secret for /admin/* routes (skip auth endpoints)
+  // Check admin auth for /admin/* routes (skip auth endpoints)
   const isAdminRoute = c.req.path.startsWith("/admin");
   const isAuthRoute = c.req.path.startsWith("/admin/auth/");
   let isAdmin = false;
   if (isAdminRoute && !isAuthRoute) {
-    const configuredSecret = c.env.ADMIN_SECRET ?? c.env.ADMIN_TOKEN;
-    if (!configuredSecret) {
-      return c.json({ error: "ADMIN_NOT_CONFIGURED", message: "Admin secret is not set. Run: wrangler secret put ADMIN_SECRET" }, 500);
+    const bearerToken = (c.req.header("authorization") || "").replace("Bearer ", "");
+
+    // Try better-auth session first
+    if (bearerToken && c.env.DB && c.env.BETTER_AUTH_SECRET) {
+      try {
+        const { payload } = await jwtVerify(bearerToken, new TextEncoder().encode(c.env.BETTER_AUTH_SECRET));
+        if (payload.sub) { isAdmin = true; }
+      } catch {}
     }
-    const authHeader = c.req.header("authorization");
-    const tokenHeader = c.req.header("x-admin-token");
-    const providedSecret = authHeader ?? tokenHeader ?? null;
-    if (!providedSecret) {
-      return c.json({ error: "UNAUTHORIZED", message: "Authentication required" }, 401);
+
+    // Fallback: old ADMIN_SECRET check
+    if (!isAdmin) {
+      const configuredSecret = c.env.ADMIN_SECRET ?? c.env.ADMIN_TOKEN;
+      if (!configuredSecret) {
+        return c.json({ error: "ADMIN_NOT_CONFIGURED", message: "No admin auth configured. Set BETTER_AUTH_SECRET or ADMIN_SECRET." }, 500);
+      }
+      if (!bearerToken && !c.req.header("x-admin-token")) {
+        return c.json({ error: "UNAUTHORIZED", message: "Authentication required" }, 401);
+      }
+      const provided = c.req.header("x-admin-token") || bearerToken;
+      if (!verifyAdminSecret(provided, configuredSecret)) {
+        return c.json({ error: "UNAUTHORIZED", message: "Invalid credentials" }, 401);
+      }
+      isAdmin = true;
     }
-    if (!verifyAdminSecret(providedSecret, configuredSecret)) {
-      return c.json({ error: "UNAUTHORIZED", message: "Invalid admin secret. Check your password." }, 401);
-    }
-    isAdmin = true;
   } else if (isAuthRoute) {
-    // Auth routes are public (better-auth handles its own auth)
     isAdmin = true;
   }
   c.set("isAdmin", isAdmin);

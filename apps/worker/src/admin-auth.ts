@@ -13,6 +13,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { twoFactor } from "better-auth/plugins/two-factor";
+import { bearer } from "better-auth/plugins/bearer";
 import { drizzle } from "drizzle-orm/d1";
 
 export function createAuth(d1: D1Database, baseURL: string, env: any) {
@@ -41,7 +42,7 @@ export function createAuth(d1: D1Database, baseURL: string, env: any) {
     database: drizzleAdapter(db, { provider: "sqlite" }),
     emailAndPassword: { enabled: true },
     socialProviders: providers,
-    plugins: [twoFactor()],
+    plugins: [twoFactor(), bearer()],
     trustedOrigins: [baseURL, "http://localhost:8787", "http://localhost:5173"],
     secret,
   });

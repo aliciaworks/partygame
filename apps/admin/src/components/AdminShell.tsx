@@ -176,27 +176,62 @@ export function AdminShell() {
 // ── Login Screen ─────────────────────────────────────────────────────────────
 
 function LoginScreen({ onLogin }: { onLogin: (t: string) => void }) {
-  const [secret, setSecret] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [methods, setMethods] = useState<{ password: boolean; google: any } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [methods, setMethods] = useState<any>(null);
   const { t } = useTranslation();
 
   useEffect(() => {
-    // Fetch available login methods
     fetch(portal.baseUrl + "admin/auth/methods")
-      .then(r => r.json())
-      .then(d => setMethods(d))
-      .catch(() => setMethods({ password: true, google: false }));
-
-    // Check if returning from Google OAuth callback
-    const params = new URLSearchParams(window.location.search);
-    const authToken = params.get("token");
-    if (authToken) {
-      localStorage.setItem("partygame.portal.adminToken", authToken);
-      window.history.replaceState({}, "", window.location.pathname);
-      onLogin(authToken);
-    }
+      .then(r => r.json()).then(d => setMethods(d))
+      .catch(() => setMethods({ password: true }));
+    const p = new URLSearchParams(window.location.search);
+    const tk = p.get("token");
+    if (tk) { localStorage.setItem("partygame.portal.adminToken", tk); window.history.replaceState({},"",window.location.pathname); onLogin(tk); }
   }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      // Try better-auth sign-in first
+      const r = await fetch(new URL("/admin/auth/sign-in/email", portal.baseUrl), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email || "admin@partygame.local", password }),
+        credentials: "include",
+      });
+      if (r.ok) {
+        const data = await r.json();
+        const token = data.token || data.session?.token || "";
+        if (token) {
+          localStorage.setItem("partygame.portal.adminToken", token);
+          onLogin(token);
+          return;
+        }
+        // Cookie-based session: just set a flag
+        localStorage.setItem("partygame.portal.adminToken", "better-auth-session");
+        onLogin("better-auth-session");
+        return;
+      }
+      // Fallback: old ADMIN_SECRET check
+      if (!email) {
+        const r2 = await fetch(new URL("/admin/platform", portal.baseUrl), {
+          headers: { Authorization: `Bearer ${password}` },
+        });
+        if (r2.ok) { localStorage.setItem("partygame.portal.adminToken", password); onLogin(password); return; }
+      }
+      const b = await r.json().catch(() => ({}));
+      setError(b.message || "Login failed");
+    } catch {
+      setError("Cannot reach server");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleGoogleLogin = () => {
     const callbackUrl = window.location.origin + window.location.pathname;
@@ -221,36 +256,23 @@ function LoginScreen({ onLogin }: { onLogin: (t: string) => void }) {
           </div>
         )}
 
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setError(null);
-            try {
-              const r = await fetch(new URL("/admin/platform", portal.baseUrl), {
-                headers: { Authorization: `Bearer ${secret}` },
-              });
-              if (r.ok) {
-                localStorage.setItem("partygame.portal.adminToken", secret);
-                onLogin(secret);
-              } else {
-                const b = await r.json().catch(() => ({}));
-                setError(b.message || "Login failed");
-              }
-            } catch {
-              setError("Cannot reach server");
-            }
-          }}
-          className="flex flex-col gap-4"
-        >
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="admin@example.com"
+            className="w-full px-3 py-2 text-sm bg-kumo-base border border-kumo-line rounded-md text-kumo-default focus:outline-none focus:ring-2 focus:ring-kumo-brand"
+          />
           <input
             type="password"
-            value={secret}
-            onChange={(e) => setSecret(e.target.value)}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password"
             className="w-full px-3 py-2 text-sm bg-kumo-base border border-kumo-line rounded-md text-kumo-default focus:outline-none focus:ring-2 focus:ring-kumo-brand"
-            placeholder="••••••••"
           />
-          <Button type="submit" variant="primary" className="w-full font-semibold">
-            {t("login.button")}
+          <Button type="submit" variant="primary" className="w-full font-semibold" disabled={loading}>
+            {loading ? "..." : t("login.button")}
           </Button>
         </form>
 
