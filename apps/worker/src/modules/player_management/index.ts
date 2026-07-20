@@ -84,10 +84,10 @@ export const playerManagementModule: WorkerModule = {
   manifest: playerManagementManifest,
   init(app: Hono<any>) {
     app.use("/admin/*", async (c, next) => {
+      if (c.req.path.startsWith("/admin/auth/")) return next();
       if (!c.get("isAdmin")) {
         return c.json({ error: "Unauthorized" }, 401);
       }
-
       await next();
     });
 
