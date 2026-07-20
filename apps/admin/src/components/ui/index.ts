@@ -5,8 +5,6 @@ export { Button, LinkButton, RefreshButton } from "@cloudflare/kumo";
 export { Badge } from "@cloudflare/kumo";
 export { Input, Field } from "@cloudflare/kumo";
 export { Checkbox } from "@cloudflare/kumo";
-export { Table } from "@cloudflare/kumo";
-export { Sidebar } from "@cloudflare/kumo";
 export { Tabs } from "@cloudflare/kumo";
 export { Loader } from "@cloudflare/kumo";
 export { Text } from "@cloudflare/kumo";

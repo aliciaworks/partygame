@@ -2,7 +2,7 @@ import { Outlet, NavLink } from "react-router-dom";
 import { portal } from "../lib/portal";
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Button, Sidebar } from "./ui";
+import { Button } from "./ui";
 import { cn } from "../lib/utils";
 import {
   Layout,
@@ -16,7 +16,6 @@ import {
   Monitor,
   Translate,
   Package,
-  Fingerprint,
 } from "@phosphor-icons/react";
 import type { Icon } from "@phosphor-icons/react";
 
@@ -82,7 +81,7 @@ export function AdminShell() {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-kumo-base text-kumo-default">
       {/* Sidebar */}
-      <Sidebar className="w-64 shrink-0 border-r border-kumo-line p-4 flex flex-col gap-1">
+      <nav className="w-64 shrink-0 border-r border-kumo-line bg-kumo-elevated p-4 flex flex-col gap-1">
         <div className="mb-6 pl-2 mt-2">
           <h2 className="text-lg font-bold tracking-tight text-kumo-brand">
             {t("app.title")}
@@ -164,7 +163,7 @@ export function AdminShell() {
             {t("nav.logout")}
           </Button>
         </div>
-      </Sidebar>
+      </nav>
 
       {/* Main content */}
       <main className="flex-1 p-8 overflow-y-auto bg-kumo-recessed">
