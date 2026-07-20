@@ -39,7 +39,8 @@
     "leaderboard": "Leaderboard",
     "friends": "Friends",
     "playerProfile": "Player Profile",
-    "watermark": "Hidden Watermark"
+    "watermark": "Hidden Watermark",
+    "abTesting": "A/B Testing"
   },
   "assets": {
     "title": "Asset Manager",
@@ -48,6 +49,7 @@
     "name_label": "Asset Name",
     "file_label": "Asset File",
     "watermark_enable": "Enable Hidden Watermark",
+    "ab_testing": "A/B Testing (Multi-Variant)",
     "variant_count": "A/B/C Test Variants",
     "variant_hint": "{{count}} uniquely watermarked copies.",
     "processing": "Processing variants...",

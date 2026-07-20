@@ -10,6 +10,7 @@ export type PlatformFeatures = {
   replays: boolean;
   guilds: boolean;
   watermark: boolean;
+  abTesting: boolean;
 };
 
 export type Deprecation = {
@@ -69,6 +70,7 @@ const DEFAULT_FEATURES: PlatformFeatures = {
   replays: true,
   guilds: true,
   watermark: false,
+  abTesting: false,
 };
 
 const FEATURE_KEYS = Object.keys(DEFAULT_FEATURES) as Array<keyof PlatformFeatures>;

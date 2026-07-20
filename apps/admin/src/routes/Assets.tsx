@@ -32,6 +32,7 @@ export function Assets() {
   const [assetName, setAssetName] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [watermarkEnabled, setWatermarkEnabled] = useState(false);
+  const [abTestingEnabled, setAbTestingEnabled] = useState(false);
   const [variantCount, setVariantCount] = useState(4);
 
   // Progress
@@ -70,7 +71,7 @@ export function Assets() {
       setUploadStatus("");
 
       try {
-        const count = watermarkEnabled ? variantCount : 1;
+        const count = (abTestingEnabled || watermarkEnabled) ? variantCount : 1;
 
         // 1. Create asset on server
         setUploadStatus("Creating asset...");
@@ -206,8 +207,20 @@ export function Assets() {
             </span>
           </label>
 
+          {/* A/B Testing toggle */}
+          <label className="flex items-center gap-3 cursor-pointer">
+            <Checkbox
+              checked={abTestingEnabled}
+              onCheckedChange={(c) => setAbTestingEnabled(c as boolean)}
+            />
+            <span className="text-sm font-semibold text-kumo-default flex items-center gap-1.5">
+              <Flask className="h-4 w-4" />
+              {t("assets.ab_testing", "A/B Testing (Multi-Variant)")}
+            </span>
+          </label>
+
           {/* Variant count (A/B/C) */}
-          {watermarkEnabled && (
+          {(watermarkEnabled || abTestingEnabled) && (
             <div className="flex flex-col gap-2 ml-8 pl-4 border-l-2 border-kumo-brand/30">
               <label className="text-sm font-semibold text-kumo-default flex items-center gap-1.5">
                 <Flask className="h-4 w-4 text-kumo-brand" />
@@ -383,14 +396,17 @@ export function Assets() {
                         {new Date(a.uploadedAt).toLocaleDateString()}
                       </td>
                       <td className="px-4 py-3">
-                        {a.watermarkEnabled ? (
-                          <Badge variant="success" appearance="dot">
-                            <ShieldCheck className="h-3 w-3 inline mr-1" />
-                            Watermarked
-                          </Badge>
-                        ) : (
-                          <Badge variant="neutral">Standard</Badge>
-                        )}
+                        <div className="flex gap-1.5 flex-wrap">
+                          {a.watermarkEnabled && (
+                            <Badge variant="success" appearance="dot">WM</Badge>
+                          )}
+                          {a.variantCount > 1 && !a.watermarkEnabled && (
+                            <Badge variant="accent" appearance="dot">A/B</Badge>
+                          )}
+                          {a.variantCount <= 1 && (
+                            <Badge variant="neutral">Standard</Badge>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <Button

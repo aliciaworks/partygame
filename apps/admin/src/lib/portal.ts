@@ -15,6 +15,7 @@ export type PlatformFeatures = {
   friends: boolean;
   playerProfile: boolean;
   watermark: boolean;
+  abTesting: boolean;
 };
 
 export type MaintenanceWindow = {

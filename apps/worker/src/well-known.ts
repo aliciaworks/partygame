@@ -55,5 +55,6 @@ export const AGENT_CONFIG = {
     replays: { type: "boolean", default: true },
     guilds: { type: "boolean", default: true },
     watermark: { type: "boolean", default: false },
+    abTesting: { type: "boolean", default: false },
   },
 };
