@@ -1,5 +1,6 @@
 name = "partygame-example-backend"
 main = "src/index.ts"
+compatibility_date = "2026-07-20"
 
 [cache]
 enabled = true
