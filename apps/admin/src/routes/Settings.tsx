@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { portal, type PlatformState } from "../lib/portal";
 import { Button, Checkbox, Loader, Banner } from "../components/ui";
 import { useState, useEffect } from "react";
-import { Gear, Warning, Server, Plus, Trash } from "@phosphor-icons/react";
+import { Gear, Warning, HardDrives, Plus, Trash } from "@phosphor-icons/react";
 
 export function Settings() {
   const queryClient = useQueryClient();
