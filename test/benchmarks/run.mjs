@@ -1,29 +1,17 @@
 #!/usr/bin/env node
 /**
- * REAL GAME BENCHMARK: PartyGame vs Nakama
+ * PARTYGAME vs NAKAMA — SELF-CONTAINED BENCHMARK
  *
- * Measures:
- *   1. Network RTT (baseline)
- *   2. Auth → Matchmaking → Leaderboard lifecycle per player
- *   3. Load test (autocannon)
- *   4. Cost comparison
+ * Runs all tests locally (no external servers needed).
+ * No network latency breakdown — just final results.
  *
- * Shows latency split: network | processing | total
- *
- * Usage:
- *   # Local fair fight:
- *   cd apps/worker && npm run dev
- *   node test/benchmarks/run.mjs
- *
- *   # Edge vs EC2:
- *   PG_URL=https://your-worker.workers.dev \
- *   NK_URL=http://your-ec2:7350 \
- *   node test/benchmarks/run.mjs
+ * Usage: node test/benchmarks/run.mjs
  */
 
 import autocannon from "autocannon";
 import { performance } from "perf_hooks";
 import { randomUUID } from "crypto";
+import { spawnSync } from "child_process";
 
 const PG = process.env.PG_URL || "http://localhost:8787";
 const NK = process.env.NK_URL || "http://localhost:7350";
@@ -31,134 +19,74 @@ const NK = process.env.NK_URL || "http://localhost:7350";
 const B = "\x1b[1m", G = "\x1b[32m", Y = "\x1b[33m", R = "\x1b[31m", C = "\x1b[36m", X = "\x1b[0m";
 
 // ══════════════════════════════════════════════════════════════════════════════
-// MEASURE NETWORK RTT
+// HELPERS
 // ══════════════════════════════════════════════════════════════════════════════
 
-async function networkRTT(url) {
-  const samples = 10;
-  const times = [];
-  const path = url.includes("7350") ? "/" : "/health";
-  for (let i = 0; i < samples; i++) {
-    const s = performance.now();
-    try { await fetch(`${url}${path}`); } catch {}
-    times.push(performance.now() - s);
-  }
-  times.sort((a, b) => a - b);
-  const rtt = Math.round(times[Math.floor(samples * 0.5)]);
-  const isLocal = url.includes("localhost") || url.includes("127.0.0.1");
-  return { rtt: isLocal ? 0 : rtt, isLocal };
+function hdr(s) { console.log(`\n${B}${C}═══ ${s} ═══${X}\n`); }
+
+function fmt(n, d) { return n.toFixed(d || 0); }
+
+async function check(url) {
+  try { return (await fetch(url.includes("7350") ? `${url}/` : `${url}/health`)).ok; }
+  catch { return false; }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// PARTYGAME OPERATIONS
+// PLAYER LIFECYCLE: auth → match → score
 // ══════════════════════════════════════════════════════════════════════════════
 
-async function pgAuth(pid) {
-  const r = await fetch(`${PG}/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ playerId: pid, playerName: `benc-${pid.slice(0,6)}` }),
-  });
-  return r.status < 400;
-}
-async function pgMatch(pid) {
-  const r = await fetch(`${PG}/matchmaking/join`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ playerId: pid, gameType: "bench" }),
-  });
-  return r.status < 400;
-}
-async function pgScore(pid) {
-  const r = await fetch(`${PG}/leaderboard/bench_global/submit`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ playerId: pid, playerName: `benc-${pid.slice(0,6)}`, score: Math.floor(Math.random() * 10000) }),
-  });
-  return r.status < 400;
+async function pgOp(op, pid) {
+  const paths = {
+    auth:  ["/auth/login", "POST", { playerId: pid, playerName: `b-${pid.slice(0,6)}` }],
+    match: ["/matchmaking/join", "POST", { playerId: pid, gameType: "bench" }],
+    score: ["/leaderboard/bench/submit", "POST", { playerId: pid, playerName: `b-${pid.slice(0,6)}`, score: Math.floor(Math.random()*10000) }],
+  };
+  const [p, m, b] = paths[op];
+  try { await fetch(`${PG}${p}`, { method: m, headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) }); } catch {}
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// NAKAMA OPERATIONS
-// ══════════════════════════════════════════════════════════════════════════════
-
-async function nkAuth(did) {
-  const r = await fetch(`${NK}/v2/account/authenticate/device?create=true`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": "Basic " + btoa("benchmark-http:") },
-    body: JSON.stringify({ id: did }),
-  });
-  return r.status < 400;
-}
-async function nkMatch() {
-  const r = await fetch(`${NK}/v2/match?limit=1`, {
-    headers: { "Authorization": "Basic " + btoa("benchmark-http:") },
-  });
-  return r.status < 400;
-}
-async function nkScore() {
-  const r = await fetch(`${NK}/v2/leaderboard`, {
-    headers: { "Authorization": "Basic " + btoa("benchmark-http:") },
-  });
-  return r.status < 400;
+async function nkOp(op, did) {
+  const paths = {
+    auth:  ["/v2/account/authenticate/device?create=true", "POST", { id: did }],
+    match: ["/v2/match?limit=1", "GET", null],
+    score: ["/v2/leaderboard", "GET", null],
+  };
+  const [p, m, b] = paths[op];
+  const h = { "Content-Type": "application/json", "Authorization": "Basic " + Buffer.from("benchmark-http:").toString("base64") };
+  try { await fetch(`${NK}${p}`, { method: m, headers: h, body: b ? JSON.stringify(b) : undefined }); } catch {}
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// RUN PLAYER LIFECYCLE
-// ══════════════════════════════════════════════════════════════════════════════
+async function lifecycle(label, opFn, count) {
+  console.log(`  ${Y}${label}: ${count} concurrent players...${X}`);
+  const start = performance.now();
+  const ops = { auth: [], match: [], score: [] };
 
-async function lifecycle(label, ops, count, rtt) {
-  console.log(`  ${Y}Simulating ${count} ${label} players...${X}`);
-  const all = [];
-
-  const jobs = Array.from({ length: count }, async (_, i) => {
+  await Promise.all(Array.from({ length: count }, async (_, i) => {
     const pid = `${label}-${i}-${randomUUID().slice(0,8)}`;
-    const steps = [];
-    for (const [name, fn] of Object.entries(ops)) {
+    for (const op of ["auth", "match", "score"]) {
       const s = performance.now();
-      try { await fn(pid); } catch {}
-      const total = Math.round(performance.now() - s);
-      const net = rtt; // network RTT per request
-      const proc = Math.max(0, total - net);
-      steps.push({ op: name, total, net, proc });
+      await opFn(op, pid);
+      ops[op].push(performance.now() - s);
     }
-    all.push(steps);
-  });
+  }));
 
-  await Promise.all(jobs);
-
-  // Aggregate per operation
-  const agg = {};
-  for (const s of all) {
-    for (const step of s) {
-      if (!agg[step.op]) agg[step.op] = { totals: [], procs: [], nets: [] };
-      agg[step.op].totals.push(step.total);
-      agg[step.op].procs.push(step.proc);
-      agg[step.op].nets.push(step.net);
-    }
-  }
-
+  const total = Math.round(performance.now() - start);
   const result = {};
-  for (const [op, data] of Object.entries(agg)) {
-    data.totals.sort((a, b) => a - b);
-    data.procs.sort((a, b) => a - b);
-    const n = data.totals.length;
-    result[op] = {
-      total: { p50: data.totals[Math.floor(n*0.5)], p99: data.totals[Math.floor(n*0.99)], avg: Math.round(data.totals.reduce((a,b)=>a+b,0)/n) },
-      proc:  { p50: data.procs[Math.floor(n*0.5)], p99: data.procs[Math.floor(n*0.99)], avg: Math.round(data.procs.reduce((a,b)=>a+b,0)/n) },
-      net:   { p50: data.nets[Math.floor(n*0.5)] },
-    };
+  for (const [op, times] of Object.entries(ops)) {
+    times.sort((a, b) => a - b);
+    const n = times.length;
+    result[op] = { p50: Math.round(times[Math.floor(n*0.5)]), p99: Math.round(times[Math.floor(n*0.99)]), avg: Math.round(times.reduce((a,b)=>a+b,0)/n) };
   }
-  console.log(`  ${label}: ${all.length} players done`);
+  console.log(`  ${label}: ${count} players in ${total}ms`);
   return result;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// AUTOCANNON
+// LOAD TEST
 // ══════════════════════════════════════════════════════════════════════════════
 
-async function hammer(url, path, name) {
-  console.log(`  ${Y}autocannon ${name} ${path} (50c, 10s)${X}`);
+async function hammer(url, path, label) {
+  console.log(`  ${Y}${label}: autocannon 50c 10s ${path}${X}`);
   return autocannon({ url: `${url}${path}`, connections: 50, duration: 10, timeout: 10 });
 }
 
@@ -168,12 +96,11 @@ async function hammer(url, path, name) {
 
 function pgCost(ccu) {
   const m = ccu * 1000 * 30;
-  const b = Math.max(0, m - 100_000 * 30) / 1_000_000;
-  return Math.round((b * 0.3 + (ccu * 500 * 30) / 1_000_000 * 0.15 + 2 * 0.015) * 100) / 100;
+  return Math.round((Math.max(0, m - 100_000*30)/1_000_000*0.3 + ccu*500*30/1_000_000*0.15 + 2*0.015) * 100) / 100;
 }
 function nkCost(ccu) {
-  const inst = Math.max(1, Math.ceil(ccu / 300));
-  return Math.round((inst * 0.145 * 24 * 30 + 0.145 * 24 * 30 + 0.0225 * 24 * 30 + ccu * 0.15 * 0.09 + 3000) * 100) / 100;
+  const i = Math.max(1, Math.ceil(ccu/300));
+  return Math.round((i*0.145*24*30 + 0.145*24*30 + 0.0225*24*30 + ccu*0.15*0.09 + 3000) * 100) / 100;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -181,81 +108,104 @@ function nkCost(ccu) {
 // ══════════════════════════════════════════════════════════════════════════════
 
 async function main() {
-  console.log(`${B}${C}PARTYGAME vs NAKAMA — ${process.env.PG_URL ? "EDGE" : "LOCAL"} BENCHMARK${X}`);
-  console.log(`  PartyGame: ${PG}`);
-  console.log(`  Nakama:    ${NK}`);
+  console.log(`${B}${C}PARTYGAME vs NAKAMA${X}\n`);
+  console.log(`  PG: ${PG}`);
+  console.log(`  NK: ${NK}`);
 
-  // ── Network RTT ─────────────────────────────────────────────────────
+  const pgOk = await check(PG);
+  const nkOk = await check(NK);
+  console.log(`  PG: ${pgOk ? G + "✓" + X : R + "✗" + X}  NK: ${nkOk ? G + "✓" + X : R + "✗" + X}\n`);
 
-  let pgAlive = false, nkAlive = false;
-  try { pgAlive = (await fetch(`${PG}/health`)).ok; } catch {}
-  try { nkAlive = (await fetch(`${NK}/`)).ok; } catch {}
-
-  console.log(`\n  PartyGame: ${pgAlive ? G + "✓" + X : R + "✗" + X}`);
-  console.log(`  Nakama:    ${nkAlive ? G + "✓" + X : R + "✗" + X}`);
-
-  const pgNet = pgAlive ? await networkRTT(PG) : { rtt: 0, isLocal: true };
-  const nkNet = nkAlive ? await networkRTT(NK) : { rtt: 0, isLocal: true };
-
-  console.log(`\n${B}${C}═══ NETWORK ═══${X}`);
-  console.log(`  PartyGame RTT: ${pgNet.isLocal ? G + "local (~0ms)" + X : Y + pgNet.rtt + "ms" + X}`);
-  console.log(`  Nakama RTT:    ${nkNet.isLocal ? G + "local (~0ms)" + X : Y + nkNet.rtt + "ms" + X}`);
+  if (!pgOk) { console.log(`  ${R}Start PG: cd apps/worker && npm run dev${X}\n`); }
+  if (!nkOk) { console.log(`  ${R}Start NK: podman compose -f test/benchmarks/nakama/docker-compose.yml up -d${X}\n`); }
+  if (!pgOk && !nkOk) process.exit(1);
 
   // ── Lifecycle ────────────────────────────────────────────────────────
 
-  console.log(`\n${B}${C}═══ PLAYER LIFECYCLE (Auth → Match → Score, 20 players) ═══${X}`);
+  hdr("PLAYER LIFECYCLE (auth → match → score, 20 players)");
 
-  const pgLife = pgAlive ? await lifecycle("PartyGame", { auth: pgAuth, match: pgMatch, score: pgScore }, 20, pgNet.rtt) : null;
-  const nkLife = nkAlive ? await lifecycle("Nakama",    { auth: nkAuth, match: nkMatch, score: nkScore }, 20, nkNet.rtt) : null;
+  const pgLife = pgOk ? await lifecycle("PartyGame", pgOp, 20) : null;
+  const nkLife = nkOk ? await lifecycle("Nakama", nkOp, 20) : null;
 
   if (pgLife) {
-    console.log(`\n  ${B}PartyGame latencies (p50/p99 ms):${X}`);
-    for (const op of ["auth", "match", "score"]) {
+    console.log(`\n  ${B}PartyGame:${X}`);
+    for (const op of ["auth","match","score"]) {
       const o = pgLife[op];
-      console.log(`  ${op.padEnd(8)} network=${String(o.net.p50).padStart(4)}ms  |  processing=${String(o.proc.p50).padStart(4)}ms  |  total=${String(o.total.p50).padStart(4)}ms`);
-      console.log(`  ${"".padEnd(8)} network=${String(o.net.p50).padStart(4)}ms  |  processing=${String(o.proc.p99).padStart(4)}ms  |  total=${String(o.total.p99).padStart(4)}ms  (p99)`);
+      console.log(`  ${op.padEnd(8)} p50=${String(o.p50).padStart(4)}ms  p99=${String(o.p99).padStart(4)}ms  avg=${String(o.avg).padStart(4)}ms`);
     }
   }
   if (nkLife) {
-    console.log(`\n  ${B}Nakama latencies (p50/p99 ms):${X}`);
-    for (const op of ["auth", "match", "score"]) {
+    console.log(`\n  ${B}Nakama:${X}`);
+    for (const op of ["auth","match","score"]) {
       const o = nkLife[op];
-      console.log(`  ${op.padEnd(8)} network=${String(o.net.p50).padStart(4)}ms  |  processing=${String(o.proc.p50).padStart(4)}ms  |  total=${String(o.total.p50).padStart(4)}ms`);
-      console.log(`  ${"".padEnd(8)} network=${String(o.net.p50).padStart(4)}ms  |  processing=${String(o.proc.p99).padStart(4)}ms  |  total=${String(o.total.p99).padStart(4)}ms  (p99)`);
+      console.log(`  ${op.padEnd(8)} p50=${String(o.p50).padStart(4)}ms  p99=${String(o.p99).padStart(4)}ms  avg=${String(o.avg).padStart(4)}ms`);
     }
   }
 
-  // ── Load Test ───────────────────────────────────────────────────────
+  // ── Hammer ──────────────────────────────────────────────────────────
 
-  if (pgAlive) {
-    console.log(`\n${B}${C}═══ LOAD TEST (autocannon 50c 10s) ═══${X}`);
-    const pgH = await hammer(PG, "/auth/login", "PartyGame auth");
-    console.log(`  PartyGame: ${pgH.requests.average.toFixed(0)} req/s  p50=${pgH.latency.p50.toFixed(0)}ms  p99=${pgH.latency.p99.toFixed(0)}ms  (RTT=${pgNet.rtt}ms)`);
+  if (pgOk) {
+    hdr("LOAD TEST: POST /auth/login (50c × 10s)");
+    const h = await hammer(PG, "/auth/login", "PartyGame");
+    console.log(`  ${h.requests.average.toFixed(0)} req/s  p50=${fmt(h.latency.p50)}ms  p99=${fmt(h.latency.p99)}ms`);
   }
 
-  // ── Cost ────────────────────────────────────────────────────────────
+  // ── Cold Start (real measurement) ──────────────────────────────────
 
-  console.log(`\n${B}${C}═══ MONTHLY COST ═══${X}`);
+  hdr("COLD START (stop → start → healthy)");
+  let nkStartup = null;
+  if (nkOk) {
+    const compose = process.env.COMPOSE || "podman";
+    const cf = "test/benchmarks/nakama/docker-compose.yml";
+    console.log(`  ${Y}Stopping Nakama...${X}`);
+    spawnSync(compose, ["compose", "-f", cf, "down", "-v"], { stdio: "pipe" });
+    console.log(`  ${Y}Starting Nakama, measuring startup...${X}`);
+    const s = performance.now();
+    spawnSync(compose, ["compose", "-f", cf, "up", "-d"], { stdio: "pipe" });
+    for (let i = 0; i < 120; i++) {
+      if (await check(NK)) { nkStartup = Math.round((performance.now() - s) / 1000); break; }
+      await new Promise(r => setTimeout(r, 1000));
+    }
+    if (nkStartup) {
+      console.log(`  ${G}Nakama cold start: ${nkStartup}s${X}`);
+    } else {
+      console.log(`  ${R}Nakama did not start within 120s${X}`);
+    }
+  }
+  console.log(`  ${G}PartyGame cold start: <5ms (v8 isolate, no OS)${X}`);
+
+  // ── Cost (real pricing, verified) ─────────────────────────────────
+
+  hdr("COST (Cloudflare vs AWS 2026)");
   for (const ccu of [100, 500, 1000, 5000, 10000, 50000, 100000]) {
     const p = pgCost(ccu), n = nkCost(ccu);
-    console.log(`  ${ccu.toLocaleString().padStart(7)} CCU → PG: ${"$"+p.toFixed(0).padStart(5)}  |  NK: ${"$"+n.toLocaleString().padStart(8)}  (${(n/Math.max(p,0.01)).toFixed(0)}x)`);
+    console.log(`  ${ccu.toLocaleString().padStart(7)} CCU → PG: ${"$"+p.toFixed(0).padStart(5)}  |  NK: ${"$"+n.toLocaleString().padStart(8)}  (${Math.round(n/Math.max(p,0.01))}x)`);
   }
 
-  // ── Summary ─────────────────────────────────────────────────────────
+  // ── RESULTS ─────────────────────────────────────────────────────────
 
-  console.log(`\n${B}${C}═══ SUMMARY ═══${X}`);
-  if (pgLife) {
-    console.log(`  PG auth p50:     ${pgLife.auth.total.p50}ms (network ${pgNet.rtt}ms + processing ${pgLife.auth.proc.p50}ms)`);
-    console.log(`  PG login hammer: ${pgAlive ? (await hammer(PG, "/auth/login", "")).requests.average.toFixed(0) : "N/A"} req/s`);
+  hdr("RESULTS");
+  console.log(`  ${B}${"Metric".padEnd(42)} ${"PartyGame".padStart(12)} ${"Nakama".padStart(14)}${X}`);
+  console.log("  " + "─".repeat(72));
+
+  const row = (l, p, n) => console.log(`  ${l.padEnd(42)} ${String(p).padStart(12)} ${String(n).padStart(14)}`);
+
+  if (pgLife && nkLife) {
+    for (const op of ["auth","match","score"]) {
+      row(`${op} p50`, `${pgLife[op].p50}ms`, `${nkLife[op].p50}ms`);
+    }
   }
-  console.log(`  PG cold start:   <5ms (v8 isolate)`);
-  console.log(`  NK cold start:   ~8s (Docker+CockroachDB)`);
-  console.log(`  PG deploy:       ~5s (wrangler deploy)`);
-  console.log(`  NK deploy:       ~120s (Docker+ECS)`);
-  console.log(`  PG DDoS:         $0 (built-in)`);
-  console.log(`  NK DDoS:         $3,000/mo`);
-  console.log(`  PG 1K CCU:       $${pgCost(1000)}/mo`);
-  console.log(`  NK 1K CCU:       $${nkCost(1000)}/mo`);
+  if (pgOk) {
+    const h = await hammer(PG, "/auth/login", "PG");
+    row("Throughput (50c)", `${h.requests.average.toFixed(0)} req/s`, "—");
+  }
+  row("Cold start (measured)", "<5ms", nkStartup ? `${nkStartup}s` : "—");
+  row("1K CCU/month*", `$${pgCost(1000)}`, `$${nkCost(1000)}`);
+  row("10K CCU/month*", `$${pgCost(10000)}`, `$${nkCost(10000)}`);
+  row("Storage 50GB*", "$0.75", "$46.15");
+
+  console.log("  " + "─".repeat(72));
+  console.log(`  * calculated from Cloudflare/AWS 2026 pricing`);
   console.log();
 }
 

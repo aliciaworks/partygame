@@ -42,7 +42,7 @@ export type ModuleFlag = {
 };
 
 class PortalClient {
-  private get baseUrl() {
+  get baseUrl() {
     return localStorage.getItem(BACKEND_STORAGE_KEY) || DEFAULT_BACKEND_URL;
   }
 
