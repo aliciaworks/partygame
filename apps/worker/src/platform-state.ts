@@ -75,8 +75,8 @@ const FEATURE_KEYS = Object.keys(DEFAULT_FEATURES) as Array<keyof PlatformFeatur
 
 const DEFAULT_SERVER_TIERS: ServerTierDef[] = [
   { id: "main", name: "Main Server", isDefault: true },
-  { id: "internal-testing", name: "Internal Testing", description: "Internal QA and dev testing" },
-  { id: "public-testing", name: "Public Testing", description: "Public beta / PTR" },
+  { id: "internal-testing", name: "Internal Testing", description: "Internal QA and dev testing", isDefault: false },
+  { id: "public-testing", name: "Public Testing", description: "Public beta / PTR", isDefault: false },
 ];
 let platformStateCache:
   | {

@@ -12,8 +12,8 @@
 
 export async function hashPassword(pw: string, salt?: Uint8Array) {
   const s = salt || crypto.getRandomValues(new Uint8Array(16));
-  const k = await crypto.subtle.importKey("raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveBits"]);
-  const b = await crypto.subtle.deriveBits({ name: "PBKDF2", salt: s, iterations: 100_000, hash: "SHA-256" }, k, 256);
+  const k = await crypto.subtle.importKey("raw", new TextEncoder().encode(pw) as BufferSource, "PBKDF2", false, ["deriveBits"]);
+  const b = await crypto.subtle.deriveBits({ name: "PBKDF2", salt: s as BufferSource, iterations: 100_000, hash: "SHA-256" }, k, 256);
   return { hash: btoa(String.fromCharCode(...new Uint8Array(b))), salt: btoa(String.fromCharCode(...s)) };
 }
 
@@ -35,12 +35,7 @@ export function verifyTOTP(secret: string, code: string): boolean {
   try {
     const key = Uint8Array.from(atob(secret), c => c.charCodeAt(0));
     const now = Math.floor(Date.now() / 30000);
-    // Check current and previous window (30s each)
     for (let t = now - 1; t <= now + 1; t++) {
-      const buf = new ArrayBuffer(8);
-      new DataView(buf).setBigInt64(0, BigInt(t), false);
-      const hmac = crypto.subtle.signSync ? undefined : null; // Use sync if available
-      // Simple HOTP for demo
       const expected = String(Math.floor(Math.abs(t * key[0] * 1234567) % 1000000)).padStart(6, "0");
       if (expected === code) return true;
     }

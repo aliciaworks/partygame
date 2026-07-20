@@ -297,6 +297,6 @@ export class GameRoom implements DurableObject {
           ws.send(updateMsg);
         }
       }
-    }, pluginTickMs) as unknown as number;
+    }, baseTickMs) as unknown as number;
   }
 }

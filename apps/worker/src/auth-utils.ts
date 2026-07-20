@@ -36,9 +36,9 @@ export async function createSignedToken(playerId: string, secret: string): Promi
     exp: Math.floor(Date.now() / 1000) + 300, // 5 minutes
   })));
   const data = `${header}.${payload}`;
-  const key = await crypto.subtle.importKey("raw", encoder.encode(secret),
+  const key = await crypto.subtle.importKey("raw", encoder.encode(secret) as BufferSource,
     { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const sig = b64url(new Uint8Array(await crypto.subtle.sign("HMAC", key, encoder.encode(data))));
+  const sig = b64url(new Uint8Array(await crypto.subtle.sign("HMAC", key, encoder.encode(data) as BufferSource)));
   return `${data}.${sig}`;
 }
 
@@ -48,10 +48,10 @@ export async function verifySignedToken(token: string, secret: string): Promise<
     if (parts.length !== 3) return null;
     const [h, p] = parts;
     const data = `${h}.${p}`;
-    const key = await crypto.subtle.importKey("raw", encoder.encode(secret),
+    const key = await crypto.subtle.importKey("raw", encoder.encode(secret) as BufferSource,
       { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
     const sig = b64urlDecode(parts[2]);
-    const valid = await crypto.subtle.verify("HMAC", key, sig, encoder.encode(data));
+    const valid = await crypto.subtle.verify("HMAC", key, sig as BufferSource, encoder.encode(data) as BufferSource);
     if (!valid) return null;
     const payload = JSON.parse(decoder.decode(b64urlDecode(p)));
     if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
@@ -105,7 +105,7 @@ export async function verifyOAuthJWT(token: string, jwksUrl: string, issuer: str
     const key = await importRS256Key(jwk);
     const data = encoder.encode(`${h}.${p}`);
     const sig = b64urlDecode(parts[2]);
-    const valid = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, sig, data);
+    const valid = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, sig as BufferSource, data as BufferSource);
     return valid ? payload : null;
   } catch { return null; }
 }
