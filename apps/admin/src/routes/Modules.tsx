@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { portal, type PlatformFeatures, type PlatformState } from "../lib/portal";
-import { Button, Switch, Loader } from "./ui";
+import { Button, Switch, Loader } from "../components/ui";
 import { useTranslation } from "react-i18next";
 import { Cpu, ArrowsClockwise } from "@phosphor-icons/react";
 

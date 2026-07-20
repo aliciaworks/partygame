@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { portal } from "../lib/portal";
 import { useTranslation } from "react-i18next";
-import { Badge, Loader } from "./ui";
+import { Badge, Loader } from "../components/ui";
 import { ChartBar } from "@phosphor-icons/react";
 
 export function Dashboard() {

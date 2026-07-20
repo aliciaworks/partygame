@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { portal } from "../lib/portal";
 import { generateVariants, extractWatermark, type WatermarkProgress } from "../lib/watermark";
-import { Button, Badge, Checkbox, Loader } from "./ui";
+import { Button, Badge, Checkbox, Loader } from "../components/ui";
 import { useState, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import {

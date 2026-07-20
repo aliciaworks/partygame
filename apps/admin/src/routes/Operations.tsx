@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { portal } from "../lib/portal";
-import { Button, Badge, Loader } from "./ui";
+import { Button, Badge, Loader } from "../components/ui";
 import { useState } from "react";
 import { Terminal, Upload, Rocket, ShieldWarning } from "@phosphor-icons/react";
 

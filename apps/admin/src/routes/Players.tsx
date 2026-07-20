@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { portal } from "../lib/portal";
-import { Button, Badge, Loader } from "./ui";
+import { Button, Badge, Loader } from "../components/ui";
 import { Users, ShieldCheck, ShieldWarning } from "@phosphor-icons/react";
 
 export function Players() {
