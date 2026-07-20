@@ -278,7 +278,7 @@ import Layout from "../layouts/Layout.astro";
       </div>
 
       <p class="mt-6 text-xs text-slate-500 text-center">
-        Benchmarks verified by <code class="text-indigo-400">npm test</code>. Cloudflare Workers Free tier vs Nakama on AWS EC2 c7g.xlarge + CockroachDB + Shield Advanced.
+        Benchmarks verified by <code class="text-indigo-400">node test/benchmarks/run.mjs</code>. Cloudflare Workers <b>Paid tier</b> (no 10ms CPU limit) vs Nakama on AWS EC2 c7g.xlarge + CockroachDB + Shield Advanced. <span class="text-slate-500">Free tier is slower due to 10ms CPU cap per request.</span>
       </p>
     </div>
   </section>

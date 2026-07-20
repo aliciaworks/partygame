@@ -263,6 +263,25 @@ export default {
       console.log(`Processing message from queue:`, message.id);
       
       const data = message.body;
+      if (data.type === "LEADERBOARD_SUBMIT") {
+        // Batch leaderboard writes through the queue for lower latency
+        try {
+          await env.DB.prepare(
+            `INSERT INTO leaderboard (leaderboard_id, player_id, player_name, score) 
+             VALUES (?, ?, ?, ?) 
+             ON CONFLICT(leaderboard_id, player_id) DO UPDATE SET 
+             score = excluded.score, 
+             player_name = excluded.player_name, 
+             updated_at = CURRENT_TIMESTAMP 
+             WHERE excluded.score > leaderboard.score`
+          ).bind(data.leaderboardId, data.playerId, data.playerName, data.score).run();
+        } catch (err) {
+          console.error("Failed to process LEADERBOARD_SUBMIT", err);
+        }
+        message.ack();
+        return;
+      }
+
       if (data.type === "MATCH_END") {
         console.log(`Match ${data.matchId} ended! Processing ${data.players.length} players...`);
         

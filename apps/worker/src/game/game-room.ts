@@ -234,18 +234,22 @@ export class GameRoom implements DurableObject {
   }
 
   private startGameLoop() {
-    const pluginTickMs = this.plugin.tickIntervalMs;
-    if (pluginTickMs <= 0) return;
+    const baseTickMs = this.plugin.tickIntervalMs;
+    if (baseTickMs <= 0) return;
 
     this.interval = setInterval(() => {
       this.tick++;
 
-      // Rebuild the sessions map from active WebSockets for this tick
       const sessions = new Map<string, Session>();
       for (const ws of this.state.getWebSockets()) {
         const tags = this.state.getTags(ws);
         const playerId = tags[0] ?? "unknown";
         sessions.set(playerId, this.getOrCreateSession(ws, playerId));
+      }
+
+      // Adaptive tick: when solo, reduce to 1Hz to save CPU
+      if (sessions.size <= 1 && this.tick % Math.max(1, Math.floor(baseTickMs / 1000)) !== 0) {
+        return;
       }
 
       if (sessions.size === 0) {

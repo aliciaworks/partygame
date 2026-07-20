@@ -222,7 +222,7 @@ export const assetsModule: WorkerModule = {
           "Content-Disposition": `attachment; filename="${m.name}"`,
           "X-Asset-Variant": String(vi),
           "X-Asset-Variant-Count": String(m.variantCount),
-          "Cache-Control": "private, max-age=3600",
+          "Cache-Control": "public, max-age=86400, s-maxage=86400",
         },
       });
     });

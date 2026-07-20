@@ -57,6 +57,20 @@ export const leaderboardModule: WorkerModule<{ DB: D1Database }> = {
       const leaderboardId = c.req.param("id");
       const playerName = body.playerName || "Unknown";
 
+      // Async: write to Queue for batch processing (avoids D1 write lock contention)
+      if (c.env.MATCH_QUEUE) {
+        await c.env.MATCH_QUEUE.send({
+          type: "LEADERBOARD_SUBMIT",
+          leaderboardId,
+          playerId: body.playerId,
+          playerName,
+          score: body.score,
+          timestamp: Date.now(),
+        });
+        return c.json({ success: true, queued: true });
+      }
+
+      // Fallback: direct D1 write when Queue is unavailable
       await c.env.DB.prepare(
         `INSERT INTO leaderboard (leaderboard_id, player_id, player_name, score) 
          VALUES (?, ?, ?, ?) 
