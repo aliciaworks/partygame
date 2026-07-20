@@ -14,6 +14,7 @@ export type PlatformFeatures = {
   leaderboard: boolean;
   friends: boolean;
   playerProfile: boolean;
+  watermark: boolean;
 };
 
 export type MaintenanceWindow = {
@@ -143,6 +144,63 @@ class PortalClient {
   
   logout() {
     localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
+  }
+
+  // ── Assets & Watermarking ───────────────────────────────────────────
+
+  async createAsset(config: {
+    name: string;
+    tags?: string[];
+    watermarkEnabled?: boolean;
+    variantCount?: number;
+    serverTiers?: string[];
+  }): Promise<{
+    assetId: string;
+    manifest: Record<string, unknown>;
+    uploadUrls: { variantIndex: number; uploadUrl: string }[];
+    variantCount: number;
+  }> {
+    return this.request("/admin/assets", {
+      method: "POST",
+      body: JSON.stringify(config),
+    });
+  }
+
+  async uploadAssetVariant(
+    assetId: string,
+    variantIndex: number,
+    data: ArrayBuffer,
+  ): Promise<{ success: boolean }> {
+    const url = new URL(`/admin/assets/${assetId}/variant/${variantIndex}/upload`, this.baseUrl);
+    const headers = new Headers();
+    headers.set("Content-Type", "application/octet-stream");
+    if (this.token) headers.set("Authorization", `Bearer ${this.token}`);
+    const r = await fetch(url.toString(), { method: "PUT", body: data, headers });
+    if (!r.ok) throw new Error(`Upload failed: ${r.status}`);
+    return r.json();
+  }
+
+  async getAssets(): Promise<{ assets: Record<string, unknown>[] }> {
+    return this.request("/admin/assets");
+  }
+
+  async deleteAsset(assetId: string): Promise<{ success: boolean }> {
+    return this.request(`/admin/assets/${assetId}`, { method: "DELETE" });
+  }
+
+  async extractWatermark(data: ArrayBuffer): Promise<{
+    found: boolean;
+    variantIndex?: number;
+    payload?: string;
+    message?: string;
+  }> {
+    const url = new URL("/admin/assets/forensic/watermark", this.baseUrl);
+    const headers = new Headers();
+    headers.set("Content-Type", "application/octet-stream");
+    if (this.token) headers.set("Authorization", `Bearer ${this.token}`);
+    const r = await fetch(url.toString(), { method: "POST", body: data, headers });
+    if (!r.ok) throw new Error(`Forensic failed: ${r.status}`);
+    return r.json();
   }
 }
 

@@ -5,6 +5,7 @@
   "nav": {
     "dashboard": "仪表盘",
     "modules": "功能模块",
+    "assets": "资产管理",
     "operations": "运维操作",
     "players": "玩家管理",
     "settings": "设置",
@@ -37,6 +38,36 @@
     "matchmaking": "匹配系统",
     "leaderboard": "排行榜",
     "friends": "好友系统",
-    "playerProfile": "玩家档案"
+    "playerProfile": "玩家档案",
+    "watermark": "隐藏水印"
+  },
+  "assets": {
+    "title": "资产管理",
+    "upload_title": "上传资源",
+    "upload_desc": "上传游戏资源，支持隐藏水印和 A/B/C 测试变体。",
+    "name_label": "资源名称",
+    "file_label": "资源文件",
+    "watermark_enable": "启用隐藏水印",
+    "variant_count": "A/B/C 测试变体数",
+    "variant_hint": "生成 {{count}} 个带有唯一水印的副本。",
+    "processing": "正在处理变体...",
+    "uploading": "上传中...",
+    "upload_watermarked": "上传 {{count}} 个变体",
+    "upload_btn": "上传资源",
+    "asset_list": "已部署资源",
+    "col_name": "名称",
+    "col_id": "资源 ID",
+    "col_variants": "变体数",
+    "col_size": "大小",
+    "col_date": "上传时间",
+    "col_status": "状态",
+    "col_actions": "操作",
+    "empty": "暂无已上传资源。",
+    "forensic_title": "溯源取证",
+    "forensic_desc": "上传泄露文件，提取隐藏水印以追踪泄露源头。",
+    "extract_btn": "提取",
+    "watermark_found": "发现水印！",
+    "watermark_not_found": "未发现水印块。",
+    "variant_label": "变体索引"
   }
 }

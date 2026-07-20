@@ -14,6 +14,7 @@ import { playerProfileModule } from "./player_profile/index";
 import { economyModule } from "./economy/index";
 // import { guildsModule } from "./guilds/index";
 import { seasonsModule } from "./seasons/index";
+import { assetsModule } from "./assets/index";
 
 export type ModuleManifest = {
   id: string;
@@ -42,6 +43,7 @@ const defaultModules = [
   economyModule,
   // guildsModule,
   seasonsModule,
+  assetsModule,
 ] as const;
 
 export function getModuleManifests(): ModuleManifest[] {

@@ -14,6 +14,7 @@ const Modules = React.lazy(() => import("./routes/Modules").then(m => ({ default
 const Players = React.lazy(() => import("./routes/Players").then(m => ({ default: m.Players })));
 const Operations = React.lazy(() => import("./routes/Operations").then(m => ({ default: m.Operations })));
 const Settings = React.lazy(() => import("./routes/Settings").then(m => ({ default: m.Settings })));
+const Assets = React.lazy(() => import("./routes/Assets").then(m => ({ default: m.Assets })));
 
 const queryClient = new QueryClient();
 
@@ -37,6 +38,10 @@ const router = createBrowserRouter([
       {
         path: "players",
         element: <Players />,
+      },
+      {
+        path: "assets",
+        element: <Assets />,
       },
       {
         path: "settings",

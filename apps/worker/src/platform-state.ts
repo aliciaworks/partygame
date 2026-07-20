@@ -9,6 +9,7 @@ export type PlatformFeatures = {
   seasons: boolean;
   replays: boolean;
   guilds: boolean;
+  watermark: boolean;
 };
 
 export type Deprecation = {
@@ -30,6 +31,13 @@ export type CurrencyDef = {
   type: "hard" | "soft";
 };
 
+export type ServerTierDef = {
+  id: string;
+  name: string;
+  description?: string;
+  isDefault: boolean;
+};
+
 export type PlatformState = {
   features: PlatformFeatures;
   currencies: Record<string, CurrencyDef>;
@@ -37,10 +45,11 @@ export type PlatformState = {
     currentSeasonId: string;
     endsAt: string;
   };
-  apiVersion: string; // ISO date (YYYY-MM-DD) - deployment date
-  minClientVersion?: string; // minimum required client version (SemVer)
-  deprecations: Deprecation[]; // APIs scheduled for removal
+  apiVersion: string;
+  minClientVersion?: string;
+  deprecations: Deprecation[];
   maintenance?: MaintenanceWindow;
+  serverTiers: ServerTierDef[];
   revision: number;
   updatedAt: string;
 };
@@ -59,6 +68,7 @@ const DEFAULT_FEATURES: PlatformFeatures = {
   seasons: true,
   replays: true,
   guilds: true,
+  watermark: false,
 };
 
 const FEATURE_KEYS = Object.keys(DEFAULT_FEATURES) as Array<keyof PlatformFeatures>;
