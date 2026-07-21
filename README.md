@@ -4,6 +4,9 @@ An open-source, serverless game backend engine built natively on Cloudflare's ed
 
 Designed for indie developers and studios. Zero server maintenance. Zero idle cost. Pay only when players are online.
 
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/aliciaworks/partygame)
+[![Live Demo](https://img.shields.io/badge/Demo-Admin%20Panel-6366f1?style=for-the-badge)](https://partygame-example-backend.aliciaworks.workers.dev/admin/)
+
 ---
 
 ## Features
