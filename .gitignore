@@ -16,6 +16,10 @@ build/
 # Cloudflare & Wrangler
 .wrangler/
 
+# Generated Admin SPA (built by build-admin script)
+apps/worker/admin-dist/
+apps/worker/src/admin-index.generated.ts
+
 # Environment files
 .env
 .env.local

@@ -1,5 +1,5 @@
 export const DEFAULT_BACKEND_URL =
-  "https://partygame-example-backend.aliciaworks.workers.dev/";
+  (typeof window !== "undefined" ? window.location.origin + "/" : "http://localhost:8787/");
 
 export const BACKEND_STORAGE_KEY = "partygame.portal.backendUrl";
 export const ADMIN_TOKEN_STORAGE_KEY = "partygame.portal.adminToken";

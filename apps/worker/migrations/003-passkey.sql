@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS passkey_credentials (
   id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL REFERENCES user(id),
+  user_id TEXT NOT NULL REFERENCES admin_users(id),
   credential_id TEXT UNIQUE NOT NULL,
   public_key TEXT NOT NULL,
   counter INTEGER DEFAULT 0,
