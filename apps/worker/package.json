@@ -6,7 +6,7 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "deploy": "npm run build-admin && wrangler deploy",
-    "build-admin": "cd ../admin && npm run build && cd ../.. && node scripts/generate-admin-index.js && rm -rf apps/worker/admin-dist && mkdir -p apps/worker/admin-dist/admin && cp -r apps/admin/build/* apps/worker/admin-dist/admin/",
+    "build-admin": "npm install --workspace=@partygame/admin && cd ../.. && npm run build --workspace=@partygame/admin && node scripts/generate-admin-index.js && rm -rf apps/worker/admin-dist && mkdir -p apps/worker/admin-dist/admin && cp -r apps/admin/build/* apps/worker/admin-dist/admin/",
     "generate-sdk": "ts-node scripts/generate-sdk.ts"
   },
   "dependencies": {
